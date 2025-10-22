@@ -1,0 +1,20 @@
+# File: server/.gitignore
+
+# dependencies
+node_modules
+
+# environment variables
+# Rất quan trọng: Không bao giờ commit file .env
+.env
+
+# logs
+*.log
+npm-debug.log*
+
+# system files
+.DS_Store
+Thumbs.db
+
+# editor directories
+.vscode
+.idea
