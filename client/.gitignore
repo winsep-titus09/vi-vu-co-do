@@ -1,5 +1,22 @@
-# Logs
-logs
+# ================================
+# 📦 NODE & BUILD
+# ================================
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+.env
+.env.*
+*.env.local
+*.env.development.local
+*.env.production.local
+*.env.test.local
+
+# ================================
+# ⚙️ LOGS
+# ================================
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,18 +24,92 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# ================================
+# 🧩 SYSTEM / OS FILES
+# ================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
 
-# Editor directories and files
+# ================================
+# 💻 IDE & EDITOR CONFIG
+# ================================
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# ================================
+# 🪶 FRONTEND — React JSX (Vite)
+# ================================
+# Cache và build tạm
+vite.svg
+vite.config.temp.js
+
+# Tailwind
+.tailwind-cache/
+.postcssrc
+postcss.config.cjs
+
+# ================================
+# 🎨 IMAGES / ASSETS
+# ================================
+# Không commit ảnh thật hoặc upload từ Cloudflare
+/public/images/uploads/
+/public/images/**/*.jpg
+/public/images/**/*.jpeg
+/public/images/**/*.png
+/public/images/**/*.webp
+/public/images/**/*.gif
+/public/images/**/*.svg
+
+# Cho phép ảnh placeholder nhẹ
+!/public/images/placeholders/
+
+# ================================
+# 🧠 DOCUMENTATION / LOCAL TEST
+# ================================
+__tests__/
+coverage/
+*.spec.js
+*.test.js
+*.test.jsx
+*.bak
+*.tmp
+*.temp
+
+# ================================
+# 🧩 SERVER (Node/Express local)
+# ================================
+/server/node_modules/
+/server/dist/
+/server/.env
+/server/logs/
+/server/debug.log
+/server/error.log
+
+# ================================
+# ☁️ CLOUDFLARE / R2 / DEPLOYMENT
+# ================================
+# Không lưu file config cá nhân hoặc credential
+.r2-creds
+cloudflare.json
+*.pem
+*.key
+*.crt
+
+# ================================
+# 🧱 MISC
+# ================================
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+npm-debug.log*
+.idea_modules/
+tmp/
+temp/

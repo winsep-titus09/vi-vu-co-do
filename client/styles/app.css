@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+/* =======================================
+   🎨 THEME TOKENS — Tailwind v4.1
+   ======================================= */
+@theme {
+  /* ---- Colors ---- */
+  --color-primary: #5b3d7c; /* Tím Huế (màu chủ đạo, nút bấm, tiêu đề) */
+  --color-primary-light: #ede9f2; /* Tím nhạt (nền footer, hover) */
+  --color-secondary: #d4af37; /* Vàng Cung Đình (tag, icon sao, điểm nhấn) */
+  --color-accent: #4c6a5a; /* Xanh Sông Hương (tag, icon danh mục) */
+
+  --color-text-primary: #3a3a3a; /* Xám đen (chữ chính, tiêu đề) */
+  --color-text-secondary: #6b6b6b; /* Xám nhạt (chữ phụ, mô tả) */
+
+  --color-bg-main: #fcfaf5; /* Be ấm (nền chính toàn trang) */
+  --color-bg-card: #ffffff; /* Trắng (nền thẻ, navbar) */
+
+  --color-border-light: #efebe6; /* Màu viền (phân cách thẻ, footer) */
+
+  /* ---- Fonts ---- */
+  --font-heading: "Playfair Display", serif; /* Cho h1–h6 */
+  --font-body: Inter, ui-sans-serif, system-ui, sans-serif; /* Nội dung chính */
+
+  /* ---- Radius ---- */
+  --radius-card: 12px; /* 0.75rem */
+  --radius-btn: 8px; /* 0.5rem  */
+  --radius-input: 6px; /* 0.375rem*/
+
+  /* ---- Shadows ---- */
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-input: 0 1px 3px rgba(0, 0, 0, 0.03);
+  --shadow-nav: 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  /* ---- Typography scale ---- */
+  --text-h1: 48px;
+  --text-h2: 40px;
+  --text-h3: 32px;
+  --text-h4: 24px;
+  --text-h5: 20px;
+  --text-h6: 18px;
+
+  --leading-tight: 1.15;
+  --leading-normal: 1.4;
+}
+
+/* =======================================
+   🧱 BASE STYLES
+   ======================================= */
+html,
+body {
+  @apply bg-bg-main text-text-primary font-body;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  @apply font-heading text-text-primary;
+}
+h1 {
+  @apply text-h1 leading-tight;
+}
+h2 {
+  @apply text-h2 leading-tight;
+}
+h3 {
+  @apply text-h3 leading-tight;
+}
+h4 {
+  @apply text-h4 leading-normal;
+}
+h5 {
+  @apply text-h5 leading-normal;
+}
+h6 {
+  @apply text-h6 leading-normal;
+}
+
+/* =======================================
+   🧩 CUSTOM UTILITIES
+   ======================================= */
+
+/* ----- Layout ----- */
+@utility container-main {
+  @apply max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* ----- Card ----- */
+@utility card {
+  @apply bg-bg-card rounded-card shadow-card border border-border-light;
+}
+
+/* ----- Input / Form ----- */
+@utility input-base {
+  @apply rounded-input shadow-input border border-border-light bg-bg-card
+         text-text-primary placeholder:text-text-secondary;
+}
+
+@utility select-base {
+  @apply input-base pr-8 appearance-none bg-[right_0.75rem_center] bg-no-repeat;
+}
+
+@utility textarea-base {
+  @apply input-base min-h-28;
+}
+
+@utility input-error {
+  @apply border-[#e5484d] focus-visible:ring-[#e5484d]/30;
+}
+
+@utility help-text {
+  @apply text-xs text-text-secondary mt-1;
+}
+
+/* ----- Navbar Shadow ----- */
+@utility nav-elevated {
+  @apply shadow-nav bg-bg-card;
+}
+
+/* =======================================
+   🪶 BUTTON SYSTEM (v4.1 preset)
+   ======================================= */
+@utility btn {
+  @apply inline-flex items-center justify-center rounded-btn font-medium
+         transition-[background,opacity,transform,box-shadow] duration-150
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30
+         disabled:opacity-50 disabled:pointer-events-none gap-2;
+}
+
+@utility btn-primary {
+  @apply btn bg-primary text-white hover:bg-primary/90 active:scale-[.99];
+}
+
+@utility btn-secondary {
+  @apply btn bg-secondary text-gray-900 hover:bg-secondary/90 active:scale-[.99];
+}
+
+@utility btn-outline {
+  @apply btn bg-transparent border border-border-light text-text-primary hover:bg-primary-light;
+}
+
+@utility btn-ghost {
+  @apply btn bg-transparent text-text-primary hover:bg-primary-light;
+}
+
+/* Kích thước */
+@utility btn-sm {
+  @apply h-9 px-3 text-sm;
+}
+@utility btn-md {
+  @apply h-10 px-4 text-sm;
+}
+@utility btn-lg {
+  @apply h-11 px-5 text-base;
+}
+
+/* Icon only */
+@utility btn-icon {
+  @apply btn h-10 w-10 p-0;
+}
+
+/* =======================================
+   🏷 CHIP / TAG
+   ======================================= */
+@utility chip {
+  @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium
+         border border-border-light bg-bg-card;
+}
+
+@utility chip-accent {
+  @apply chip text-accent border-accent/30 bg-accent/10;
+}
+
+@utility chip-secondary {
+  @apply chip text-gray-900 bg-secondary/10 border-secondary/30;
+}
