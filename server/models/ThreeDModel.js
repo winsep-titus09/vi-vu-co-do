@@ -4,7 +4,11 @@ const ThreeDModelSchema = new mongoose.Schema(
         name: { type: String, required: true, trim: true },
         description: String,
         file_url: { type: String, required: true }, // .glb / .gltf
-        file_type: { type: String, enum: ["glb", "gltf"], required: true },
+        file_type: {
+            type: String,
+            enum: ["glb", "gltf", "panorama"],
+            required: true,
+        },
         thumbnail_url: { type: String },
         hotspots: [{ x: Number, y: Number, z: Number, label: String }],
         locationId: { type: mongoose.Schema.Types.ObjectId, ref: "Location" },

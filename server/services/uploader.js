@@ -77,3 +77,28 @@ export const deleteFromCloudinary = async (publicId, resourceType = "image") => 
         console.warn("Cloudinary destroy error:", e.message);
     }
 };
+
+// === Upload file 3D (.glb/.gltf) ===
+export const uploadRawBufferToCloudinary = (buffer, folder, options = {}) =>
+    new Promise((resolve, reject) => {
+        const cloudFolder = [process.env.CLOUDINARY_FOLDER, folder]
+            .filter(Boolean)
+            .join("/");
+
+        const uploadOptions = {
+            folder: cloudFolder,
+            resource_type: "raw", // để Cloudinary nhận .glb/.gltf
+            overwrite: true,
+            use_filename: true,
+            unique_filename: true,
+            allowed_formats: ["glb", "gltf"],
+            ...options,
+        };
+
+        const stream = cloudinary.uploader.upload_stream(uploadOptions, (err, result) => {
+            if (err) return reject(err);
+            resolve(result);
+        });
+
+        streamifier.createReadStream(buffer).pipe(stream);
+    });

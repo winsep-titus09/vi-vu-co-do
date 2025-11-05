@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
+import slugify from "slugify";
 const LocationSchema = new mongoose.Schema(
     {
         name: { type: String, required: true, trim: true },
+        slug: { type: String, unique: true, index: true },
         description: String,
         address: String,
         coords: {
@@ -14,5 +16,14 @@ const LocationSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+// ✅ Tự động tạo slug trước khi lưu
+LocationSchema.pre("save", function (next) {
+    if (this.isModified("name") || !this.slug) {
+        this.slug = slugify(this.name, { lower: true, strict: true });
+    }
+    next();
+});
+
 LocationSchema.index({ coords: "2dsphere" });
 export default mongoose.model("Location", LocationSchema, "locations");
