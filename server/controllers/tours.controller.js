@@ -1,173 +1,374 @@
 // server/controllers/tours.controller.js
-import slugify from "slugify";
 import mongoose from "mongoose";
+import slugify from "slugify";
+
 import Tour from "../models/Tour.js";
+import Location from "../models/Location.js";
 import User from "../models/User.js";
+import TourCategory from "../models/TourCategory.js";
 import GuideProfile from "../models/GuideProfile.js";
-import { createTourSchema } from "../utils/validator.js";
 
-const toObjectId = (id) => new mongoose.Types.ObjectId(id);
+import { createTourSchema, updateTourSchema } from "../utils/validator.js";
+import { notifyAdmins, notifyUser } from "../services/notify.js";
 
-const ensureUniqueSlug = async (base) => {
-    let slug = slugify(base, { lower: true, strict: true });
-    if (!slug) slug = "tour";
-    let i = 0;
-    while (await Tour.exists({ slug })) {
-        i += 1;
-        slug = `${slugify(base, { lower: true, strict: true })}-${i}`;
-    }
+// Lọc chỉ tour đã duyệt (public)
+const buildPublicFilter = () => ({
+    "approval.status": "approved",
+    status: "active",
+});
+
+slugify.extend({ "đ": "d", "Đ": "D" });
+async function makeUniqueSlug(Model, name) {
+    const base = slugify(name, { lower: true, strict: true, locale: "vi" });
+    let slug = base, i = 2;
+    while (await Model.exists({ slug })) slug = `${base}-${i++}`;
     return slug;
+}
+
+function asConflictIfDuplicate(err) {
+    if (err?.code === 11000) {
+        const key = err?.keyPattern ? Object.keys(err.keyPattern)[0] : null;
+        let message = "Dữ liệu đã tồn tại.";
+        if (key === "slug") message = "Tên tour đã tồn tại (slug bị trùng). Hãy đổi tên hoặc chỉnh lại slug.";
+        if (key === "name") message = "Tên tour đã tồn tại. Hãy chọn tên khác.";
+        return { status: 409, body: { message, duplicateKey: key, keyValue: err?.keyValue || null } };
+    }
+    return null;
+}
+
+async function resolveRoleName(user) {
+    const val = [user?.role_id?.name, user?.role?.name, user?.roleName, user?.role]
+        .find(Boolean);
+    return (val || "").toString().trim().toLowerCase();
+}
+
+/** GET /api/tours?q=&category_id=&page=&limit= */
+export const listTours = async (req, res) => {
+    try {
+        const { q, category_id, page = 1, limit = 12 } = req.query;
+        const filter = buildPublicFilter();
+
+        if (q) filter.name = { $regex: q, $options: "i" };
+        if (category_id && mongoose.isValidObjectId(category_id)) {
+            filter.$or = [{ category_id }, { categories: category_id }];
+        }
+
+        const pg = Math.max(parseInt(page) || 1, 1);
+        const lm = Math.min(Math.max(parseInt(limit) || 12, 1), 100);
+
+        const [items, total] = await Promise.all([
+            Tour.find(filter)
+                .populate("category_id", "name")
+                .populate("guides.guideId", "name avatar_url")
+                .populate("locations.locationId", "name slug")
+                .sort({ createdAt: -1 })
+                .skip((pg - 1) * lm)
+                .limit(lm),
+            Tour.countDocuments(filter),
+        ]);
+
+        return res.json({ items, total, page: pg, pageSize: lm });
+    } catch (err) {
+        console.error("listTours error:", err);
+        return res.status(500).json({ message: "Lỗi máy chủ." });
+    }
 };
 
+/** GET /api/tours/:token (id hoặc slug) */
+export const getTour = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const isOid = mongoose.isValidObjectId(token);
+        const filter = buildPublicFilter();
+
+        const cond = isOid ? { _id: token, ...filter } : { slug: token, ...filter };
+        const tour = await Tour.findOne(cond)
+            .populate("category_id", "name")
+            .populate("guides.guideId", "name avatar_url")
+            .populate("locations.locationId", "name slug")
+            .lean();
+
+        if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
+
+        return res.json(tour); // <-- FIX: trả về tour
+    } catch (err) {
+        console.error("getTour error:", err);
+        return res.status(500).json({ message: "Lỗi máy chủ." });
+    }
+};
+
+/** POST /api/tours  (Admin trực tiếp) */
 export const createTour = async (req, res) => {
     try {
-        const role = req.user?.role_id?.name; // 'admin' | 'guide' | 'tourist'
-        if (!["admin", "guide"].includes(role)) {
-            return res.status(403).json({ message: "Chỉ admin hoặc hướng dẫn viên mới được tạo tour." });
+        const roleName = await resolveRoleName(req.user);
+        if (!["admin", "guide"].includes(roleName)) {
+            return res.status(403).json({ message: "Bạn không có quyền tạo tour." });
+        }
+        // HDV không được tạo trực tiếp (theo flow hiện tại)
+        if (roleName === "guide") {
+            return res.status(403).json({ message: "HDV không được tạo tour trực tiếp. Vui lòng gửi yêu cầu tại /api/tour-requests." });
         }
 
-        const parsed = createTourSchema.safeParse(req.body);
+        // Không cho override approval từ body
+        const { approval, ...incoming } = req.body || {};
+        const parsed = createTourSchema.safeParse(incoming);
         if (!parsed.success) {
-            const msg = parsed.error.issues.map(i => i.message).join("; ");
-            return res.status(400).json({ message: "Dữ liệu không hợp lệ", details: msg });
+            return res.status(400).json({ message: "Dữ liệu không hợp lệ.", errors: parsed.error.flatten() });
         }
-        const payload = parsed.data;
+        const data = parsed.data;
 
-        // Tạo slug duy nhất
-        const slug = await ensureUniqueSlug(payload.name);
-
-        // Khung tour ban đầu
-        const doc = {
-            name: payload.name,
-            slug,
-            description: payload.description,
-            duration: payload.duration,
-            price: payload.price,
-            max_guests: payload.max_guests,
-            category_id: payload.category_id ? toObjectId(payload.category_id) : undefined,
-            cover_image_url: payload.cover_image_url ?? null,
-            gallery: payload.gallery,
-            itinerary: payload.itinerary,
-            featured: payload.featured,
-            status: payload.status,           // active/inactive (hiển thị)
-            free_under_age: payload.free_under_age,
-            guides: [],
-            locations: payload.locations?.map(l => ({ locationId: toObjectId(l.locationId), order: l.order })),
-            created_by: req.user._id,         // NEW
-            approval_status: "pending"        // default, sẽ sửa nếu admin
-        };
-
-        if (role === "guide") {
-            // guide tạo → chờ duyệt
-            doc.guide_id = req.user._id; // giữ tương thích legacy
-            doc.guides = [{ guideId: req.user._id, isMain: true }];
-            doc.approval_status = "pending";
+        // ---- VALIDATE LOCATIONS (bắt buộc) ----
+        const locations = Array.isArray(data.locations) ? data.locations : [];
+        if (!locations.length) {
+            return res.status(400).json({ message: "Cần chọn ít nhất 1 địa điểm cho tour." });
         }
+        const locationIds = locations.map(i => i.locationId);
+        const locCount = await Location.countDocuments({ _id: { $in: locationIds } });
+        if (locCount !== locationIds.length) {
+            return res.status(400).json({ message: "Danh sách địa điểm có phần tử không tồn tại." });
+        }
+        // Chuẩn hoá order & sort
+        const normalizedLocations = locations
+            .map((x, i) => ({ locationId: x.locationId, order: typeof x.order === "number" ? x.order : i }))
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-        if (role === "admin") {
-            // admin tạo → duyệt ngay
-            doc.approval_status = "approved";
-
-            // Nếu admin truyền sẵn guides → kiểm tra tồn tại & đúng role
-            if (payload.guides?.length) {
-                const guideIds = payload.guides.map(g => toObjectId(g.guideId));
-                const guides = await User.find({ _id: { $in: guideIds } }).populate("role_id");
-                const invalid = guides.filter(u => u?.role_id?.name !== "guide" || u.status !== "active");
-                if (invalid.length) {
-                    return res.status(400).json({ message: "Có HDV không hợp lệ hoặc không hoạt động." });
-                }
-                doc.guides = payload.guides.map(g => ({
-                    guideId: toObjectId(g.guideId),
-                    isMain: !!g.isMain
-                }));
-                // Nếu có HDV main → đồng bộ legacy guide_id
-                const main = doc.guides.find(g => g.isMain);
-                if (main) doc.guide_id = main.guideId;
-            } else {
-                // Không đính kèm HDV nào → để khách tự chọn HDV khả dụng khi đặt
-                doc.guides = [];
-                doc.guide_id = undefined;
+        // ---- VALIDATE CATEGORIES ----
+        const categories = (data.categories && data.categories.length)
+            ? data.categories
+            : (data.category_id ? [data.category_id] : []);
+        if (categories.length) {
+            const catCount = await TourCategory.countDocuments({ _id: { $in: categories } });
+            if (catCount !== categories.length) {
+                return res.status(400).json({ message: "Danh sách danh mục có phần tử không tồn tại." });
             }
         }
 
-        const created = await Tour.create(doc);
-        // Chuẩn hoá giá về number cho response
-        const json = created.toObject();
-        json.price = created.priceNumber;
+        // ---- Flexible date defaults (nếu validator chưa set) ----
+        const allow_custom_date = (data.allow_custom_date !== undefined) ? !!data.allow_custom_date : true;
+        const fixed_departure_time = data.fixed_departure_time || "08:00";
+        const min_days_before_start = Number.isInteger(data.min_days_before_start) ? data.min_days_before_start : 0;
+        const max_days_advance = Number.isInteger(data.max_days_advance) ? data.max_days_advance : 180;
+        const closed_weekdays = Array.isArray(data.closed_weekdays) ? data.closed_weekdays : [];
+        const blackout_dates = Array.isArray(data.blackout_dates) ? data.blackout_dates : [];
+        const per_date_capacity = (data.per_date_capacity === null || data.per_date_capacity === undefined)
+            ? null
+            : Number(data.per_date_capacity);
 
-        return res.status(201).json({ message: "Tạo tour thành công", data: json });
+        // ---- slug duy nhất từ name ----
+        const slug = await makeUniqueSlug(Tour, data.name);
+
+        // ---- Tạo Tour ----
+        const tour = await Tour.create({
+            slug,
+            name: data.name,
+            description: data.description,
+            duration: data.duration,
+            price: data.price,
+            max_guests: data.max_guests,
+            category_id: data.category_id || null,
+            categories,
+            cover_image_url: data.cover_image_url || null,
+            gallery: data.gallery || [],
+            itinerary: data.itinerary || [],
+            featured: !!data.featured,
+            status: data.status || "active",
+
+            // trace
+            created_by: req.user._id,
+            created_by_role: roleName,
+
+            // phê duyệt: admin tạo -> approved
+            approval: { status: "approved", reviewed_by: req.user._id, reviewed_at: new Date(), notes: null },
+
+            // quan hệ
+            guides: data.guides || [],
+            locations: normalizedLocations,
+
+            // ---- NGÀY LINH HOẠT + GIỜ CỐ ĐỊNH ----
+            allow_custom_date,
+            fixed_departure_time,
+            min_days_before_start,
+            max_days_advance,
+            closed_weekdays,
+            blackout_dates,
+            per_date_capacity,
+        });
+
+        // 🔔 Thông báo cho team admin
+        try {
+            const adminName = req.user?.name || "Admin";
+            await notifyAdmins({
+                type: "tour:created",
+                content: `${adminName} đã tạo tour mới: ${tour.name}`,
+                url: `/admin/tours/${tour._id}`,
+                meta: { tourId: tour._id.toString(), slug: tour.slug },
+            });
+        } catch (e) {
+            console.warn("notifyAdmins tour:created failed:", e?.message);
+        }
+
+        // 🔔 (tuỳ chọn) notify các HDV được gán
+        try {
+            if (Array.isArray(tour.guides) && tour.guides.length) {
+                for (const g of tour.guides) {
+                    if (!g?.guideId) continue;
+                    await notifyUser({
+                        userId: g.guideId,
+                        type: "tour:assigned",
+                        content: `Bạn được chỉ định làm HDV cho tour: "${tour.name}"`,
+                        url: `/tours/${tour.slug}`,
+                        meta: { tourId: tour._id.toString(), isMain: !!g.isMain },
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn("notifyUser tour:assigned failed:", e?.message);
+        }
+
+        return res.status(201).json(tour);
     } catch (err) {
+        const mapped = asConflictIfDuplicate(err);
+        if (mapped) return res.status(mapped.status).json(mapped.body);
         console.error("createTour error:", err);
-        return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+        return res.status(500).json({ message: "Lỗi máy chủ." });
     }
 };
 
-// (Optional) liệt kê HDV khả dụng (đơn giản): role=guide, user.active & profile approved
+/** PATCH /api/tours/:id  (admin; guide chỉ sửa tour của mình khi còn pending) */
+export const updateTour = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "ID không hợp lệ." });
+
+        const roleName = await resolveRoleName(req.user);
+
+        const tour = await Tour.findById(id);
+        if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
+
+        if (roleName === "guide") {
+            const isOwner = tour.created_by?.toString() === req.user._id.toString();
+            const isPending = tour.approval?.status === "pending";
+            if (!isOwner || !isPending) {
+                return res.status(403).json({ message: "Bạn chỉ có thể sửa tour mình tạo khi còn chờ duyệt." });
+            }
+        } else if (roleName !== "admin") {
+            return res.status(403).json({ message: "Bạn không có quyền sửa tour." });
+        }
+
+        const parsed = updateTourSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({ message: "Dữ liệu không hợp lệ.", errors: parsed.error.flatten() });
+        }
+        const data = parsed.data;
+
+        // cập nhật name -> slug duy nhất
+        if (data.name && data.name !== tour.name) {
+            tour.slug = await makeUniqueSlug(Tour, data.name);
+        }
+
+        // validate locations nếu gửi lên
+        if (data.locations?.length) {
+            const ids = data.locations.map((x) => x.locationId);
+            const count = await Location.countDocuments({ _id: { $in: ids } });
+            if (count !== ids.length) {
+                return res.status(400).json({ message: "Danh sách địa điểm có phần tử không tồn tại." });
+            }
+            // chuẩn hoá & sort
+            data.locations = data.locations
+                .map((x, i) => ({ locationId: x.locationId, order: typeof x.order === "number" ? x.order : i }))
+                .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        }
+
+        // validate categories nếu có
+        if (data.categories?.length) {
+            const catCount = await TourCategory.countDocuments({ _id: { $in: data.categories } });
+            if (catCount !== data.categories.length) {
+                return res.status(400).json({ message: "Danh sách danh mục có phần tử không tồn tại." });
+            }
+        } else if (data.category_id && mongoose.isValidObjectId(data.category_id)) {
+            // single category_id ok
+        }
+
+        if (roleName === "guide") {
+            // guide không được sửa approval
+            delete data.approval;
+            // nếu sửa guides thì đảm bảo bản thân là isMain
+            if (data.guides) {
+                const me = req.user._id.toString();
+                const hasMe = data.guides.some((g) => g.guideId?.toString() === me);
+                if (!hasMe) data.guides.unshift({ guideId: req.user._id, isMain: true });
+                data.guides = data.guides.map((g) => ({ ...g, isMain: g.guideId?.toString() === me }));
+            }
+        }
+
+        Object.assign(tour, data);
+        await tour.save();
+
+        return res.json(tour);
+    } catch (err) {
+        const mapped = asConflictIfDuplicate(err);
+        if (mapped) return res.status(mapped.status).json(mapped.body);
+        console.error("updateTour error:", err);
+        return res.status(500).json({ message: "Lỗi máy chủ." });
+    }
+};
+
+/** DELETE /api/tours/:id  (admin; guide chỉ xóa tour của mình khi pending) */
+export const deleteTour = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "ID không hợp lệ." });
+
+        const roleName = await resolveRoleName(req.user);
+
+        const tour = await Tour.findById(id);
+        if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
+
+        if (roleName === "guide") {
+            const isOwner = tour.created_by?.toString() === req.user._id.toString();
+            const isPending = tour.approval?.status === "pending";
+            if (!isOwner || !isPending) {
+                return res.status(403).json({ message: "Bạn chỉ có thể xóa tour mình tạo khi còn chờ duyệt." });
+            }
+        } else if (roleName !== "admin") {
+            return res.status(403).json({ message: "Bạn không có quyền xóa tour." });
+        }
+
+        await tour.deleteOne();
+        return res.json({ message: "Đã xóa tour." });
+    } catch (err) {
+        console.error("deleteTour error:", err);
+        return res.status(500).json({ message: "Lỗi máy chủ." });
+    }
+};
+
+/** GET /api/tours/available-guides  (admin dùng khi tạo tour trực tiếp) */
 export const listAvailableGuides = async (req, res) => {
     try {
-        const q = (req.query.q || "").trim();
-        const date = req.query.date; // để dành mở rộng kiểm tra lịch bận
+        const users = await User.find()
+            .populate({
+                path: "role_id",
+                match: { name: "guide" },
+                select: "name",
+            })
+            .select("name avatar_url role_id")
+            .lean();
 
-        // filter cơ bản
-        const guides = await User.find().populate("role_id");
-        const filtered = guides.filter(u => u?.role_id?.name === "guide" && u.status === "active");
+        const guideUsers = users
+            .filter((u) => u.role_id?.name === "guide")
+            .map((u) => ({ _id: u._id, name: u.name, avatar_url: u.avatar_url }));
 
-        // join profile để kiểm tra profile.status
-        const guideIds = filtered.map(u => u._id);
-        const profiles = await GuideProfile.find({ user_id: { $in: guideIds }, status: "approved" });
-        const profileMap = new Map(profiles.map(p => [String(p.user_id), p]));
+        const profiles = await GuideProfile.find({
+            status: "approved",
+            user_id: { $in: guideUsers.map((g) => g._id) }
+        }).select("user_id").lean();
 
-        let result = filtered
-            .filter(u => profileMap.has(String(u._id)))
-            .filter(u => !q || u.name.toLowerCase().includes(q.toLowerCase()))
-            .map(u => ({
-                id: u._id,
-                name: u.name,
-                avatar_url: u.avatar_url || null,
-                phone_number: u.phone_number || null
-            }));
+        const approvedIds = new Set(profiles.map((p) => p.user_id.toString()));
+        const approvedGuides = guideUsers.filter((g) => approvedIds.has(g._id.toString()));
 
-        // TODO: nếu có module lịch bận thì loại trừ guide đã bận theo `date`
-        return res.json({ data: result, count: result.length });
+        return res.json(approvedGuides);
     } catch (err) {
         console.error("listAvailableGuides error:", err);
-        return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
-    }
-};
-
-// (Optional) Admin duyệt / từ chối tour
-export const approveTour = async (req, res) => {
-    try {
-        const id = req.params.id;
-        const updated = await Tour.findByIdAndUpdate(
-            id,
-            { $set: { approval_status: "approved" } },
-            { new: true }
-        );
-        if (!updated) return res.status(404).json({ message: "Không tìm thấy tour" });
-        const json = updated.toObject();
-        json.price = updated.priceNumber;
-        return res.json({ message: "Đã duyệt tour", data: json });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
-    }
-};
-
-export const rejectTour = async (req, res) => {
-    try {
-        const id = req.params.id;
-        const updated = await Tour.findByIdAndUpdate(
-            id,
-            { $set: { approval_status: "rejected" } },
-            { new: true }
-        );
-        if (!updated) return res.status(404).json({ message: "Không tìm thấy tour" });
-        const json = updated.toObject();
-        json.price = updated.priceNumber;
-        return res.json({ message: "Đã từ chối tour", data: json });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+        return res.status(500).json({ message: "Lỗi máy chủ." });
     }
 };

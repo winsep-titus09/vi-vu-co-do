@@ -3,6 +3,7 @@ import GuideApplication from "../models/GuideApplication.js";
 import GuideProfile from "../models/GuideProfile.js";
 import Role from "../models/Role.js";
 import User from "../models/User.js";
+import { notifyAdmins } from "../services/notify.js";
 import { notifyUser } from "../services/notify.js";
 
 /**
@@ -59,13 +60,12 @@ export const applyGuide = async (req, res) => {
         );
 
         // Nếu bạn đã có service thông báo cho admin, có thể bật lại:
-        // import { notifyAdmins } from "../services/notify.js";
-        // await notifyAdmins({
-        //   type: "guide_application:new",
-        //   content: `${user.name} vừa gửi yêu cầu trở thành HDV.`,
-        //   url: "/admin/guide-applications",
-        //   meta: { applicationId: appDoc._id, applicantId: user._id },
-        // });
+        await notifyAdmins({
+            type: "guide_application:new",
+            content: `${user.name} vừa gửi yêu cầu trở thành HDV.`,
+            url: `/admin/guide-applications/${appDoc._id}`,
+            meta: { applicationId: appDoc._id, applicantId: user._id },
+        });
 
         return res.status(201).json({
             message: "Gửi hồ sơ thành công. Vui lòng chờ admin xét duyệt.",
