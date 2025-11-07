@@ -20,7 +20,8 @@ export const globalLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     message: { status: 429, message: "Too many requests, please try again later." },
-    skip: (req) => req.method === "OPTIONS",
+    skip: (req) =>
+        req.method === "OPTIONS" || req.path === "/api/payments/ipn",
     store,
     keyGenerator: ipKeyGenerator(), // helper chuẩn cho IPv6
 });

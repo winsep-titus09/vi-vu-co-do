@@ -2,6 +2,7 @@
 import Booking from "../models/Booking.js";
 import Tour from "../models/Tour.js";
 import { notifyAdmins, notifyUser } from "../services/notify.js";
+import { getTakenSlots, isGuideBusy, hasGuideLockedThisTourDate } from "../helpers/bookings.helper.js";
 
 function toDateOrNull(input) {
     if (!input) return null;
@@ -35,7 +36,7 @@ function computePrice({ basePrice, participants }) {
     return { total, normalized };
 }
 
-// 1) USER tạo booking => CHỜ HDV DUYỆT
+// 1) USER tạo booking => CHỜ HDV DUYỆT (hoặc AUTO-APPROVE nếu HDV đã khóa tour+ngày)
 export const createBooking = async (req, res) => {
     try {
         const userId = req.user?._id;
@@ -46,7 +47,7 @@ export const createBooking = async (req, res) => {
 
         if (start_date && !start) {
             return res.status(400).json({
-                message: "start_date không hợp lệ. Dùng 'YYYY-MM-DD' (VD: 2025-12-20) hoặc ISO 8601 (VD: 2025-12-20T00:00:0007:00).",
+                message: "start_date không hợp lệ. Dùng 'YYYY-MM-DD' (VD: 2025-12-20) hoặc ISO 8601 (VD: 2025-12-20T00:00:00+07:00).",
                 received: start_date
             });
         }
@@ -75,41 +76,75 @@ export const createBooking = async (req, res) => {
         const basePrice = Number(tour.price || 0);
         const { total, normalized } = computePrice({ basePrice, participants });
 
+        // 🔒 SLOT CHECK (tránh overbook) — kiểm tra TRƯỚC khi tạo
+        const requested = normalized.filter(p => p.count_slot).length;
+        const taken = await getTakenSlots(tour._id, start);
+        const remaining = Math.max((Number(tour.max_guests) || 0) - taken, 0);
+
+        if (requested > remaining) {
+            return res.status(409).json({
+                message: `Không đủ chỗ. Còn ${remaining} slot, nhưng yêu cầu ${requested}.`,
+                meta: { remaining, requested }
+            });
+        }
+
         const intendedGuide =
             guide_id ||
             (tour.guide_id ? String(tour.guide_id) : (tour.guides?.[0]?.guideId ? String(tour.guides[0].guideId) : null));
+
+        // === AUTO-APPROVE: nếu HDV này đã “nhận” CHÍNH tour này ở CÙNG ngày (accepted/awaiting_payment/paid/completed)
+        let status = "waiting_guide";
+        let guide_decision = { status: "pending" };
+
+        if (intendedGuide) {
+            const busy = await isGuideBusy(intendedGuide, start, end);
+            if (busy) {
+                return res.status(409).json({
+                    message: "HDV đã bận thời gian này. Vui lòng chọn ngày khác hoặc HDV khác.",
+                });
+            }
+        }
 
         const booking = await Booking.create({
             customer_id: userId,
             tour_id,
             intended_guide_id: intendedGuide || null,
-            start_date: start_date ? new Date(start_date) : null,
-            end_date: end_date ? new Date(end_date) : null,
+            start_date: start ?? null,     // ✅ dùng bản đã parse
+            end_date: end ?? null,         // ✅ dùng bản đã parse
             contact,
             total_price: total,
             participants: normalized,
-            status: "waiting_guide",
-            guide_decision: { status: "pending" },
+            status,
+            guide_decision,
         });
 
-        // Notify HDV (nếu có)
-        if (intendedGuide) {
-            await notifyUser({
-                userId: intendedGuide,
-                type: "booking:request",
-                content: `Có yêu cầu đặt tour ${tour.name || `#${booking._id}`} cần bạn xác nhận.`,
-                url: `/guide/bookings/${booking._id}`,
+        // Thông báo
+        if (status === "awaiting_payment") {
+            // Đã auto-approve → báo KH thanh toán, KHÔNG cần ping HDV nữa
+            await notifyUser(userId, {
+                type: "booking:approved",
+                content: `Yêu cầu đặt tour ${tour.name || `#${booking._id}`} đã được hệ thống xác nhận. Vui lòng thanh toán.`,
+                url: `/booking/${booking._id}`,
                 meta: { bookingId: booking._id, tourId: tour._id },
-            });
+            }).catch(() => { });
+        } else {
+            // Còn chờ HDV duyệt
+            if (intendedGuide) {
+                await notifyUser({
+                    userId: intendedGuide,
+                    type: "booking:request",
+                    content: `Có yêu cầu đặt tour ${tour.name || `#${booking._id}`} cần bạn xác nhận.`,
+                    url: `/guide/bookings/${booking._id}`,
+                    meta: { bookingId: booking._id, tourId: tour._id },
+                }).catch(() => { });
+            }
+            await notifyUser(userId, {
+                type: "booking:created",
+                content: `Đã gửi yêu cầu đặt tour ${tour.name || `#${booking._id}`}. Vui lòng chờ HDV duyệt.`,
+                url: `/booking/${booking._id}`,
+                meta: { bookingId: booking._id },
+            }).catch(() => { });
         }
-
-        // Notify User
-        await notifyUser(userId, {
-            type: "booking:created",
-            content: `Đã gửi yêu cầu đặt tour ${tour.name || `#${booking._id}`}. Vui lòng chờ HDV duyệt.`,
-            url: `/booking/${booking._id}`,
-            meta: { bookingId: booking._id },
-        }).catch(() => { });
 
         res.status(201).json({ booking });
     } catch (e) {
@@ -139,7 +174,33 @@ export const guideApproveBooking = async (req, res) => {
 
         // 🔧 LOAD TOUR để có tour.name dùng trong content thông báo
         const tourDoc = await Tour.findById(booking.tour_id).lean();
+        if (!tourDoc) return res.status(404).json({ message: "Tour không tồn tại" });
         const tourName = tourDoc?.name || `#${booking._id}`;
+
+        // 🔒 SLOT CHECK lần 2 (tránh race condition)
+        const requested = (booking.participants || []).filter(p => p.count_slot).length;
+        const taken = await getTakenSlots(booking.tour_id, booking.start_date);
+        const remaining = Math.max((Number(tourDoc.max_guests) || 0) - taken, 0);
+
+        if (requested > remaining) {
+            return res.status(409).json({
+                message: `Không đủ chỗ để duyệt. Còn ${remaining} slot, cần ${requested}.`,
+                meta: { remaining, requested }
+            });
+        }
+
+        // ❗ BUSY CHECK: nếu HDV đã bận bởi 1 booking khác trùng ngày/khoảng ngày → CHẶN duyệt
+        const busy = await isGuideBusy(
+            booking.intended_guide_id || user._id,
+            booking.start_date,
+            booking.end_date,
+            booking._id
+        );
+        if (busy) {
+            return res.status(409).json({
+                message: "Bạn đã nhận một tour khác trùng thời gian. Không thể duyệt booking này.",
+            });
+        }
 
         // Cập nhật trạng thái
         booking.status = "awaiting_payment";

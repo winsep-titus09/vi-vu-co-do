@@ -51,6 +51,9 @@ export const createCheckout = async (req, res) => {
             return res.status(400).json({ message: "Booking chưa được HDV duyệt để thanh toán" });
         }
 
+        console.log("[CHECKOUT] IPN =", process.env.PAYMENT_IPN_URL);
+        console.log("[CHECKOUT] RETURN =", process.env.PAYMENT_RETURN_URL);
+
         // 1) Nếu đã có phiên PENDING còn hạn -> trả về payUrl cũ
         const nowMs = Date.now();
         const pendingValid =
@@ -71,8 +74,8 @@ export const createCheckout = async (req, res) => {
         const amount = Number(booking.total_price);
         const orderId = `${booking._id}-${Date.now()}`;
         const orderInfo = `Thanh toán booking ${orderId}`;
-        const returnUrl = process.env.PAYMENT_RETURN_URL;
-        const notifyUrl = process.env.PAYMENT_IPN_URL;
+        const returnUrl = req.query.return || process.env.PAYMENT_RETURN_URL;
+        const notifyUrl = req.query.ipn || process.env.PAYMENT_IPN_URL;
 
         // 3) Chọn phương thức thanh toán
         const requestType = resolveRequestType(method);
@@ -112,6 +115,10 @@ export const createCheckout = async (req, res) => {
 
 // IPN MoMo
 export const ipnHandler = async (req, res) => {
+    console.log("[MoMo IPN HIT]", new Date().toISOString());
+    console.log("[MoMo IPN HEADERS]", req.headers);
+    console.log("[MoMo IPN BODY]", req.body);
+
     try {
         const body = req.body || {};
         const ok = verifyMoMoIPN(body);

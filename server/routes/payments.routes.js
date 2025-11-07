@@ -6,7 +6,7 @@ import { createCheckout, ipnHandler, returnHandler } from "../controllers/paymen
 const router = express.Router();
 
 router.post("/checkout", auth, createCheckout);
-router.post("/ipn", ipnHandler);
 router.get("/return", returnHandler);
+router.post("/ipn", ipnHandler);
 
 export default router;
