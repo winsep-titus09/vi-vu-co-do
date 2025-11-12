@@ -2,14 +2,6 @@
 import mongoose from "mongoose";
 const { Decimal128, ObjectId } = mongoose.Schema.Types;
 
-/**
- * Cập nhật so với phiên bản trước:
- * + Thêm:
- *    - start_time_local: String ("HH:mm")  -> giờ khởi hành cố định trong ngày; khách sau này chỉ chọn NGÀY.
- *    - start_minute_of_day: Number         -> phút tính từ 00:00 (08:00 => 480), tiện cho sort/filter nếu cần.
- * + Không còn sử dụng TourDeparture trong luồng Tour (giữ nguyên collection khác nếu bạn muốn bảo lưu lịch sử).
- */
-
 const ItineraryItemSchema = new mongoose.Schema(
     {
         day: { type: Number, required: true },   // 1..duration
@@ -86,7 +78,7 @@ const TourSchema = new mongoose.Schema(
         guides: [{ guideId: { type: ObjectId, ref: "User" }, isMain: { type: Boolean, default: false } }],
         locations: [TourLocationSchema],
 
-        // ---- NGÀY LINH HOẠT + GIỜ CỐ ĐỊNH ----
+        // ---- NGÀY LINH HOẠCH + GIỜ CỐ ĐỊNH ----
         allow_custom_date: { type: Boolean, default: true, index: true },
         fixed_departure_time: { type: String, default: "08:00" }, // "HH:mm"
         min_days_before_start: { type: Number, default: 0 },
@@ -101,5 +93,10 @@ const TourSchema = new mongoose.Schema(
 // Gợi ý index
 TourSchema.index({ name: "text", description: "text" }, { name: "idx_tours_text" });
 TourSchema.index({ category_id: 1, status: 1 }, { name: "idx_tours_category_status" });
+
+// Tối ưu cho lọc nâng cao
+TourSchema.index({ price: 1 }, { name: "idx_tours_price" });
+TourSchema.index({ "guides.guideId": 1 }, { name: "idx_tours_guides" });
+TourSchema.index({ allow_custom_date: 1 }, { name: "idx_tours_allow_custom_date" });
 
 export default mongoose.model("Tour", TourSchema);

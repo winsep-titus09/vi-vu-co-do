@@ -42,15 +42,95 @@ async function resolveRoleName(user) {
     return (val || "").toString().trim().toLowerCase();
 }
 
-/** GET /api/tours?q=&category_id=&page=&limit= */
+// helper cho regex an toàn
+function escapeRegex(str = "") {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// helper: parse danh sách id từ string CSV hoặc array
+const toArrayIds = (v) => {
+    if (!v) return [];
+    if (Array.isArray(v)) return v;
+    if (typeof v === "string") return v.split(",").map((s) => s.trim()).filter(Boolean);
+    return [];
+};
+
+/**
+ * GET /api/tours
+ * Hỗ trợ query:
+ * - q: chuỗi tìm kiếm theo tên
+ * - category_id: 1 danh mục (tương thích cũ)
+ * - category_ids hoặc categories: nhiều danh mục (array hoặc CSV), yêu cầu tour chứa TẤT CẢ các danh mục đã chọn
+ * - price_min, price_max: khoảng giá
+ * - guide_name: tên HDV
+ * - page, limit
+ */
 export const listTours = async (req, res) => {
     try {
-        const { q, category_id, page = 1, limit = 12 } = req.query;
+        const {
+            q,
+            category_id,
+            page = 1,
+            limit = 12,
+            price_min,
+            price_max,
+            guide_name,
+        } = req.query;
+
         const filter = buildPublicFilter();
 
+        // q: tìm theo tên (không phân biệt hoa thường)
         if (q) filter.name = { $regex: q, $options: "i" };
-        if (category_id && mongoose.isValidObjectId(category_id)) {
-            filter.$or = [{ category_id }, { categories: category_id }];
+
+        // Lọc theo DANH MỤC:
+        // - Nếu chọn 1 danh mục: chấp nhận tour có category_id == id hoặc categories chứa id (giữ tương thích cũ).
+        // - Nếu chọn >= 2 danh mục: yêu cầu tour chứa TẤT CẢ các danh mục đã chọn.
+        const rawCatIds = [
+            ...toArrayIds(req.query.category_ids),
+            ...toArrayIds(req.query.categories),
+        ];
+        if (!rawCatIds.length && category_id) rawCatIds.push(category_id);
+
+        const catObjIds = rawCatIds
+            .filter((id) => mongoose.isValidObjectId(id))
+            .map((id) => new mongoose.Types.ObjectId(id));
+
+        if (catObjIds.length === 1) {
+            const cid = catObjIds[0];
+            // 1 danh mục -> OR cho tương thích cũ
+            filter.$or = [{ category_id: cid }, { categories: cid }];
+        } else if (catObjIds.length > 1) {
+            // >= 2 danh mục -> bắt buộc chứa TẤT CẢ danh mục đã chọn
+            // Dùng $expr + $setIsSubset để kiểm tra tập {category_id} ∪ categories có chứa toàn bộ catObjIds
+            const categoriesUnionExpr = {
+                $setUnion: [
+                    ["$category_id"],                // bọc scalar thành mảng (nếu null -> [null], không ảnh hưởng tới subset)
+                    { $ifNull: ["$categories", []] } // nếu không có mảng categories thì dùng []
+                ]
+            };
+            filter.$expr = { $setIsSubset: [catObjIds, categoriesUnionExpr] };
+        }
+
+        // khoảng giá (Mongoose cast Number -> Decimal128 OK)
+        const pmin = Number(price_min);
+        const pmax = Number(price_max);
+        if (Number.isFinite(pmin) || Number.isFinite(pmax)) {
+            filter.price = {};
+            if (Number.isFinite(pmin)) filter.price.$gte = pmin;
+            if (Number.isFinite(pmax)) filter.price.$lte = pmax;
+        }
+
+        // tên HDV -> tìm user ids rồi lọc guides.guideId
+        if (guide_name) {
+            const gRegex = new RegExp(escapeRegex(guide_name), "i");
+            const guideUsers = await User.find({ name: gRegex }, { _id: 1 }).lean();
+            const guideIds = guideUsers.map((u) => u._id);
+            if (guideIds.length === 0) {
+                const pgEmpty = Math.max(parseInt(page) || 1, 1);
+                const lmEmpty = Math.min(Math.max(parseInt(limit) || 12, 1), 100);
+                return res.json({ items: [], total: 0, page: pgEmpty, pageSize: lmEmpty });
+            }
+            filter["guides.guideId"] = { $in: guideIds };
         }
 
         const pg = Math.max(parseInt(page) || 1, 1);
@@ -90,7 +170,7 @@ export const getTour = async (req, res) => {
 
         if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
 
-        return res.json(tour); // <-- FIX: trả về tour
+        return res.json(tour);
     } catch (err) {
         console.error("getTour error:", err);
         return res.status(500).json({ message: "Lỗi máy chủ." });
@@ -184,7 +264,7 @@ export const createTour = async (req, res) => {
             guides: data.guides || [],
             locations: normalizedLocations,
 
-            // ---- NGÀY LINH HOẠT + GIỜ CỐ ĐỊNH ----
+            // ---- NGÀY LINH HOẠCH + GIỜ CỐ ĐỊNH ----
             allow_custom_date,
             fixed_departure_time,
             min_days_before_start,
