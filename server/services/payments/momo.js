@@ -1,6 +1,7 @@
 // server/services/payments/momo.js
 import crypto from "crypto";
 import fetch from "node-fetch";
+import { getGatewayConfig } from "./config.js";
 
 /**
  * Tạo phiên thanh toán MoMo
@@ -14,11 +15,13 @@ export async function createMoMoPayment({
     requestType,
     extraData,
 }) {
-    const endpoint = process.env.MOMO_ENDPOINT;
-    const partnerCode = process.env.MOMO_PARTNER_CODE;
-    const accessKey = process.env.MOMO_ACCESS_KEY;
-    const secretKey = process.env.MOMO_SECRET_KEY;
-    const requestTypeEnv = process.env.MOMO_REQUEST_TYPE || "captureWallet";
+    // Đọc cấu hình động từ DB (fallback ENV bên trong helper)
+    const cfg = await getGatewayConfig("momo");
+    const endpoint = cfg.endpoint;
+    const partnerCode = cfg.partnerCode;
+    const accessKey = cfg.accessKey;
+    const secretKey = cfg.secretKey;
+    const requestTypeEnv = cfg.requestType || "captureWallet";
     requestType = requestType || requestTypeEnv;
 
     const requestId = `${partnerCode}-${Date.now()}`;
@@ -102,8 +105,8 @@ export async function createMoMoPayment({
  * KHÔNG sort alphabet; nối theo thứ tự field cố định & chỉ nối field có trong payload.
  */
 export function verifyMoMoIPN(body) {
-    const secretKey = process.env.MOMO_SECRET_KEY;
-    const accessKey = process.env.MOMO_ACCESS_KEY; // <- bắt buộc có trong chuỗi ký
+    const secretKey = process.env.MOMO_SECRET_KEY; // vẫn giữ fallback ENV cho IPN
+    const accessKey = process.env.MOMO_ACCESS_KEY; // dùng để bổ sung accessKey nếu payload thiếu
 
     // MoMo v2 order of fields for signature
     const ORDER = [

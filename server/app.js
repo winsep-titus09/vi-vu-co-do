@@ -24,6 +24,7 @@ import adminLocationCategoryRoutes from "./routes/admin/locationCategories.route
 import adminLocationRoutes from "./routes/admin/locations.routes.js";
 import adminTourRoutes from "./routes/admin/tours.routes.js";
 import adminTourRequestRoutes from "./routes/admin/tour-requests.routes.js";
+import adminPaymentSettingRoutes from "./routes/admin/paymentSettings.routes.js"; // <— thêm
 
 const app = express();
 app.use(cors());
@@ -55,6 +56,7 @@ app.use("/api/admin/location-categories", adminLocationCategoryRoutes);
 app.use("/api/admin/locations", adminLocationRoutes);
 app.use("/api/admin/tours", adminTourRoutes);
 app.use("/api/admin/tour-requests", adminTourRequestRoutes);
+app.use("/api/admin/payment-settings", adminPaymentSettingRoutes); // <— thêm
 
 app.get("/health", (_, res) => res.json({ ok: true }));
 
