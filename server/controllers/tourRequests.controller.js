@@ -1,6 +1,5 @@
 // server/controllers/tourRequests.controller.js
 import mongoose from "mongoose";
-import slugify from "slugify";
 
 import TourRequest from "../models/TourRequest.js";
 import Tour from "../models/Tour.js";
@@ -9,15 +8,7 @@ import TourCategory from "../models/TourCategory.js";
 
 import { createTourRequestSchema, updateTourRequestSchema } from "../utils/validator.js";
 import { notifyAdmins, notifyUser } from "../services/notify.js";
-
-slugify.extend({ "đ": "d", "Đ": "D" });
-
-async function makeUniqueSlug(Model, name) {
-    const base = slugify(name, { lower: true, strict: true, locale: "vi" });
-    let slug = base, i = 2;
-    while (await Model.exists({ slug })) slug = `${base}-${i++}`;
-    return slug;
-}
+import { makeUniqueSlug } from "../utils/slug.js"; // dùng utils slug dùng chung
 
 function roleNameOf(user) {
     return (user?.role_id?.name || user?.role || "").toString().trim().toLowerCase();

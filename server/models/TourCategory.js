@@ -1,6 +1,6 @@
 // server/models/TourCategory.js
 import mongoose from "mongoose";
-import slugify from "slugify";
+import { toSlug } from "../utils/slug.js";
 
 const TourCategorySchema = new mongoose.Schema(
     {
@@ -17,7 +17,7 @@ const TourCategorySchema = new mongoose.Schema(
 
 TourCategorySchema.pre("save", function (next) {
     if (this.isModified("name") || !this.slug) {
-        this.slug = slugify(this.name, { lower: true, strict: true });
+        this.slug = toSlug(this.name);
     }
     next();
 });

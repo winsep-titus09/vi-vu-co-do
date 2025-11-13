@@ -17,6 +17,10 @@ import tourRequestRoutes from "./routes/tour-requests.routes.js";
 import bookingsRoutes from "./routes/bookings.routes.js";
 import paymentsRoutes from "./routes/payments.routes.js";
 
+// Blog public
+import articleRoutes from "./routes/articles.routes.js";
+import articleCategoryPublicRoutes from "./routes/articleCategories.routes.js";
+
 // admin
 import adminGuideAppRoutes from "./routes/admin/guideApplications.routes.js";
 import adminNotifyRoutes from "./routes/admin/notifications.routes.js";
@@ -24,7 +28,11 @@ import adminLocationCategoryRoutes from "./routes/admin/locationCategories.route
 import adminLocationRoutes from "./routes/admin/locations.routes.js";
 import adminTourRoutes from "./routes/admin/tours.routes.js";
 import adminTourRequestRoutes from "./routes/admin/tour-requests.routes.js";
-import adminPaymentSettingRoutes from "./routes/admin/paymentSettings.routes.js"; // <— thêm
+import adminPaymentSettingRoutes from "./routes/admin/paymentSettings.routes.js";
+
+// Blog admin
+import adminArticleRoutes from "./routes/admin/articles.routes.js";
+import adminArticleCategoryRoutes from "./routes/admin/articleCategories.routes.js";
 
 const app = express();
 app.use(cors());
@@ -49,6 +57,10 @@ app.use("/api/tour-requests", tourRequestRoutes);
 app.use("/api/bookings", bookingsRoutes);
 app.use("/api/payments", paymentsRoutes);
 
+// blog public
+app.use("/api/articles", articleRoutes);
+app.use("/api/article-categories", articleCategoryPublicRoutes);
+
 // admin api
 app.use("/api/admin/guide-applications", adminGuideAppRoutes);
 app.use("/api/admin/notifications", adminNotifyRoutes);
@@ -56,7 +68,11 @@ app.use("/api/admin/location-categories", adminLocationCategoryRoutes);
 app.use("/api/admin/locations", adminLocationRoutes);
 app.use("/api/admin/tours", adminTourRoutes);
 app.use("/api/admin/tour-requests", adminTourRequestRoutes);
-app.use("/api/admin/payment-settings", adminPaymentSettingRoutes); // <— thêm
+app.use("/api/admin/payment-settings", adminPaymentSettingRoutes);
+
+// blog admin
+app.use("/api/admin/articles", adminArticleRoutes);
+app.use("/api/admin/article-categories", adminArticleCategoryRoutes);
 
 app.get("/health", (_, res) => res.json({ ok: true }));
 

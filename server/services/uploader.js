@@ -102,3 +102,25 @@ export const uploadRawBufferToCloudinary = (buffer, folder, options = {}) =>
 
         streamifier.createReadStream(buffer).pipe(stream);
     });
+
+/**
+ * Upload ảnh từ URL lên Cloudinary (không cần multipart)
+ * @param {string} imageUrl
+ * @param {string} folder
+ * @param {object} options
+ */
+export const uploadFromUrlToCloudinary = (imageUrl, folder, options = {}) =>
+    new Promise((resolve, reject) => {
+        const cloudFolder = [process.env.CLOUDINARY_FOLDER, folder]
+            .filter(Boolean)
+            .join("/");
+
+        cloudinary.uploader.upload(
+            imageUrl,
+            { folder: cloudFolder, resource_type: "image", overwrite: true, ...options },
+            (err, result) => {
+                if (err) return reject(err);
+                resolve(result);
+            }
+        );
+    });

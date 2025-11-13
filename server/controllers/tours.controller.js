@@ -1,6 +1,5 @@
 // server/controllers/tours.controller.js
 import mongoose from "mongoose";
-import slugify from "slugify";
 
 import Tour from "../models/Tour.js";
 import Location from "../models/Location.js";
@@ -10,20 +9,13 @@ import GuideProfile from "../models/GuideProfile.js";
 
 import { createTourSchema, updateTourSchema } from "../utils/validator.js";
 import { notifyAdmins, notifyUser } from "../services/notify.js";
+import { makeUniqueSlug } from "../utils/slug.js"; // dùng utils slug dùng chung
 
 // Lọc chỉ tour đã duyệt (public)
 const buildPublicFilter = () => ({
     "approval.status": "approved",
     status: "active",
 });
-
-slugify.extend({ "đ": "d", "Đ": "D" });
-async function makeUniqueSlug(Model, name) {
-    const base = slugify(name, { lower: true, strict: true, locale: "vi" });
-    let slug = base, i = 2;
-    while (await Model.exists({ slug })) slug = `${base}-${i++}`;
-    return slug;
-}
 
 function asConflictIfDuplicate(err) {
     if (err?.code === 11000) {

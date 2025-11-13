@@ -1,6 +1,6 @@
 // server/routes/locationCategories.routes.js
 import express from "express";
-import { listCategories, getCategory } from "../controllers/locationCategory.controller.js";
+import { listCategories, getCategory } from "../controllers/locationCategories.controller.js";
 
 const router = express.Router();
 
