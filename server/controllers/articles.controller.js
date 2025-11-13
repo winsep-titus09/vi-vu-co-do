@@ -380,3 +380,21 @@ export const deleteFeatureImage = async (req, res) => {
         res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
     }
 };
+
+export const listFeaturedArticlesPublic = async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 3, 1), 50);
+        const items = await Article.find({ status: "published", featured: true })
+            .select("title slug feature_image_url featured publishedAt createdAt authorId categoryId")
+            .populate("authorId", "name avatar_url")
+            .populate("categoryId", "name slug")
+            .sort({ publishedAt: -1, createdAt: -1 })
+            .limit(limit)
+            .lean();
+
+        return res.json({ items, limit });
+    } catch (err) {
+        console.error("listFeaturedArticlesPublic error:", err);
+        res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+    }
+};

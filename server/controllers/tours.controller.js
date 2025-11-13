@@ -444,3 +444,22 @@ export const listAvailableGuides = async (req, res) => {
         return res.status(500).json({ message: "Lỗi máy chủ." });
     }
 };
+
+export const listFeaturedTours = async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 3, 1), 50);
+
+        const items = await Tour.find({ ...buildPublicFilter(), featured: true })
+            .populate("category_id", "name")
+            .populate("guides.guideId", "name avatar_url")
+            .populate("locations.locationId", "name slug")
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .lean();
+
+        return res.json({ items, limit });
+    } catch (err) {
+        console.error("listFeaturedTours error:", err);
+        return res.status(500).json({ message: "Lỗi máy chủ." });
+    }
+};

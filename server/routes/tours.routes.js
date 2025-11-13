@@ -8,13 +8,15 @@ import {
     createTour,
     updateTour,
     deleteTour,
-    listAvailableGuides
+    listAvailableGuides,
+    listFeaturedTours,
 } from "../controllers/tours.controller.js";
 
 const router = express.Router();
 
 // public
 router.get("/", listTours);
+router.get("/featured", listFeaturedTours);
 router.get("/available-guides", auth, authorize("admin", "guide", "tourist"), listAvailableGuides);
 
 // id hoặc slug (dùng token như Locations)

@@ -90,3 +90,20 @@ export const getPublicGuideProfile = async (req, res) => {
         return res.status(500).json({ message: "Lỗi máy chủ khi lấy hồ sơ hướng dẫn viên." });
     }
 };
+
+export const listFeaturedGuides = async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 3, 1), 50);
+        const items = await GuideProfile.find({ status: "approved", is_featured: true })
+            .select("user_id introduction bio_video_url experience languages is_featured createdAt")
+            .populate("user_id", "name avatar_url")
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .lean();
+
+        return res.json({ items, limit });
+    } catch (err) {
+        console.error("listFeaturedGuides error:", err);
+        return res.status(500).json({ message: "Lỗi máy chủ khi lấy HDV tiêu biểu." });
+    }
+};
