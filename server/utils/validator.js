@@ -66,7 +66,20 @@ export const createTourCategorySchema = z.object({
 export const updateTourCategorySchema = createTourCategorySchema.partial();
 
 // ----- Tour -----
-const oid = z.string().regex(/^[0-9a-fA-F]{24}$/);
+const oid = z.string().regex(/^[0-9a-fA-F]{24}$/, "ID không hợp lệ");
+
+export const createTourReviewSchema = z.object({
+    bookingId: oid,
+    tour_rating: z.number().int().min(1).max(5),
+    tour_comment: z.string().max(2000).optional(),
+});
+
+// B2: schema đánh giá HDV
+export const createGuideReviewSchema = z.object({
+    bookingId: oid,
+    guide_rating: z.number().int().min(1).max(5),
+    guide_comment: z.string().max(2000).optional(),
+});
 
 // Lịch khởi hành gửi kèm khi tạo Tour
 export const departureItemSchema = z.object({

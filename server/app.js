@@ -16,6 +16,7 @@ import tourCategoryRoutes from "./routes/tourCategories.routes.js";
 import tourRequestRoutes from "./routes/tour-requests.routes.js";
 import bookingsRoutes from "./routes/bookings.routes.js";
 import paymentsRoutes from "./routes/payments.routes.js";
+import reviewRoutes from "./routes/reviews.routes.js";
 
 // Blog public
 import articleRoutes from "./routes/articles.routes.js";
@@ -56,6 +57,7 @@ app.use("/api/tour-categories", tourCategoryRoutes);
 app.use("/api/tour-requests", tourRequestRoutes);
 app.use("/api/bookings", bookingsRoutes);
 app.use("/api/payments", paymentsRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // blog public
 app.use("/api/articles", articleRoutes);
