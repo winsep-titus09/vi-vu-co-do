@@ -36,6 +36,13 @@ function computePrice({ basePrice, participants }) {
     return { total, normalized };
 }
 
+// Helper tại chỗ: cộng ngày
+function addDays(d, days) {
+    const x = new Date(d);
+    x.setDate(x.getDate() + days);
+    return x;
+}
+
 // 1) USER tạo booking => CHỜ HDV DUYỆT (hoặc AUTO-APPROVE nếu HDV đã khóa tour+ngày)
 export const createBooking = async (req, res) => {
     try {
@@ -58,7 +65,7 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // Không cho chọn ngày quá khứ (so sánh theo 07:00, 0h hôm nay)
+        // Không cho chọn ngày quá khứ (so sánh theo 0h hôm nay)
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         if (start && start < todayStart) {
@@ -88,20 +95,37 @@ export const createBooking = async (req, res) => {
             });
         }
 
+        // Chọn HDV ưu tiên
         const intendedGuide =
             guide_id ||
             (tour.guide_id ? String(tour.guide_id) : (tour.guides?.[0]?.guideId ? String(tour.guides[0].guideId) : null));
+
+        // Tính end_date nếu client KHÔNG gửi (Cách 2): start_date + (duration - 1) ngày
+        const durationDays = Math.max(Number(tour?.duration || 1), 1);
+        const computedEnd = end ?? (start ? addDays(start, durationDays - 1) : null);
 
         // === AUTO-APPROVE: nếu HDV này đã “nhận” CHÍNH tour này ở CÙNG ngày (accepted/awaiting_payment/paid/completed)
         let status = "waiting_guide";
         let guide_decision = { status: "pending" };
 
         if (intendedGuide) {
-            const busy = await isGuideBusy(intendedGuide, start, end);
+            // Nếu HDV bận bởi 1 booking khác trùng khoảng ngày → chặn luôn
+            const busy = await isGuideBusy(intendedGuide, start, computedEnd);
             if (busy) {
                 return res.status(409).json({
                     message: "HDV đã bận thời gian này. Vui lòng chọn ngày khác hoặc HDV khác.",
                 });
+            }
+
+            // Nếu HDV đã từng nhận chính tour này ở cùng ngày → bỏ qua bước duyệt
+            const locked = await hasGuideLockedThisTourDate(intendedGuide, tour._id, start, computedEnd);
+            if (locked) {
+                status = "awaiting_payment";
+                guide_decision = {
+                    status: "accepted",
+                    decided_at: new Date(),
+                    decided_by: intendedGuide,
+                };
             }
         }
 
@@ -109,8 +133,8 @@ export const createBooking = async (req, res) => {
             customer_id: userId,
             tour_id,
             intended_guide_id: intendedGuide || null,
-            start_date: start ?? null,     // ✅ dùng bản đã parse
-            end_date: end ?? null,         // ✅ dùng bản đã parse
+            start_date: start ?? null,     // bản đã parse
+            end_date: computedEnd ?? null, // tự tính theo duration nếu client không gửi
             contact,
             total_price: total,
             participants: normalized,
@@ -249,21 +273,19 @@ export const guideRejectBooking = async (req, res) => {
             return res.status(400).json({ message: "Booking không ở trạng thái chờ HDV" });
         }
 
-        // 🔧 TẢI TOUR để có tên tour cho thông báo
+        // 🔧 LOAD TOUR để có tour.name dùng trong content thông báo
         const tourDoc = await Tour.findById(booking.tour_id).lean();
         const tourName = tourDoc?.name || `#${booking._id}`;
 
-        // Cập nhật trạng thái booking
         booking.status = "rejected";
         booking.guide_decision = {
             status: "rejected",
             decided_at: new Date(),
             decided_by: user._id,
-            note: note || null,
+            note: note || undefined,
         };
         await booking.save();
 
-        // Thông báo cho USER (đúng chữ ký notifyUser nhận object)
         await notifyUser({
             userId: booking.customer_id,
             type: "booking:rejected",
