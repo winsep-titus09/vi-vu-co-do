@@ -59,7 +59,7 @@ export const applyGuide = async (req, res) => {
             { upsert: true, new: true }
         );
 
-        // Nếu bạn đã có service thông báo cho admin, có thể bật lại:
+        // Thông báo cho admin + meta đầy đủ để template email hiển thị tên & email
         await notifyAdmins({
             type: "guide_application:new",
             content: `${user.name} vừa gửi yêu cầu trở thành HDV.`,
@@ -69,7 +69,7 @@ export const applyGuide = async (req, res) => {
                 applicantId: user._id,
                 applicantName: user.name,
                 applicantEmail: user.email,
-                adminUrl: `${process.env.APP_BASE_URL}/admin/guide-applications/${appDoc._id}`
+                adminUrl: `${process.env.APP_BASE_URL || ""}/admin/guide-applications/${appDoc._id}`
             },
         });
 

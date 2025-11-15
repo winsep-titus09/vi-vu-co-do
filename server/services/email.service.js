@@ -5,7 +5,6 @@ import { fileURLToPath } from "url";
 
 const transporter = createTransporter();
 
-// Đảm bảo đường dẫn tuyệt đối đúng dù chạy ở root hay thư mục server
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -16,7 +15,9 @@ function renderTemplate(templateKey, data = {}) {
         html = fs.readFileSync(filePath, "utf-8");
     } catch (err) {
         console.error("[EMAIL] Không đọc được template:", templateKey, "path:", filePath, "error:", err.message);
-        throw err;
+        // Fallback gửi nội dung thuần để vẫn thử gửi mail (giúp debug)
+        html = `<p><strong>Template '${templateKey}' lỗi hoặc không tồn tại.</strong></p>
+            <pre>${Object.entries(data).map(([k, v]) => `${k}: ${v}`).join("\n")}</pre>`;
     }
     for (const [k, v] of Object.entries(data)) {
         const re = new RegExp(`{{\\s*${k}\\s*}}`, "g");
@@ -37,5 +38,6 @@ export async function sendEmailRaw({ to, subject, html }) {
 
 export async function sendTemplateEmail({ to, subject, templateKey, data }) {
     const html = renderTemplate(templateKey, data);
+    console.log("[EMAIL] sendTemplateEmail", { to, subject, templateKey });
     return sendEmailRaw({ to, subject, html });
 }
