@@ -7,6 +7,8 @@ import {
     getReviewForBooking,
     getTourRatingStats,
     getGuideRatingStats,
+    listTourReviewsPublic,
+    listGuideReviewsPublic,
 } from "../controllers/reviews.controller.js";
 
 const router = express.Router();
@@ -20,8 +22,12 @@ router.post("/guide", auth, createGuideReview);
 // Xem review theo booking (chủ booking)
 router.get("/bookings/:bookingId", auth, getReviewForBooking);
 
-// Thống kê trung bình
+// Thống kê trung bình (public)
 router.get("/tours/:tourId/stats", getTourRatingStats);
 router.get("/guides/:guideId/stats", getGuideRatingStats);
+
+// PUBLIC listing reviews theo Tour/HDV (phân trang)
+router.get("/tours/:tourId", listTourReviewsPublic);
+router.get("/guides/:guideId", listGuideReviewsPublic);
 
 export default router;
