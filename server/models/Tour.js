@@ -71,7 +71,7 @@ const TourSchema = new mongoose.Schema(
         itinerary: [{ day: Number, title: String, details: String }],
 
         featured: { type: Boolean, default: false },
-        status: { type: String, enum: ["active", "inactive"], default: "inactive" },
+        status: { type: String, enum: ["active", "inactive"], default: "active" },
         free_under_age: { type: Number, default: 11 },
 
         // guides & locations

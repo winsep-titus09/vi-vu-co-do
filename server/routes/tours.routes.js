@@ -8,16 +8,19 @@ import {
     createTour,
     updateTour,
     deleteTour,
-    listAvailableGuides,
-    listFeaturedTours,
+    listAvailableGuides
 } from "../controllers/tours.controller.js";
+import { checkTourDate, checkMultipleTourDates } from "../controllers/tourAvailability.controller.js";
 
 const router = express.Router();
 
 // public
 router.get("/", listTours);
-router.get("/featured", listFeaturedTours);
 router.get("/available-guides", auth, authorize("admin", "guide", "tourist"), listAvailableGuides);
+
+// CHECK DATE endpoints (đặt TRƯỚC catch-all ":token")
+router.get("/:id/check-date", checkTourDate);
+router.post("/:id/check-dates", checkMultipleTourDates);
 
 // id hoặc slug (dùng token như Locations)
 router.get("/:token", getTour);
