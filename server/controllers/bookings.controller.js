@@ -143,13 +143,16 @@ export const createBooking = async (req, res) => {
         });
 
         // Thông báo
+        const tourName = tour.name || `#${booking._id}`;
+
         if (status === "awaiting_payment") {
             // Đã auto-approve → báo KH thanh toán, KHÔNG cần ping HDV nữa
-            await notifyUser(userId, {
+            await notifyUser({
+                userId,
                 type: "booking:approved",
-                content: `Yêu cầu đặt tour ${tour.name || `#${booking._id}`} đã được hệ thống xác nhận. Vui lòng thanh toán.`,
+                content: `Yêu cầu đặt tour ${tourName} đã được hệ thống xác nhận. Vui lòng thanh toán.`,
                 url: `/booking/${booking._id}`,
-                meta: { bookingId: booking._id, tourId: tour._id },
+                meta: { bookingId: booking._id, tourId: tour._id, tourName },
             }).catch(() => { });
         } else {
             // Còn chờ HDV duyệt
@@ -157,16 +160,17 @@ export const createBooking = async (req, res) => {
                 await notifyUser({
                     userId: intendedGuide,
                     type: "booking:request",
-                    content: `Có yêu cầu đặt tour ${tour.name || `#${booking._id}`} cần bạn xác nhận.`,
+                    content: `Có yêu cầu đặt tour ${tourName} cần bạn xác nhận.`,
                     url: `/guide/bookings/${booking._id}`,
-                    meta: { bookingId: booking._id, tourId: tour._id },
+                    meta: { bookingId: booking._id, tourId: tour._id, tourName },
                 }).catch(() => { });
             }
-            await notifyUser(userId, {
+            await notifyUser({
+                userId,
                 type: "booking:created",
-                content: `Đã gửi yêu cầu đặt tour ${tour.name || `#${booking._id}`}. Vui lòng chờ HDV duyệt.`,
+                content: `Đã gửi yêu cầu đặt tour ${tourName}. Vui lòng chờ HDV duyệt.`,
                 url: `/booking/${booking._id}`,
-                meta: { bookingId: booking._id },
+                meta: { bookingId: booking._id, tourId: tour._id, tourName },
             }).catch(() => { });
         }
 

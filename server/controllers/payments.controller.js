@@ -2,6 +2,7 @@
 import Booking from "../models/Booking.js";
 import Transaction from "../models/Transaction.js";
 import Tour from "../models/Tour.js";
+import User from "../models/User.js";
 import { createMoMoPayment, verifyMoMoIPN } from "../services/payments/momo.js";
 import { notifyAdmins, notifyUser } from "../services/notify.js";
 
@@ -163,19 +164,25 @@ export const ipnHandler = async (req, res) => {
             note: `MoMo resultCode ${resultCode}`,
         });
 
+        // Lấy thông tin tour + customer để enrich meta
+        let tourName = `#${booking._id}`;
+        try {
+            const tourDoc = await Tour.findById(booking.tour_id).lean();
+            if (tourDoc?.name) tourName = tourDoc.name;
+        } catch { /* ignore */ }
+
+        let customerName = "";
+        let customerEmail = "";
+        try {
+            const u = await User.findById(booking.customer_id).lean();
+            customerName = u?.name || "";
+            customerEmail = u?.email || "";
+        } catch { /* ignore */ }
+
         if (success) {
             booking.status = "paid";
             if (booking.payment_session) booking.payment_session.status = "paid";
             await booking.save();
-
-            // Lấy tên tour để đưa vào content
-            let tourName = `#${booking._id}`;
-            try {
-                const tourDoc = await Tour.findById(booking.tour_id).lean();
-                if (tourDoc?.name) tourName = tourDoc.name;
-            } catch {
-                // bỏ qua nếu không lấy được tên tour
-            }
 
             // Notify user
             await notifyUser({
@@ -183,7 +190,15 @@ export const ipnHandler = async (req, res) => {
                 type: "booking:paid",
                 content: `Thanh toán đơn đặt tour "${tourName}" thành công.`,
                 url: `/booking/${booking._id}`,
-                meta: { bookingId: booking._id, tourId: booking.tour_id, tourName },
+                meta: {
+                    bookingId: booking._id,
+                    tourId: booking.tour_id,
+                    tourName,
+                    startDate: booking.start_date ? new Date(booking.start_date).toLocaleDateString("vi-VN") : "",
+                    bookingUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}`,
+                    customerName,
+                    customerEmail
+                },
             }).catch(() => { });
 
             // Notify admin (KHI ĐÃ THANH TOÁN THÀNH CÔNG)
@@ -191,14 +206,21 @@ export const ipnHandler = async (req, res) => {
                 type: "booking:paid",
                 content: `Đơn #${booking._id} đã được thanh toán.`,
                 url: `/admin/bookings/${booking._id}`,
-                meta: { bookingId: booking._id, tourId: booking.tour_id, tourName },
+                meta: {
+                    bookingId: booking._id,
+                    tourId: booking.tour_id,
+                    tourName,
+                    bookingCode: booking._id,
+                    customerName,
+                    customerEmail
+                },
             }).catch(() => { });
 
             // (tuỳ chọn) Notify guide
             if (booking.intended_guide_id) {
                 await notifyUser({
                     userId: booking.intended_guide_id,
-                    type: "booking:paid",
+                    type: "booking:paid_guide",
                     content: `Đơn của khách đã thanh toán: "${tourName}".`,
                     url: `/guide/bookings/${booking._id}`,
                     meta: { bookingId: booking._id, tourId: booking.tour_id, tourName },
@@ -207,6 +229,15 @@ export const ipnHandler = async (req, res) => {
         } else {
             if (booking.payment_session) booking.payment_session.status = "failed";
             await booking.save();
+
+            // Gửi thông báo thất bại cho khách
+            await notifyUser({
+                userId: booking.customer_id,
+                type: "booking:payment_failed",
+                content: `Thanh toán thất bại cho booking "${tourName}".`,
+                url: `/booking/${booking._id}/pay`,
+                meta: { bookingId: booking._id, tourId: booking.tour_id, tourName },
+            }).catch(() => { });
         }
 
         return res.status(200).json({ resultCode: 0, message: "OK" });
