@@ -5,16 +5,19 @@ import { fileURLToPath } from "url";
 
 const transporter = createTransporter();
 
-// Lấy đúng đường dẫn thư mục hiện tại của file (ESM)
+// Đảm bảo đường dẫn tuyệt đối đúng dù chạy ở root hay thư mục server
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function renderTemplate(templateKey, data = {}) {
-    // Luôn đúng: ../templates/email/<templateKey>.html tính từ file này
-    const templatesDir = path.join(__dirname, "..", "templates", "email");
-    const filePath = path.join(templatesDir, `${templateKey}.html`);
-
-    let html = fs.readFileSync(filePath, "utf-8");
+    const filePath = path.join(__dirname, "..", "templates", "email", `${templateKey}.html`);
+    let html;
+    try {
+        html = fs.readFileSync(filePath, "utf-8");
+    } catch (err) {
+        console.error("[EMAIL] Không đọc được template:", templateKey, "path:", filePath, "error:", err.message);
+        throw err;
+    }
     for (const [k, v] of Object.entries(data)) {
         const re = new RegExp(`{{\\s*${k}\\s*}}`, "g");
         html = html.replace(re, String(v ?? ""));
