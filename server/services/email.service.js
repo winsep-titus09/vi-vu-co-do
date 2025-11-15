@@ -1,11 +1,19 @@
 import { createTransporter } from "../config/email.js";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 const transporter = createTransporter();
 
+// Lấy đúng đường dẫn thư mục hiện tại của file (ESM)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 function renderTemplate(templateKey, data = {}) {
-    const filePath = path.join(process.cwd(), "server", "templates", "email", `${templateKey}.html`);
+    // Luôn đúng: ../templates/email/<templateKey>.html tính từ file này
+    const templatesDir = path.join(__dirname, "..", "templates", "email");
+    const filePath = path.join(templatesDir, `${templateKey}.html`);
+
     let html = fs.readFileSync(filePath, "utf-8");
     for (const [k, v] of Object.entries(data)) {
         const re = new RegExp(`{{\\s*${k}\\s*}}`, "g");

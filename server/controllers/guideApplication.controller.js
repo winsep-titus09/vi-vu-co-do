@@ -64,7 +64,13 @@ export const applyGuide = async (req, res) => {
             type: "guide_application:new",
             content: `${user.name} vừa gửi yêu cầu trở thành HDV.`,
             url: `/admin/guide-applications/${appDoc._id}`,
-            meta: { applicationId: appDoc._id, applicantId: user._id },
+            meta: {
+                applicationId: appDoc._id,
+                applicantId: user._id,
+                applicantName: user.name,
+                applicantEmail: user.email,
+                adminUrl: `${process.env.APP_BASE_URL}/admin/guide-applications/${appDoc._id}`
+            },
         });
 
         return res.status(201).json({
