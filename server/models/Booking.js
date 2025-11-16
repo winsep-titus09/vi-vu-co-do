@@ -72,6 +72,12 @@ const BookingSchema = new mongoose.Schema(
 
         guide_decision: { type: GuideDecisionSchema, default: () => ({}) },
 
+        // MỐC HẠN
+        // - Hạn HDV duyệt (set khi tạo booking nếu đang waiting_guide)
+        // - Hạn khách thanh toán (set khi sang awaiting_payment)
+        guide_approval_due_at: { type: Date, default: null, index: true },
+        payment_due_at: { type: Date, default: null, index: true },
+
         participants: [ParticipantSchema],
         payment_session: PaymentSessionSchema,
     },
@@ -80,5 +86,8 @@ const BookingSchema = new mongoose.Schema(
 
 BookingSchema.index({ customer_id: 1, createdAt: -1 });
 BookingSchema.index({ intended_guide_id: 1, "guide_decision.status": 1 });
+// Tối ưu quét cron
+BookingSchema.index({ status: 1, payment_due_at: 1 });
+BookingSchema.index({ status: 1, guide_approval_due_at: 1 });
 
 export default mongoose.model("Booking", BookingSchema, "bookings");

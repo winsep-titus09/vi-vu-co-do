@@ -43,6 +43,12 @@ function addDays(d, days) {
     return x;
 }
 
+// Helper đọc phút từ ENV (fallback nếu không có)
+function minutesFromEnv(name, fallback) {
+    const v = Number(process.env[name]);
+    return Number.isFinite(v) && v > 0 ? v : fallback;
+}
+
 // 1) USER tạo booking => CHỜ HDV DUYỆT (hoặc AUTO-APPROVE nếu HDV đã khóa tour+ngày)
 export const createBooking = async (req, res) => {
     try {
@@ -104,16 +110,22 @@ export const createBooking = async (req, res) => {
         const durationDays = Math.max(Number(tour?.duration || 1), 1);
         const computedEnd = end ?? (start ? addDays(start, durationDays - 1) : null);
 
+        // Thời hạn (phút) từ ENV
+        const approvalMins = minutesFromEnv("BOOKING_GUIDE_APPROVAL_TIMEOUT_MINUTES", 120);
+        const paymentMins = minutesFromEnv("BOOKING_PAYMENT_TIMEOUT_MINUTES", 60);
+
         // === AUTO-APPROVE: nếu HDV này đã “nhận” CHÍNH tour này ở CÙNG ngày (accepted/awaiting_payment/paid/completed)
         let status = "waiting_guide";
         let guide_decision = { status: "pending" };
+        let guide_approval_due_at = null;
+        let payment_due_at = null;
 
         if (intendedGuide) {
             // Nếu HDV bận bởi 1 booking khác trùng khoảng ngày → chặn luôn
-            const busy = await isGuideBusy(intendedGuide, start, computedEnd);
+            const busy = await isGuideBusy(intendedGuide, start, computedEnd, null, tour._id);
             if (busy) {
                 return res.status(409).json({
-                    message: "HDV đã bận thời gian này. Vui lòng chọn ngày khác hoặc HDV khác.",
+                    message: "HDV đã bận thời gian này với tour khác. Vui lòng chọn ngày khác hoặc HDV khác.",
                 });
             }
 
@@ -126,7 +138,13 @@ export const createBooking = async (req, res) => {
                     decided_at: new Date(),
                     decided_by: intendedGuide,
                 };
+                payment_due_at = new Date(Date.now() + paymentMins * 60 * 1000);
             }
+        }
+
+        // Nếu vẫn chờ HDV duyệt → đặt hạn duyệt
+        if (status === "waiting_guide") {
+            guide_approval_due_at = new Date(Date.now() + approvalMins * 60 * 1000);
         }
 
         const booking = await Booking.create({
@@ -140,6 +158,8 @@ export const createBooking = async (req, res) => {
             participants: normalized,
             status,
             guide_decision,
+            guide_approval_due_at,
+            payment_due_at,
         });
 
         // Thông báo
@@ -152,7 +172,13 @@ export const createBooking = async (req, res) => {
                 type: "booking:approved",
                 content: `Yêu cầu đặt tour ${tourName} đã được hệ thống xác nhận. Vui lòng thanh toán.`,
                 url: `/booking/${booking._id}`,
-                meta: { bookingId: booking._id, tourId: tour._id, tourName },
+                meta: {
+                    bookingId: booking._id,
+                    tourId: tour._id,
+                    tourName,
+                    // Gửi hạn thanh toán để FE/email hiển thị
+                    dueDate: payment_due_at ? new Date(payment_due_at).toISOString() : undefined,
+                },
             }).catch(() => { });
         } else {
             // Còn chờ HDV duyệt
@@ -222,7 +248,8 @@ export const guideApproveBooking = async (req, res) => {
             booking.intended_guide_id || user._id,
             booking.start_date,
             booking.end_date,
-            booking._id
+            booking._id,
+            booking.tour_id
         );
         if (busy) {
             return res.status(409).json({
@@ -230,13 +257,15 @@ export const guideApproveBooking = async (req, res) => {
             });
         }
 
-        // Cập nhật trạng thái
+        // Cập nhật trạng thái + hạn thanh toán
+        const paymentMins = minutesFromEnv("BOOKING_PAYMENT_TIMEOUT_MINUTES", 60);
         booking.status = "awaiting_payment";
         booking.guide_decision = {
             status: "accepted",
             decided_at: new Date(),
             decided_by: user._id,
         };
+        booking.payment_due_at = new Date(Date.now() + paymentMins * 60 * 1000);
         await booking.save();
 
         // Notify USER: mời thanh toán (dùng tourName thay vì id)
@@ -245,7 +274,12 @@ export const guideApproveBooking = async (req, res) => {
             type: "booking:approved",
             content: `Yêu cầu đặt tour ${tourName} đã được HDV duyệt. Vui lòng thanh toán.`,
             url: `/booking/${booking._id}`,
-            meta: { bookingId: booking._id, tourId: booking.tour_id, tourName },
+            meta: {
+                bookingId: booking._id,
+                tourId: booking.tour_id,
+                tourName,
+                dueDate: booking.payment_due_at ? new Date(booking.payment_due_at).toISOString() : undefined,
+            },
         }).catch(() => { });
 
         // LƯU Ý: không notify admin ở bước này (chỉ notify khi IPN paid)

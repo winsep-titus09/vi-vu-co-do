@@ -174,6 +174,20 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 });
                 break;
 
+            // Gửi cho CUSTOMER: booking bị hủy do quá hạn thanh toán
+            case "booking:cancelled":
+                await sendTemplateEmail({
+                    to,
+                    subject: "Đơn đặt tour đã bị hủy do quá hạn thanh toán",
+                    templateKey: "bookingCancelled",
+                    data: {
+                        userName: user.name || "Bạn",
+                        tourName: meta?.tourName || "",
+                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
+                    }
+                });
+                break;
+
             // REVIEW REMINDER từ cron
             case "review:prompt:tour":
             case "tour:completed_review_reminder":

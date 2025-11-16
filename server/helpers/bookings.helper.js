@@ -2,14 +2,12 @@
 import Booking from "../models/Booking.js";
 
 /**
- * Tính tổng số slot đã được giữ của tour trong ngày khởi hành cụ thể
- * @param {ObjectId} tourId 
- * @param {Date} startDate 
- * @returns {Promise<number>} tổng slot đã chiếm
+ * Danh sách trạng thái được coi là "giữ chỗ" / "đã nhận"
+ * (booking ở các trạng thái này sẽ chiếm slot và làm HDV bận, trừ khi là cùng tour + cùng ngày)
  */
 export const ACTIVE_STATUSES = ["accepted", "awaiting_payment", "paid", "completed"];
 
-/** Tính tổng slot đã chiếm của 1 tour trong 1 ngày */
+/** Tính tổng slot đã chiếm của 1 tour trong 1 ngày cụ thể */
 export async function getTakenSlots(tourId, startDate) {
     const bookings = await Booking.find({
         tour_id: tourId,
@@ -35,20 +33,39 @@ function overlap(aStart, aEnd, bStart, bEnd) {
 }
 
 /**
- * HDV đã "bận" trong khoảng ngày này bởi một booking khác? (khác _id)
- * Dùng để chặn HDV nhận tour khác trùng thời gian.
+ * HDV đã "bận" trong khoảng ngày này bởi một booking khác?
+ *
+ * Logic mới:
+ * - Vẫn coi HDV bận nếu đã có booking trùng khoảng thời gian ở tour khác.
+ * - KHÔNG coi là bận nếu:
+ *      + Booking đang xét cùng tour (tourIdForSame)
+ *      + Và cùng khoảng ngày (overlap) => cho phép nhiều booking của cùng tour + ngày đó (miễn còn slot).
+ *
+ * @param {string|ObjectId} guideId
+ * @param {Date} startDate
+ * @param {Date} endDate
+ * @param {string|ObjectId|null} excludeBookingId  (bỏ qua booking chính nó)
+ * @param {string|ObjectId|null} tourIdForSame     (nếu truyền, bỏ qua busy các booking cùng tour + overlap ngày)
+ * @returns {Promise<boolean>} true nếu HDV bận bởi tour khác hoặc khác ngày
  */
-export async function isGuideBusy(guideId, startDate, endDate, excludeBookingId = null) {
+export async function isGuideBusy(guideId, startDate, endDate, excludeBookingId = null, tourIdForSame = null) {
     const docs = await Booking.find({
         intended_guide_id: guideId,
         status: { $in: ACTIVE_STATUSES },
-        // lọc sơ bộ theo ngày bắt đầu trùng ngày để giảm tải (logic giao nhau sẽ check tiếp)
         start_date: { $ne: null }
     }).lean();
 
     return docs.some(b => {
         if (excludeBookingId && String(b._id) === String(excludeBookingId)) return false;
-        return overlap(b.start_date, b.end_date, startDate, endDate);
+
+        const sameTour = tourIdForSame && String(b.tour_id) === String(tourIdForSame);
+        const isOverlap = overlap(b.start_date, b.end_date, startDate, endDate);
+
+        // Nếu là cùng tour & overlap → cho phép (không tính busy)
+        if (sameTour && isOverlap) return false;
+
+        // Các trường hợp còn lại: overlap với tour khác → busy
+        return isOverlap;
     });
 }
 

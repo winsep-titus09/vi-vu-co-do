@@ -4,6 +4,7 @@ import Booking from "../models/Booking.js";
 import Review from "../models/Review.js";
 import Notification from "../models/Notification.js";
 import { notifyUser } from "./notify.js";
+import Tour from "../models/Tour.js";
 
 /**
  * Dọn dẹp token hết hạn – chạy mỗi ngày lúc 00:00
@@ -16,17 +17,113 @@ cron.schedule("0 0 * * *", async () => {
 
 /**
  * Cron mỗi phút:
- * - Xác định các booking vừa kết thúc trong khoảng 5 phút qua (tránh quét cả lịch sử).
- * - Nếu chưa có review tour -> gửi thông báo prompt đánh giá tour.
- * - Nếu đã có tour_rating nhưng chưa có guide_rating -> gửi prompt đánh giá HDV.
- * - Tuỳ chọn: chuyển booking từ "paid" sang "completed" khi đã kết thúc.
+ * - Auto-cancel booking quá hạn thanh toán (awaiting_payment)
+ * - Auto-reject booking quá hạn chờ HDV duyệt (waiting_guide)
+ * - Prompt review sau khi tour kết thúc + auto-complete (như cũ)
  */
 cron.schedule("* * * * *", async () => {
     const now = new Date();
-    const windowMs = 5 * 60 * 1000; // 5 phút gần nhất
-    const since = new Date(now.getTime() - windowMs);
 
+    // 1) AUTO-CANCEL do quá hạn thanh toán
     try {
+        const toCancel = await Booking.find({
+            status: "awaiting_payment",
+            payment_due_at: { $ne: null, $lte: now },
+        })
+            .select("_id customer_id tour_id payment_session")
+            .lean();
+
+        for (const b of toCancel) {
+            try {
+                // set status canceled, payment_session.expired nếu có
+                await Booking.updateOne(
+                    { _id: b._id, status: "awaiting_payment" },
+                    {
+                        $set: {
+                            status: "canceled",
+                            ...(b.payment_session
+                                ? { "payment_session.status": "expired" }
+                                : {}),
+                        },
+                    }
+                );
+
+                // notify user
+                let tourName = `#${b._id}`;
+                try {
+                    const t = await Tour.findById(b.tour_id).lean();
+                    if (t?.name) tourName = t.name;
+                } catch { /* ignore */ }
+
+                await notifyUser({
+                    userId: b.customer_id,
+                    type: "booking:cancelled",
+                    content: `Booking cho tour ${tourName} đã bị hủy do quá hạn thanh toán.`,
+                    url: `/booking/${b._id}`,
+                    meta: { bookingId: b._id, tourId: b.tour_id, tourName },
+                }).catch(() => { });
+            } catch (err) {
+                console.warn("auto-cancel booking error:", b?._id?.toString(), err?.message);
+            }
+        }
+    } catch (err) {
+        console.error("auto-cancel scan error:", err?.message);
+    }
+
+    // 2) AUTO-REJECT do quá hạn chờ HDV duyệt
+    try {
+        const toReject = await Booking.find({
+            status: "waiting_guide",
+            "guide_decision.status": "pending",
+            guide_approval_due_at: { $ne: null, $lte: now },
+        })
+            .select("_id customer_id tour_id intended_guide_id")
+            .lean();
+
+        for (const b of toReject) {
+            try {
+                await Booking.updateOne(
+                    { _id: b._id, status: "waiting_guide", "guide_decision.status": "pending" },
+                    {
+                        $set: {
+                            status: "rejected",
+                            guide_decision: {
+                                status: "rejected",
+                                decided_at: new Date(),
+                                decided_by: undefined,
+                                note: "Hệ thống từ chối do quá thời hạn chờ HDV.",
+                            },
+                        },
+                    }
+                );
+
+                let tourName = `#${b._id}`;
+                try {
+                    const t = await Tour.findById(b.tour_id).lean();
+                    if (t?.name) tourName = t.name;
+                } catch { /* ignore */ }
+
+                // Notify khách: dùng template 'booking:rejected' hiện có
+                await notifyUser({
+                    userId: b.customer_id,
+                    type: "booking:rejected",
+                    content: `Yêu cầu đặt tour ${tourName} đã bị từ chối do quá thời hạn chờ HDV.`,
+                    url: `/booking/${b._id}`,
+                    meta: { bookingId: b._id, tourId: b.tour_id, tourName, reason: "timeout_guide" },
+                }).catch(() => { });
+            } catch (err) {
+                console.warn("auto-reject booking error:", b?._id?.toString(), err?.message);
+            }
+        }
+    } catch (err) {
+        console.error("auto-reject scan error:", err?.message);
+    }
+
+    // 3) PROMPT REVIEW + auto-complete như cũ
+    try {
+        const windowMs = 5 * 60 * 1000; // 5 phút gần nhất
+        const since = new Date(now.getTime() - windowMs);
+
         // Lấy các booking kết thúc trong cửa sổ thời gian
         const bookings = await Booking.find({
             end_date: { $gt: since, $lte: now },
