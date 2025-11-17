@@ -10,7 +10,7 @@ function toDateOrNull(input) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
         return new Date(`${input}T00:00:00+07:00`);
     }
-    // Cho phép ISO 8601 đầy đủ: 2025-12-20T09:30:00+07:00
+    // Cho phép ISO 8601 đầy đủ
     const t = Date.parse(input);
     if (!Number.isNaN(t)) return new Date(t);
     return null; // không parse được
@@ -20,16 +20,16 @@ function toDateOrNull(input) {
 function computePrice({ basePrice, participants }) {
     let total = 0;
     const normalized = participants.map(p => {
-        const isFree = p.age_provided < 11;
+        const isFree = (typeof p.age_provided === "number") ? (p.age_provided < 11) : false;
         const price = isFree ? 0 : Number(basePrice);
         if (!isFree) total += price;
         return {
-            full_name: p.full_name,
-            age_provided: p.age_provided,
+            full_name: p.full_name || null,
+            age_provided: typeof p.age_provided === "number" ? p.age_provided : null,
             is_free: isFree,
             count_slot: !isFree,
             price_applied: price,
-            seat_index: null,
+            seat_index: p.seat_index ?? null,
             is_primary_contact: !!p.is_primary_contact,
         };
     });
@@ -49,18 +49,36 @@ function minutesFromEnv(name, fallback) {
     return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
-// 1) USER tạo booking => CHỜ HDV DUYỆT (hoặc AUTO-APPROVE nếu HDV đã khóa tour+ngày)
+/**
+ * Hỗ trợ nhập THUẬN TIỆN từ FE:
+ * - Nếu FE gửi participants[] (hiện hành) -> dùng như cũ
+ * - Nếu FE gửi adults (số người lớn) và children (số trẻ em <11) -> backend sinh participants tương ứng
+ *   + adults: mỗi phần tử age_provided đặt 30 (non-free) và count_slot=true
+ *   + children: mỗi phần tử age_provided đặt 5 (miễn phí theo chính sách hiện tại) và count_slot=false
+ * Lưu ý: nếu bạn muốn children có phí, FE nên gửi ages hoặc participants chi tiết.
+ */
 export const createBooking = async (req, res) => {
     try {
         const userId = req.user?._id;
-        const { tour_id, start_date, end_date, participants = [], contact = {}, guide_id } = req.body;
+        const {
+            tour_id,
+            start_date,
+            end_date,
+            participants = null, // có thể null, nếu FE dùng counts
+            guide_id,
+            // optional short form:
+            adults: adultsCountFromBody,
+            children: childrenCountFromBody,
+            children_ages, // optional array nếu FE có tuổi cụ thể
+            contact = {}
+        } = req.body;
 
         const start = toDateOrNull(start_date);
         const end = toDateOrNull(end_date);
 
         if (start_date && !start) {
             return res.status(400).json({
-                message: "start_date không hợp lệ. Dùng 'YYYY-MM-DD' (VD: 2025-12-20) hoặc ISO 8601 (VD: 2025-12-20T00:00:00+07:00).",
+                message: "start_date không hợp lệ. Dùng 'YYYY-MM-DD' hoặc ISO 8601.",
                 received: start_date
             });
         }
@@ -79,15 +97,75 @@ export const createBooking = async (req, res) => {
         }
 
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
-        if (!tour_id || !participants.length) {
-            return res.status(400).json({ message: "Thiếu tour_id hoặc participants" });
-        }
+        if (!tour_id) return res.status(400).json({ message: "Thiếu tour_id" });
 
         const tour = await Tour.findById(tour_id).lean();
         if (!tour) return res.status(404).json({ message: "Tour không tồn tại" });
 
+        // --- Build participants array: use provided participants OR the simplified counts ---
+        let participantsInput = null;
+
+        if (Array.isArray(participants) && participants.length) {
+            participantsInput = participants;
+        } else {
+            // If FE uses counts: prefer explicit adults/children. Coerce to numbers.
+            const adults = Number(adultsCountFromBody || 0);
+            const children = Number(childrenCountFromBody || 0);
+
+            // If neither participants nor counts provided -> error
+            if (adults <= 0 && children <= 0) {
+                return res.status(400).json({ message: "Thiếu participants hoặc adults/children counts." });
+            }
+
+            participantsInput = [];
+
+            // create adults entries (age 30 default)
+            for (let i = 0; i < adults; i++) {
+                participantsInput.push({
+                    full_name: null,
+                    age_provided: 30,
+                    is_primary_contact: i === 0, // first adult can be primary contact
+                    seat_index: null
+                });
+            }
+
+            // create children entries.
+            // If client supplied children_ages array, map them; else use default age 5 (treated as <11 free).
+            if (Array.isArray(children_ages) && children_ages.length) {
+                // only take up to children count or length provided
+                for (let i = 0; i < Math.min(children, children_ages.length); i++) {
+                    const age = Number(children_ages[i]);
+                    participantsInput.push({
+                        full_name: null,
+                        age_provided: Number.isFinite(age) ? age : 5,
+                        is_primary_contact: false,
+                        seat_index: null
+                    });
+                }
+                // if children count > ages length, create default age entries for remainder
+                for (let i = children_ages.length; i < children; i++) {
+                    participantsInput.push({
+                        full_name: null,
+                        age_provided: 5,
+                        is_primary_contact: false,
+                        seat_index: null
+                    });
+                }
+            } else {
+                for (let i = 0; i < children; i++) {
+                    participantsInput.push({
+                        full_name: null,
+                        age_provided: 5,
+                        is_primary_contact: false,
+                        seat_index: null
+                    });
+                }
+            }
+        }
+
+        // --- price calculation using existing computePrice helper ---
         const basePrice = Number(tour.price || 0);
-        const { total, normalized } = computePrice({ basePrice, participants });
+        const { total, normalized } = computePrice({ basePrice, participants: participantsInput });
 
         // 🔒 SLOT CHECK (tránh overbook) — kiểm tra TRƯỚC khi tạo
         const requested = normalized.filter(p => p.count_slot).length;
@@ -106,7 +184,7 @@ export const createBooking = async (req, res) => {
             guide_id ||
             (tour.guide_id ? String(tour.guide_id) : (tour.guides?.[0]?.guideId ? String(tour.guides[0].guideId) : null));
 
-        // Tính end_date nếu client KHÔNG gửi (Cách 2): start_date + (duration - 1) ngày
+        // Tính end_date nếu client KHÔNG gửi: start_date + (duration - 1) ngày
         const durationDays = Math.max(Number(tour?.duration || 1), 1);
         const computedEnd = end ?? (start ? addDays(start, durationDays - 1) : null);
 
@@ -114,14 +192,13 @@ export const createBooking = async (req, res) => {
         const approvalMins = minutesFromEnv("BOOKING_GUIDE_APPROVAL_TIMEOUT_MINUTES", 120);
         const paymentMins = minutesFromEnv("BOOKING_PAYMENT_TIMEOUT_MINUTES", 60);
 
-        // === AUTO-APPROVE: nếu HDV này đã “nhận” CHÍNH tour này ở CÙNG ngày (accepted/awaiting_payment/paid/completed)
+        // === AUTO-APPROVE: nếu HDV này đã “nhận” CHÍNH tour này ở CÙNG ngày
         let status = "waiting_guide";
         let guide_decision = { status: "pending" };
         let guide_approval_due_at = null;
         let payment_due_at = null;
 
         if (intendedGuide) {
-            // Nếu HDV bận bởi 1 booking khác trùng khoảng ngày → chặn luôn
             const busy = await isGuideBusy(intendedGuide, start, computedEnd, null, tour._id);
             if (busy) {
                 return res.status(409).json({
@@ -129,7 +206,6 @@ export const createBooking = async (req, res) => {
                 });
             }
 
-            // Nếu HDV đã từng nhận chính tour này ở cùng ngày → bỏ qua bước duyệt
             const locked = await hasGuideLockedThisTourDate(intendedGuide, tour._id, start, computedEnd);
             if (locked) {
                 status = "awaiting_payment";
@@ -151,8 +227,8 @@ export const createBooking = async (req, res) => {
             customer_id: userId,
             tour_id,
             intended_guide_id: intendedGuide || null,
-            start_date: start ?? null,     // bản đã parse
-            end_date: computedEnd ?? null, // tự tính theo duration nếu client không gửi
+            start_date: start ?? null,
+            end_date: computedEnd ?? null,
             contact,
             total_price: total,
             participants: normalized,
@@ -166,7 +242,7 @@ export const createBooking = async (req, res) => {
         const tourName = tour.name || `#${booking._id}`;
 
         if (status === "awaiting_payment") {
-            // Đã auto-approve → báo KH thanh toán, KHÔNG cần ping HDV nữa
+            // Đã auto-approve → báo KH thanh toán
             await notifyUser({
                 userId,
                 type: "booking:approved",
@@ -176,7 +252,6 @@ export const createBooking = async (req, res) => {
                     bookingId: booking._id,
                     tourId: tour._id,
                     tourName,
-                    // Gửi hạn thanh toán để FE/email hiển thị
                     dueDate: payment_due_at ? new Date(payment_due_at).toISOString() : undefined,
                 },
             }).catch(() => { });
@@ -207,10 +282,9 @@ export const createBooking = async (req, res) => {
     }
 };
 
-// 2) HDV đồng ý => CHỜ THANH TOÁN (không notify admin ở đây)
 export const guideApproveBooking = async (req, res) => {
     try {
-        const user = req.user; // {_id, role, ...}
+        const user = req.user;
         const { id } = req.params;
 
         const booking = await Booking.findById(id);
@@ -226,12 +300,10 @@ export const guideApproveBooking = async (req, res) => {
             return res.status(400).json({ message: "Booking không ở trạng thái chờ HDV" });
         }
 
-        // 🔧 LOAD TOUR để có tour.name dùng trong content thông báo
         const tourDoc = await Tour.findById(booking.tour_id).lean();
         if (!tourDoc) return res.status(404).json({ message: "Tour không tồn tại" });
         const tourName = tourDoc?.name || `#${booking._id}`;
 
-        // 🔒 SLOT CHECK lần 2 (tránh race condition)
         const requested = (booking.participants || []).filter(p => p.count_slot).length;
         const taken = await getTakenSlots(booking.tour_id, booking.start_date);
         const remaining = Math.max((Number(tourDoc.max_guests) || 0) - taken, 0);
@@ -243,7 +315,6 @@ export const guideApproveBooking = async (req, res) => {
             });
         }
 
-        // ❗ BUSY CHECK: nếu HDV đã bận bởi 1 booking khác trùng ngày/khoảng ngày → CHẶN duyệt
         const busy = await isGuideBusy(
             booking.intended_guide_id || user._id,
             booking.start_date,
@@ -257,7 +328,6 @@ export const guideApproveBooking = async (req, res) => {
             });
         }
 
-        // Cập nhật trạng thái + hạn thanh toán
         const paymentMins = minutesFromEnv("BOOKING_PAYMENT_TIMEOUT_MINUTES", 60);
         booking.status = "awaiting_payment";
         booking.guide_decision = {
@@ -268,7 +338,6 @@ export const guideApproveBooking = async (req, res) => {
         booking.payment_due_at = new Date(Date.now() + paymentMins * 60 * 1000);
         await booking.save();
 
-        // Notify USER: mời thanh toán (dùng tourName thay vì id)
         await notifyUser({
             userId: booking.customer_id,
             type: "booking:approved",
@@ -282,8 +351,6 @@ export const guideApproveBooking = async (req, res) => {
             },
         }).catch(() => { });
 
-        // LƯU Ý: không notify admin ở bước này (chỉ notify khi IPN paid)
-
         res.json({ booking });
     } catch (e) {
         console.error(e);
@@ -291,7 +358,6 @@ export const guideApproveBooking = async (req, res) => {
     }
 };
 
-// 3) HDV từ chối
 export const guideRejectBooking = async (req, res) => {
     try {
         const user = req.user;
@@ -311,7 +377,6 @@ export const guideRejectBooking = async (req, res) => {
             return res.status(400).json({ message: "Booking không ở trạng thái chờ HDV" });
         }
 
-        // 🔧 LOAD TOUR để có tour.name dùng trong content thông báo
         const tourDoc = await Tour.findById(booking.tour_id).lean();
         const tourName = tourDoc?.name || `#${booking._id}`;
 
@@ -339,7 +404,6 @@ export const guideRejectBooking = async (req, res) => {
     }
 };
 
-// 4) USER xem danh sách (hỗ trợ ?status=)
 export const getMyBookings = async (req, res) => {
     try {
         const userId = req.user?._id;
