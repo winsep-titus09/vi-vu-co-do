@@ -8,10 +8,6 @@ const transporter = createTransporter();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-function escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function getValueByPath(obj, path) {
     if (!path) return undefined;
     const parts = String(path).split(".");
@@ -25,10 +21,12 @@ function getValueByPath(obj, path) {
 
 /**
  * renderTemplate hỗ trợ:
- * - conditional block: {{#if key}} ... {{/if}} (không support nested)
- * - placeholder replacement: {{ key }}
+ * - conditional block: {{#if key}} ... {{/if}} (hỗ trợ dotted keys)
+ * - placeholder: {{ key }} hoặc {{ a.b.c }}
  * - nếu key không tồn tại -> thay bằng empty string
- * - thêm defaults cho appName, year, supportEmail, appBaseUrl, logoUrl từ env nếu caller không truyền
+ * - thêm defaults: appName, appBaseUrl, supportEmail, logoUrl, year
+ *
+ * Template files expected at: server/templates/email/<templateKey>.html
  */
 function renderTemplate(templateKey, data = {}) {
     const filePath = path.join(__dirname, "..", "templates", "email", `${templateKey}.html`);
@@ -37,12 +35,10 @@ function renderTemplate(templateKey, data = {}) {
         html = fs.readFileSync(filePath, "utf-8");
     } catch (err) {
         console.error("[EMAIL] Không đọc được template:", templateKey, "path:", filePath, "error:", err.message);
-        // Fallback gửi nội dung thuần để vẫn thử gửi mail (giúp debug)
         html = `<p><strong>Template '${templateKey}' lỗi hoặc không tồn tại.</strong></p>
             <pre>${Object.entries(data).map(([k, v]) => `${k}: ${v}`).join("\n")}</pre>`;
     }
 
-    // Thiết lập defaults chung từ ENV nếu caller không truyền
     const defaults = {
         appName: process.env.APP_NAME || "Vi Vu Co Do",
         appBaseUrl: process.env.APP_BASE_URL || "",
@@ -50,29 +46,32 @@ function renderTemplate(templateKey, data = {}) {
         logoUrl: process.env.APP_LOGO_URL || "",
         year: new Date().getFullYear(),
     };
-    // Không mutate tham số caller: merge vào newData
     const newData = { ...defaults, ...data };
 
-    // 1) Xử lý conditional blocks: {{#if key}} ... {{/if}}
-    // Lưu ý: không hỗ trợ nested blocks phức tạp. Nếu cần nested, có thể mở rộng sau.
+    // 1) Conditional blocks: {{#if key}} ... {{/if}} (supports dotted keys)
     const condRe = /{{#if\s+([\w.]+)}}([\s\S]*?){{\/if}}/g;
     html = html.replace(condRe, (match, key, inner) => {
         const val = getValueByPath(newData, key);
-        // Nếu truthy (non-empty string / number / boolean true / object) -> render inner (có thể chứa placeholder)
         if (val !== undefined && val !== null && String(val).trim() !== "") {
             return inner;
         }
-        return ""; // remove block nếu falsy
+        return "";
     });
 
-    // 2) Thay thế tất cả placeholder có trong data
-    for (const [k, v] of Object.entries(newData)) {
-        const re = new RegExp(`{{\\s*${escapeRegExp(k)}\\s*}}`, "g");
-        html = html.replace(re, String(v ?? ""));
-    }
+    // 2) Replace placeholders: {{ key }} or {{ a.b.c }}
+    html = html.replace(/{{\s*([\w.]+)\s*}}/g, (match, key) => {
+        const v = getValueByPath(newData, key);
+        return v === undefined || v === null ? "" : String(v);
+    });
 
-    // 3) Loại bỏ các placeholder còn thừa (không có key tương ứng) để tránh hiển thị {{ key }}
+    // 3) Remove leftover placeholders defensively
     html = html.replace(/{{\s*[\w.]+\s*}}/g, "");
+
+    // Debug render in non-production
+    if (process.env.NODE_ENV !== "production") {
+        console.log(`[EMAIL] Rendered template: ${templateKey} (preview)`);
+        console.log(html.slice(0, 1200));
+    }
 
     return html;
 }

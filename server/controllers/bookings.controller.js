@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import Tour from "../models/Tour.js";
 import Transaction from "../models/Transaction.js";
+import User from "../models/User.js";
 import { notifyAdmins, notifyUser } from "../services/notify.js";
 import { getTakenSlots, isGuideBusy, hasGuideLockedThisTourDate } from "../helpers/bookings.helper.js";
 
@@ -56,7 +57,7 @@ function minutesFromEnv(name, fallback) {
     return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
-function isAdmin(user) { return user?.role === "admin"; }
+function isAdmin(user) { return user?.role_id?.name === "admin" || user?.role === "admin"; }
 function isOwner(user, booking) { return String(user?._id) === String(booking.customer_id); }
 
 /**
@@ -300,7 +301,7 @@ export const guideApproveBooking = async (req, res) => {
 
         const isGuideOwner =
             booking.intended_guide_id && String(booking.intended_guide_id) === String(user._id);
-        const isUserAdmin = user?.role === "admin";
+        const isUserAdmin = user?.role === "admin" || user?.role_id?.name === "admin";
         if (!isGuideOwner && !isUserAdmin) {
             return res.status(403).json({ message: "Bạn không có quyền duyệt booking này" });
         }
@@ -385,7 +386,7 @@ export const guideRejectBooking = async (req, res) => {
 
         const isGuideOwner =
             booking.intended_guide_id && String(booking.intended_guide_id) === String(user._id);
-        const isUserAdmin = user?.role === "admin";
+        const isUserAdmin = user?.role === "admin" || user?.role_id?.name === "admin";
         if (!isGuideOwner && !isUserAdmin) {
             return res.status(403).json({ message: "Bạn không có quyền từ chối booking này" });
         }
@@ -547,20 +548,51 @@ export const cancelBooking = async (req, res) => {
             booking.cancel_requested_note = reason || null;
             await booking.save();
 
+            // prepare rich meta for emails/templates
+            const customer = await User.findById(booking.customer_id).lean().catch(() => null);
+            const bookingCode = String(booking._id);
+            const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
+            const adminUrl = `${process.env.APP_BASE_URL}/admin/refunds/${txn._id}`;
+            const requestedAt = (booking.cancel_requested_at || new Date()).toLocaleString();
+
+            const adminMeta = {
+                bookingId: booking._id,
+                bookingCode,
+                amount,
+                customerName: customer?.name || "",
+                customerEmail: customer?.email || "",
+                transactionId: txn._id,
+                message: reason || "",
+                requestedAt,
+                bookingUrl,
+                adminUrl,
+                supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+            };
+
             // Notify admins (email + internal notify)
             await notifyAdmins({
                 type: "refund:requested",
                 content: `Khách yêu cầu hoàn tiền cho booking #${booking._id}. Vui lòng kiểm tra và xử lý.`,
-                meta: { bookingId: booking._id, transactionId: txn._id, amount },
+                meta: adminMeta,
             }).catch(() => { });
 
-            // Notify customer confirm request received
+            // Notify customer confirm request received (include amount & requestedAt)
+            const userMeta = {
+                bookingId: booking._id,
+                bookingCode,
+                amount,
+                message: reason || "",
+                requestedAt,
+                bookingUrl,
+                transactionId: txn._id,
+                supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+            };
             await notifyUser({
                 userId: booking.customer_id,
                 type: "booking:refund_requested:confirm",
                 content: `Yêu cầu hủy và hoàn tiền cho booking #${booking._id} đã được gửi tới admin.`,
                 url: `/booking/${booking._id}`,
-                meta: { bookingId: booking._id, transactionId: txn._id }
+                meta: userMeta
             }).catch(() => { });
 
             return res.status(201).json({ message: "Refund request created", transaction: txn, booking });
@@ -611,12 +643,42 @@ export const adminCancelBooking = async (req, res) => {
             booking.refund_transaction_id = txn._id;
             await booking.save();
 
+            // rich meta for user/email
+            const customer = await User.findById(booking.customer_id).lean().catch(() => null);
+            const bookingCode = String(booking._id);
+            const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
+            const adminUrl = `${process.env.APP_BASE_URL}/admin/refunds/${txn._id}`;
+
+            const userMeta = {
+                bookingId: booking._id,
+                bookingCode,
+                amount,
+                transactionId: txn._id,
+                transactionCode: txn.transaction_code || "",
+                confirmedBy: user.name || user._id,
+                confirmedAt: txn.confirmed_at ? txn.confirmed_at.toLocaleString() : new Date().toLocaleString(),
+                bookingUrl,
+                supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+            };
+
             await notifyUser({
                 userId: booking.customer_id,
                 type: "booking:refunded",
                 content: `Booking #${booking._id} đã được huỷ và hoàn tiền.`,
                 url: `/booking/${booking._id}`,
-                meta: { bookingId: booking._id, transactionId: txn._id }
+                meta: userMeta
+            }).catch(() => { });
+
+            // notify admins for audit
+            await notifyAdmins({
+                type: "refund:confirmed",
+                content: `Admin đã hoàn tiền cho booking ${booking._id}`,
+                meta: {
+                    bookingId: booking._id,
+                    transactionId: txn._id,
+                    amount,
+                    confirmedBy: user.name || user._id
+                }
             }).catch(() => { });
 
             return res.json({ booking, transaction: txn });
@@ -677,18 +739,42 @@ export const adminCreateRefund = async (req, res) => {
         booking.refund_transaction_id = txn._id;
         await booking.save();
 
+        const customer = await User.findById(booking.customer_id).lean().catch(() => null);
+        const bookingCode = String(booking._id);
+        const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
+        const adminUrl = `${process.env.APP_BASE_URL}/admin/refunds/${txn._id}`;
+
+        const userMeta = {
+            bookingId: booking._id,
+            bookingCode,
+            amount: refundAmount,
+            message: note || "",
+            bookingUrl,
+            transactionId: txn._id,
+            requestedAt: new Date().toLocaleString(),
+            supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+        };
+
         await notifyUser({
             userId: booking.customer_id,
             type: "booking:refund_requested",
             content: `Yêu cầu hoàn tiền cho booking #${booking._id} đã được tạo.`,
             url: `/booking/${booking._id}`,
-            meta: { bookingId: booking._id, transactionId: txn._id }
+            meta: userMeta
         }).catch(() => { });
 
         await notifyAdmins({
             type: "refund:pending",
             content: `Refund pending for booking ${booking._id}`,
-            meta: { bookingId: booking._id, transactionId: txn._id }
+            meta: {
+                bookingId: booking._id,
+                bookingCode,
+                amount: refundAmount,
+                transactionId: txn._id,
+                customerName: customer?.name || "",
+                customerEmail: customer?.email || "",
+                adminUrl
+            }
         }).catch(() => { });
 
         return res.json({ transaction: txn, booking });
@@ -733,12 +819,41 @@ export const adminConfirmRefund = async (req, res) => {
             await booking.save();
         }
 
+        // rich meta for user notify
+        const customer = await User.findById(txn.userId).lean().catch(() => null);
+        const bookingCode = booking ? String(booking._id) : (txn.bookingId ? String(txn.bookingId) : "");
+        const bookingUrl = `${process.env.APP_BASE_URL}/booking/${txn.bookingId || ""}`;
+
+        const userMeta = {
+            bookingId: txn.bookingId,
+            bookingCode,
+            amount: txn.amount ? txn.amount.toString() : "",
+            transactionId: txn._id,
+            transactionCode: txn.transaction_code || transaction_code || "",
+            confirmedBy: user.name || user._id,
+            confirmedAt: txn.confirmed_at ? txn.confirmed_at.toLocaleString() : new Date().toLocaleString(),
+            bookingUrl,
+            supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+        };
+
         await notifyUser({
             userId: txn.userId,
             type: "booking:refunded",
             content: `Hoàn tiền cho booking #${txn.bookingId} đã hoàn tất.`,
             url: `/booking/${txn.bookingId}`,
-            meta: { bookingId: txn.bookingId, transactionId: txn._id }
+            meta: userMeta
+        }).catch(() => { });
+
+        // notify admins for audit
+        await notifyAdmins({
+            type: "refund:confirmed",
+            content: `Refund confirmed for booking ${txn.bookingId} (txn ${txn._id}).`,
+            meta: {
+                bookingId: txn.bookingId,
+                transactionId: txn._id,
+                amount: txn.amount ? txn.amount.toString() : "",
+                confirmedBy: user.name || user._id
+            }
         }).catch(() => { });
 
         return res.json({ transaction: txn, booking });

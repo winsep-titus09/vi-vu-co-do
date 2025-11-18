@@ -1,4 +1,3 @@
-// services/notify.js (mở rộng gửi email Gmail)
 import Notification from "../models/Notification.js";
 import User from "../models/User.js";
 import { sendTemplateEmail } from "./email.service.js";
@@ -6,7 +5,34 @@ import { sendTemplateEmail } from "./email.service.js";
 let ioRef = null;
 export const setIO = (io) => { ioRef = io; };
 
-// Gửi email tới danh sách admin (ADMIN_EMAILS trong .env, phân tách dấu phẩy)
+/**
+ * Flatten object (one-level dotted keys)
+ * e.g. { a: { b: 1 }, c: 2 } -> { "a.b":1, a_b:1, a: {b:1}, c:2 }
+ * We will flatten nested meta to top-level keys as well as keep nested object for backward compat.
+ */
+function flattenForTemplate(obj = {}, prefix = "", out = {}) {
+    for (const key of Object.keys(obj || {})) {
+        const val = obj[key];
+        const newKey = prefix ? `${prefix}.${key}` : key;
+        if (val && typeof val === "object" && !Array.isArray(val) && !(val instanceof Date)) {
+            flattenForTemplate(val, newKey, out);
+        } else {
+            out[newKey] = val;
+            // also expose simple underscore version for templates that used underscores
+            out[newKey.replace(/\./g, "_")] = val;
+        }
+    }
+    return out;
+}
+
+// Helper: build email data from provided meta + explicit fields
+function buildTemplateData(extra = {}, meta = {}) {
+    const flatMeta = flattenForTemplate(meta);
+    // merge extra (explicit) with flatten meta; extra overrides meta keys
+    return { ...flatMeta, ...extra };
+}
+
+// send admin email list (ADMIN_EMAILS)
 async function sendAdminEmail({ subject, templateKey, data }) {
     const list = (process.env.ADMIN_EMAILS || "")
         .split(",")
@@ -21,99 +47,102 @@ async function sendAdminEmail({ subject, templateKey, data }) {
     );
 }
 
-// Map sự kiện -> gửi email
-async function maybeSendEmail({ audience, recipientId, type, content, url, meta }) {
+/**
+ * maybeSendEmail: map event -> email template + data
+ * audience: "admin" or "user"
+ */
+async function maybeSendEmail({ audience, recipientId, type, content, url, meta = {} }) {
     try {
-        // ADMIN events
         if (audience === "admin") {
-            // Các event admin đã có
+            // general admin events
             if (type === "guide_application:new") {
-                await sendAdminEmail({
-                    subject: "Yêu cầu làm HDV mới",
-                    templateKey: "adminNewGuideApplication",
-                    data: {
-                        applicantName: meta?.applicantName || "",
-                        applicantEmail: meta?.applicantEmail || "",
-                        adminUrl: meta?.adminUrl || `${process.env.APP_BASE_URL}/admin/guide-applications${meta?.applicationId ? "/" + meta.applicationId : ""}`
-                    }
-                });
+                const data = buildTemplateData({
+                    applicantName: meta?.applicantName || "",
+                    applicantEmail: meta?.applicantEmail || "",
+                    adminUrl: meta?.adminUrl || `${process.env.APP_BASE_URL}/admin/guide-applications${meta?.applicationId ? "/" + meta.applicationId : ""}`,
+                    supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+                }, meta);
+                await sendAdminEmail({ subject: "Yêu cầu làm HDV mới", templateKey: "adminNewGuideApplication", data });
             }
+
             if (type === "booking:paid") {
-                await sendAdminEmail({
-                    subject: "Booking thanh toán thành công",
-                    templateKey: "adminPaymentSuccess",
-                    data: {
-                        tourName: meta?.tourName || "",
-                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
-                        customerName: meta?.customerName || "",
-                        customerEmail: meta?.customerEmail || ""
-                    }
-                });
+                const data = buildTemplateData({
+                    tourName: meta?.tourName || "",
+                    bookingCode: meta?.bookingCode || meta?.bookingId || "",
+                    customerName: meta?.customerName || "",
+                    customerEmail: meta?.customerEmail || ""
+                }, meta);
+                await sendAdminEmail({ subject: "Booking thanh toán thành công", templateKey: "adminPaymentSuccess", data });
             }
 
-            // MỚI: admin nhận khi có yêu cầu refund từ khách hoặc admin tạo
+            // refund requested (customer initiated or admin-created pending)
             if (type === "refund:requested" || type === "refund:pending") {
-                await sendAdminEmail({
-                    subject: "Yêu cầu hoàn tiền mới",
-                    templateKey: "adminRefundRequested",
-                    data: {
-                        bookingId: meta?.bookingId || "",
-                        bookingCode: meta?.bookingCode || "",
-                        amount: meta?.amount || "",
-                        customerName: meta?.customerName || "",
-                        customerEmail: meta?.customerEmail || "",
-                        adminUrl: meta?.adminUrl || `${process.env.APP_BASE_URL}/admin/refunds${meta?.transactionId ? "/" + meta.transactionId : ""}`
-                    }
-                });
+                const data = buildTemplateData({
+                    bookingId: meta?.bookingId || "",
+                    bookingCode: meta?.bookingCode || "",
+                    amount: meta?.amount || "",
+                    customerName: meta?.customerName || "",
+                    customerEmail: meta?.customerEmail || "",
+                    transactionId: meta?.transactionId || "",
+                    message: meta?.message || meta?.note || "",
+                    adminUrl: meta?.adminUrl || `${process.env.APP_BASE_URL}/admin/refunds${meta?.transactionId ? "/" + meta.transactionId : ""}`,
+                    supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+                }, meta);
+                await sendAdminEmail({ subject: "Yêu cầu hoàn tiền mới", templateKey: "adminRefundRequested", data });
             }
 
-            // MỚI: admin thông báo khi refund đã được xác nhận/từ chối (dùng cho audit)
             if (type === "refund:confirmed") {
-                await sendAdminEmail({
-                    subject: "Hoàn tiền đã được xác nhận",
-                    templateKey: "adminRefundConfirmed",
-                    data: {
-                        bookingId: meta?.bookingId || "",
-                        transactionId: meta?.transactionId || "",
-                        amount: meta?.amount || "",
-                        confirmedBy: meta?.confirmedBy || ""
-                    }
-                });
+                const data = buildTemplateData({
+                    bookingId: meta?.bookingId || "",
+                    transactionId: meta?.transactionId || "",
+                    amount: meta?.amount || "",
+                    confirmedBy: meta?.confirmedBy || ""
+                }, meta);
+                await sendAdminEmail({ subject: "Hoàn tiền đã được xác nhận", templateKey: "adminRefundConfirmed", data });
             }
+
             if (type === "refund:rejected") {
-                await sendAdminEmail({
-                    subject: "Yêu cầu hoàn tiền đã bị từ chối",
-                    templateKey: "adminRefundRejected",
-                    data: {
-                        bookingId: meta?.bookingId || "",
-                        transactionId: meta?.transactionId || "",
-                        reason: meta?.reason || "",
-                        rejectedBy: meta?.rejectedBy || ""
-                    }
-                });
+                const data = buildTemplateData({
+                    bookingId: meta?.bookingId || "",
+                    transactionId: meta?.transactionId || "",
+                    reason: meta?.reason || "",
+                    rejectedBy: meta?.rejectedBy || ""
+                }, meta);
+                await sendAdminEmail({ subject: "Yêu cầu hoàn tiền đã bị từ chối", templateKey: "adminRefundRejected", data });
             }
 
             return;
         }
 
-        // USER/GUIDE events (đều là user trong hệ thống)
+        // USER/GUIDE events
         if (!recipientId) return;
         const user = await User.findById(recipientId);
         if (!user?.email) return;
-
         const to = user.email;
 
+        // prepare a base data object from meta flattened, plus helpful defaults
+        const baseMeta = buildTemplateData({
+            bookingId: meta?.bookingId || "",
+            bookingCode: meta?.bookingCode || "",
+            amount: meta?.amount || "",
+            message: meta?.message || meta?.note || "",
+            requestedAt: meta?.requestedAt || meta?.requested_at || (meta?.createdAt ? new Date(meta.createdAt).toLocaleString() : ""),
+            bookingUrl: meta?.bookingUrl || `${process.env.APP_BASE_URL}/booking/${meta?.bookingId || ""}`,
+            supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || "",
+            transactionId: meta?.transactionId || meta?.txnId || "",
+            transactionCode: meta?.transaction_code || meta?.transactionCode || "",
+            confirmedAt: meta?.confirmedAt || new Date().toLocaleString(),
+            userName: user.name || "Bạn",
+            customerName: user.name || ""
+        }, meta);
+
         switch (type) {
-            // GUIDE APPLICATION RESULTS (customer)
             case "guide_application:approved":
                 await sendTemplateEmail({
                     to,
                     subject: "Hồ sơ HDV đã được duyệt",
                     templateKey: "guideApplicationApproved",
-                    data: {
-                        userName: user.name || "Bạn",
-                        dashboardUrl: `${process.env.APP_BASE_URL}/guide/dashboard`
-                    }
+                    data: baseMeta
                 });
                 break;
             case "guide_application:rejected":
@@ -121,26 +150,16 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     to,
                     subject: "Hồ sơ HDV bị từ chối",
                     templateKey: "guideApplicationRejected",
-                    data: {
-                        userName: user.name || "Bạn",
-                        reason: meta?.reason || meta?.admin_notes || "",
-                        applyUrl: `${process.env.APP_BASE_URL}/guide/apply`
-                    }
+                    data: baseMeta
                 });
                 break;
 
-            // BOOKING FLOW
             case "booking:request":
                 await sendTemplateEmail({
                     to,
                     subject: "Có booking mới chờ duyệt",
                     templateKey: "bookingCreatedAwaitingGuide",
-                    data: {
-                        guideName: user.name || "Bạn",
-                        tourName: meta?.tourName || "",
-                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
-                        guideBookingUrl: meta?.guideBookingUrl || `${process.env.APP_BASE_URL}/guide/bookings${meta?.bookingId ? "/" + meta.bookingId : ""}`
-                    }
+                    data: baseMeta
                 });
                 break;
 
@@ -149,13 +168,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     to,
                     subject: "Yêu cầu thanh toán booking",
                     templateKey: "bookingPaymentRequired",
-                    data: {
-                        userName: user.name || "Bạn",
-                        tourName: meta?.tourName || "",
-                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
-                        dueDate: meta?.dueDate || "",
-                        paymentUrl: meta?.paymentUrl || url || `${process.env.APP_BASE_URL}/booking/${meta?.bookingId || ""}/pay`
-                    }
+                    data: baseMeta
                 });
                 break;
 
@@ -164,14 +177,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     to,
                     subject: "Yêu cầu đặt tour bị từ chối",
                     templateKey: "bookingRejected",
-                    data: {
-                        userName: user.name || "Bạn",
-                        tourName: meta?.tourName || "",
-                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
-                        reason: meta?.reason || meta?.note || "",
-                        bookingUrl: meta?.bookingUrl || url || `${process.env.APP_BASE_URL}/booking/${meta?.bookingId || ""}`,
-                        supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
-                    }
+                    data: baseMeta
                 });
                 break;
 
@@ -180,127 +186,36 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     to,
                     subject: "Thanh toán tour thành công",
                     templateKey: "bookingPaymentSuccess",
-                    data: {
-                        userName: user.name || "Bạn",
-                        tourName: meta?.tourName || "",
-                        startDate: meta?.startDate || "",
-                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
-                        bookingUrl: meta?.bookingUrl || url || `${process.env.APP_BASE_URL}/booking/${meta?.bookingId || ""}`
-                    }
+                    data: baseMeta
                 });
                 break;
 
-            case "booking:payment_failed":
-                await sendTemplateEmail({
-                    to,
-                    subject: "Thanh toán thất bại",
-                    templateKey: "bookingPaymentFailed",
-                    data: {
-                        userName: user.name || "Bạn",
-                        tourName: meta?.tourName || ""
-                    }
-                });
-                break;
-
-            case "booking:paid_guide":
-                await sendTemplateEmail({
-                    to,
-                    subject: "Khách đã thanh toán",
-                    templateKey: "bookingPaidGuide",
-                    data: {
-                        guideName: user.name || "Bạn",
-                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
-                        tourName: meta?.tourName || ""
-                    }
-                });
-                break;
-
-            case "booking:cancelled":
-                await sendTemplateEmail({
-                    to,
-                    subject: "Đơn đặt tour đã bị hủy do quá hạn thanh toán",
-                    templateKey: "bookingCancelled",
-                    data: {
-                        userName: user.name || "Bạn",
-                        tourName: meta?.tourName || "",
-                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
-                    }
-                });
-                break;
-
-            // MỚI: khi khách gửi yêu cầu hủy và tạo refund request -> gửi email confirm tới KH
             case "booking:refund_requested":
             case "booking:refund_requested:confirm":
                 await sendTemplateEmail({
                     to,
                     subject: "Yêu cầu hoàn tiền đã được gửi",
                     templateKey: "bookingRefundRequested",
-                    data: {
-                        userName: user.name || "Bạn",
-                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
-                        amount: meta?.amount || "",
-                        message: meta?.message || meta?.note || "",
-                        supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
-                    }
+                    data: baseMeta
                 });
                 break;
 
-            // MỚI: refund đã được xác nhận -> thông báo KH
             case "booking:refunded":
+                // ensure transactionCode is provided via meta.transaction_code or meta.transactionCode
                 await sendTemplateEmail({
                     to,
                     subject: "Hoàn tiền đã được thực hiện",
                     templateKey: "bookingRefunded",
-                    data: {
-                        userName: user.name || "Bạn",
-                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
-                        amount: meta?.amount || "",
-                        transactionCode: meta?.transactionCode || meta?.transactionId || "",
-                        bookingUrl: meta?.bookingUrl || url || `${process.env.APP_BASE_URL}/booking/${meta?.bookingId || ""}`
-                    }
+                    data: baseMeta
                 });
                 break;
 
-            // MỚI: refund bị từ chối -> thông báo KH với lý do
             case "booking:refund_rejected":
                 await sendTemplateEmail({
                     to,
                     subject: "Yêu cầu hoàn tiền bị từ chối",
                     templateKey: "bookingRefundRejected",
-                    data: {
-                        userName: user.name || "Bạn",
-                        bookingCode: meta?.bookingCode || meta?.bookingId || "",
-                        reason: meta?.reason || "",
-                        supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
-                    }
-                });
-                break;
-
-            // REVIEW REMINDER từ cron
-            case "review:prompt:tour":
-            case "tour:completed_review_reminder":
-                await sendTemplateEmail({
-                    to,
-                    subject: "Nhắc đánh giá tour",
-                    templateKey: "reviewReminder",
-                    data: {
-                        userName: user.name || "Bạn",
-                        tourName: meta?.tourName || "",
-                        reviewUrl: meta?.reviewUrl || url || `${process.env.APP_BASE_URL}/booking/${meta?.bookingId || ""}/review`
-                    }
-                });
-                break;
-
-            case "review:prompt:guide":
-                await sendTemplateEmail({
-                    to,
-                    subject: "Nhắc đánh giá hướng dẫn viên",
-                    templateKey: "reviewReminder",
-                    data: {
-                        userName: user.name || "Bạn",
-                        tourName: meta?.tourName || "",
-                        reviewUrl: meta?.reviewUrl || url || `${process.env.APP_BASE_URL}/booking/${meta?.bookingId || ""}/review/guide`
-                    }
+                    data: baseMeta
                 });
                 break;
 
@@ -312,7 +227,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
     }
 }
 
-// Thông báo ADMIN
+// Notify functions used by controllers
 export const notifyAdmins = async ({ type, content, url, meta = {} }) => {
     const doc = await Notification.create({
         audience: "admin",
@@ -329,11 +244,11 @@ export const notifyAdmins = async ({ type, content, url, meta = {} }) => {
         });
     }
 
-    await maybeSendEmail({ audience: "admin", recipientId: null, type, content, url, meta });
+    // call maybeSendEmail with audience admin
+    await maybeSendEmail({ audience: "admin", recipientId: null, type, content, url, meta }).catch(() => { });
     return doc;
 };
 
-// Thông báo USER/GUIDE
 export const notifyUser = async ({ userId, type, content, url, meta = {} }) => {
     if (!userId) throw new Error("Thiếu userId để gửi thông báo.");
     const doc = await Notification.create({
@@ -352,6 +267,7 @@ export const notifyUser = async ({ userId, type, content, url, meta = {} }) => {
         });
     }
 
-    await maybeSendEmail({ audience: "user", recipientId: userId, type, content, url, meta });
+    // call maybeSendEmail for user with meta
+    await maybeSendEmail({ audience: "user", recipientId: userId, type, content, url, meta }).catch(() => { });
     return doc;
 };
