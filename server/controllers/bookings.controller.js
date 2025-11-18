@@ -238,9 +238,13 @@ export const createBooking = async (req, res) => {
             payment_due_at,
         });
 
-        // Thông báo
+        // Chuẩn bị meta chung (đảm bảo có bookingCode/bookingUrl/guideBookingUrl)
+        const bookingCode = String(booking._id);
+        const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
+        const guideBookingUrl = `${process.env.APP_BASE_URL}/guide/bookings/${booking._id}`;
         const tourName = tour.name || `#${booking._id}`;
 
+        // Thông báo
         if (status === "awaiting_payment") {
             // Đã auto-approve → báo KH thanh toán
             await notifyUser({
@@ -250,9 +254,11 @@ export const createBooking = async (req, res) => {
                 url: `/booking/${booking._id}`,
                 meta: {
                     bookingId: booking._id,
-                    tourId: tour._id,
+                    bookingCode,
+                    tourId: booking._id ? booking._id : booking.tour_id,
                     tourName,
                     dueDate: payment_due_at ? new Date(payment_due_at).toISOString() : undefined,
+                    bookingUrl,
                 },
             }).catch(() => { });
         } else {
@@ -263,7 +269,13 @@ export const createBooking = async (req, res) => {
                     type: "booking:request",
                     content: `Có yêu cầu đặt tour ${tourName} cần bạn xác nhận.`,
                     url: `/guide/bookings/${booking._id}`,
-                    meta: { bookingId: booking._id, tourId: tour._id, tourName },
+                    meta: {
+                        bookingId: booking._id,
+                        bookingCode,
+                        tourId: booking._id ? booking._id : booking.tour_id,
+                        tourName,
+                        guideBookingUrl,
+                    },
                 }).catch(() => { });
             }
             await notifyUser({
@@ -271,7 +283,13 @@ export const createBooking = async (req, res) => {
                 type: "booking:created",
                 content: `Đã gửi yêu cầu đặt tour ${tourName}. Vui lòng chờ HDV duyệt.`,
                 url: `/booking/${booking._id}`,
-                meta: { bookingId: booking._id, tourId: tour._id, tourName },
+                meta: {
+                    bookingId: booking._id,
+                    bookingCode,
+                    tourId: booking._id ? booking._id : booking.tour_id,
+                    tourName,
+                    bookingUrl,
+                },
             }).catch(() => { });
         }
 
@@ -338,6 +356,9 @@ export const guideApproveBooking = async (req, res) => {
         booking.payment_due_at = new Date(Date.now() + paymentMins * 60 * 1000);
         await booking.save();
 
+        const bookingCode = String(booking._id);
+        const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
+
         await notifyUser({
             userId: booking.customer_id,
             type: "booking:approved",
@@ -345,9 +366,11 @@ export const guideApproveBooking = async (req, res) => {
             url: `/booking/${booking._id}`,
             meta: {
                 bookingId: booking._id,
+                bookingCode,
                 tourId: booking.tour_id,
                 tourName,
                 dueDate: booking.payment_due_at ? new Date(booking.payment_due_at).toISOString() : undefined,
+                bookingUrl,
             },
         }).catch(() => { });
 
@@ -389,12 +412,20 @@ export const guideRejectBooking = async (req, res) => {
         };
         await booking.save();
 
+        // Gửi notify kèm lý do trong meta.reason để template email có thể thay thế {{ reason }}
         await notifyUser({
             userId: booking.customer_id,
             type: "booking:rejected",
             content: `HDV đã từ chối yêu cầu đặt tour ${tourName}${note ? `: ${note}` : ""}`,
             url: `/booking/${booking._id}`,
-            meta: { bookingId: booking._id, tourId: booking.tour_id, tourName },
+            meta: {
+                bookingId: booking._id,
+                bookingCode: String(booking._id),
+                tourId: booking.tour_id,
+                tourName,
+                reason: note || "",
+                bookingUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}`
+            },
         }).catch(() => { });
 
         res.json({ booking });

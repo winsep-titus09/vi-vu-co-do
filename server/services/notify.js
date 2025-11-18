@@ -127,6 +127,12 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                         userName: user.name || "Bạn",
                         tourName: meta?.tourName || "",
                         bookingCode: meta?.bookingCode || meta?.bookingId || "",
+                        // <-- thêm reason vào data để template {{ reason }} được thay thế
+                        reason: meta?.reason || meta?.note || "",
+                        // bookingUrl: ưu tiên meta.bookingUrl, fallback url, fallback app path
+                        bookingUrl: meta?.bookingUrl || url || `${process.env.APP_BASE_URL}/booking/${meta?.bookingId || ""}`,
+                        // hỗ trợ hiển thị email support trong template (nếu template dùng)
+                        supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
                     }
                 });
                 break;
