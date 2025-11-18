@@ -1,4 +1,4 @@
-// server/controllers/adminRefunds.controller.js
+// server/controllers/admin/refunds.controller.js
 import mongoose from "mongoose";
 import Transaction from "../../models/Transaction.js";
 import Booking from "../../models/Booking.js";
@@ -6,14 +6,9 @@ import { notifyAdmins, notifyUser } from "../../services/notify.js";
 
 const ObjectId = mongoose.Types.ObjectId;
 
-function isAdmin(user) { return user?.role === "admin"; }
+// SỬA: kiểm tra role từ role_id.name (auth middleware populate 'role_id')
+function isAdmin(user) { return user?.role_id?.name === "admin"; }
 
-/**
- * List refund requests (admin)
- * Query params:
- *  - status (optional): pending|confirmed|failed  (default: pending)
- *  - limit, skip (optional)
- */
 export const listRefundRequests = async (req, res) => {
     try {
         const user = req.user;
@@ -38,9 +33,6 @@ export const listRefundRequests = async (req, res) => {
     }
 };
 
-/**
- * Get one refund request detail
- */
 export const getRefundRequest = async (req, res) => {
     try {
         const user = req.user;
@@ -59,13 +51,6 @@ export const getRefundRequest = async (req, res) => {
     }
 };
 
-/**
- * Confirm refund (admin)
- * - body: { transaction_code? }
- * - Sets transaction.status = "confirmed", confirmed_by, confirmed_at
- * - Updates booking.status = "canceled", sets refund_transaction_id
- * - Notifies customer
- */
 export const confirmRefundRequest = async (req, res) => {
     try {
         const user = req.user;
@@ -81,25 +66,21 @@ export const confirmRefundRequest = async (req, res) => {
         if (txn.transaction_type !== "refund") return res.status(400).json({ message: "Transaction không phải refund" });
         if (txn.status === "confirmed") return res.status(400).json({ message: "Refund đã được xác nhận" });
 
-        // Mark transaction confirmed
         txn.status = "confirmed";
         txn.confirmed_by = user._id;
         txn.confirmed_at = new Date();
         if (transaction_code) txn.transaction_code = transaction_code;
         await txn.save();
 
-        // Update booking: cancel and set refund_transaction_id
         const booking = await Booking.findById(txn.bookingId);
         if (booking) {
             booking.status = "canceled";
             booking.canceled_at = new Date();
             booking.canceled_by = user._id;
             booking.refund_transaction_id = txn._id;
-            // If it was cancel_requested flag, we keep it; otherwise set cancel_reason if needed
             await booking.save();
         }
 
-        // Notify customer
         await notifyUser({
             userId: txn.userId,
             type: "booking:refunded",
@@ -108,7 +89,6 @@ export const confirmRefundRequest = async (req, res) => {
             meta: { bookingId: txn.bookingId, transactionId: txn._id }
         }).catch(() => { });
 
-        // Optional: notify admins that refund was confirmed
         await notifyAdmins({
             type: "refund:confirmed",
             content: `Refund confirmed for booking ${txn.bookingId} (txn ${txn._id}).`,
@@ -122,13 +102,6 @@ export const confirmRefundRequest = async (req, res) => {
     }
 };
 
-/**
- * Reject refund (admin)
- * - body: { reason? }
- * - Sets transaction.status = "failed" (or 'failed'), confirmed_by and confirmed_at to record actor/time
- * - Optionally clear booking.cancel_requested (so customer may try again or keep booking)
- * - Notify customer and admins
- */
 export const rejectRefundRequest = async (req, res) => {
     try {
         const user = req.user;
@@ -146,23 +119,20 @@ export const rejectRefundRequest = async (req, res) => {
         if (txn.status === "failed") return res.status(400).json({ message: "Refund đã bị từ chối trước đó" });
 
         txn.status = "failed";
-        txn.confirmed_by = user._id; // reuse field to store actor
+        txn.confirmed_by = user._id;
         txn.confirmed_at = new Date();
         txn.note = `${txn.note || ""} | Rejected by admin: ${reason || ""}`;
         await txn.save();
 
-        // Update booking: clear cancel_requested flag so booking remains paid (or leave it depending on policy)
         const booking = await Booking.findById(txn.bookingId);
         if (booking) {
             booking.cancel_requested = false;
             booking.cancel_requested_at = null;
             booking.cancel_requested_by = null;
             booking.cancel_requested_note = null;
-            // keep booking.status as-is (likely 'paid') so service remains booked
             await booking.save();
         }
 
-        // Notify customer about rejection
         await notifyUser({
             userId: txn.userId,
             type: "booking:refund_rejected",
@@ -171,7 +141,6 @@ export const rejectRefundRequest = async (req, res) => {
             meta: { bookingId: txn.bookingId, transactionId: txn._id, reason }
         }).catch(() => { });
 
-        // Notify admins for audit
         await notifyAdmins({
             type: "refund:rejected",
             content: `Refund for booking ${txn.bookingId} was rejected by admin ${user._id}.`,

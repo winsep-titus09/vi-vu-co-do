@@ -11,9 +11,9 @@ import {
 const router = express.Router();
 
 // All routes require auth; controller checks admin role
-router.get("/refunds", auth, listRefundRequests);                 // ?status=pending
-router.get("/refunds/:txnId", auth, getRefundRequest);
-router.post("/refunds/:txnId/confirm", auth, confirmRefundRequest);
-router.post("/refunds/:txnId/reject", auth, rejectRefundRequest);
+router.get("/", auth, listRefundRequests);                 // ?status=pending
+router.get("/:txnId", auth, getRefundRequest);
+router.post("/:txnId/confirm", auth, confirmRefundRequest);
+router.post("/:txnId/reject", auth, rejectRefundRequest);
 
 export default router;
