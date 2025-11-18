@@ -80,6 +80,19 @@ const BookingSchema = new mongoose.Schema(
 
         participants: [ParticipantSchema],
         payment_session: PaymentSessionSchema,
+
+        // MỚI: thông tin hủy / hoàn tiền
+        canceled_at: { type: Date, default: null },
+        canceled_by: { type: ObjectId, ref: "User", default: null },
+        cancel_reason: { type: String, default: null },
+        refund_transaction_id: { type: ObjectId, ref: "Transaction", default: null },
+
+        // MỚI: request hủy (do khách gửi khi booking đã paid)
+        cancel_requested: { type: Boolean, default: false },
+        cancel_requested_at: { type: Date, default: null },
+        cancel_requested_by: { type: ObjectId, ref: "User", default: null },
+        cancel_requested_note: { type: String, default: null },
+
     },
     { timestamps: true, collection: "bookings" }
 );

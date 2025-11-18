@@ -1,22 +1,29 @@
 // server/controllers/bookings.controller.js
+import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import Tour from "../models/Tour.js";
+import Transaction from "../models/Transaction.js";
 import { notifyAdmins, notifyUser } from "../services/notify.js";
 import { getTakenSlots, isGuideBusy, hasGuideLockedThisTourDate } from "../helpers/bookings.helper.js";
 
+const ObjectId = mongoose.Types.ObjectId;
+
+/**
+ * Helpers
+ */
+
+// Parse date or return null. Accepts YYYY-MM-DD (interpreted as +07:00) or full ISO.
 function toDateOrNull(input) {
     if (!input) return null;
-    // Ưu tiên YYYY-MM-DD (theo timezone Asia/Bangkok +07:00)
     if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
         return new Date(`${input}T00:00:00+07:00`);
     }
-    // Cho phép ISO 8601 đầy đủ
     const t = Date.parse(input);
     if (!Number.isNaN(t)) return new Date(t);
-    return null; // không parse được
+    return null;
 }
 
-// <11 tuổi miễn phí, không chiếm slot
+// Price computation: children <11 free (no slot)
 function computePrice({ basePrice, participants }) {
     let total = 0;
     const normalized = participants.map(p => {
@@ -36,26 +43,24 @@ function computePrice({ basePrice, participants }) {
     return { total, normalized };
 }
 
-// Helper tại chỗ: cộng ngày
+// add days helper
 function addDays(d, days) {
     const x = new Date(d);
     x.setDate(x.getDate() + days);
     return x;
 }
 
-// Helper đọc phút từ ENV (fallback nếu không có)
+// read minutes from env (fallback)
 function minutesFromEnv(name, fallback) {
     const v = Number(process.env[name]);
     return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
+function isAdmin(user) { return user?.role === "admin"; }
+function isOwner(user, booking) { return String(user?._id) === String(booking.customer_id); }
+
 /**
- * Hỗ trợ nhập THUẬN TIỆN từ FE:
- * - Nếu FE gửi participants[] (hiện hành) -> dùng như cũ
- * - Nếu FE gửi adults (số người lớn) và children (số trẻ em <11) -> backend sinh participants tương ứng
- *   + adults: mỗi phần tử age_provided đặt 30 (non-free) và count_slot=true
- *   + children: mỗi phần tử age_provided đặt 5 (miễn phí theo chính sách hiện tại) và count_slot=false
- * Lưu ý: nếu bạn muốn children có phí, FE nên gửi ages hoặc participants chi tiết.
+ * Create booking
  */
 export const createBooking = async (req, res) => {
     try {
@@ -64,12 +69,11 @@ export const createBooking = async (req, res) => {
             tour_id,
             start_date,
             end_date,
-            participants = null, // có thể null, nếu FE dùng counts
+            participants = null,
             guide_id,
-            // optional short form:
             adults: adultsCountFromBody,
             children: childrenCountFromBody,
-            children_ages, // optional array nếu FE có tuổi cụ thể
+            children_ages,
             contact = {}
         } = req.body;
 
@@ -89,7 +93,7 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // Không cho chọn ngày quá khứ (so sánh theo 0h hôm nay)
+        // no past start
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         if (start && start < todayStart) {
@@ -102,37 +106,31 @@ export const createBooking = async (req, res) => {
         const tour = await Tour.findById(tour_id).lean();
         if (!tour) return res.status(404).json({ message: "Tour không tồn tại" });
 
-        // --- Build participants array: use provided participants OR the simplified counts ---
+        // Build participants array (support simplified adults/children)
         let participantsInput = null;
 
         if (Array.isArray(participants) && participants.length) {
             participantsInput = participants;
         } else {
-            // If FE uses counts: prefer explicit adults/children. Coerce to numbers.
             const adults = Number(adultsCountFromBody || 0);
             const children = Number(childrenCountFromBody || 0);
 
-            // If neither participants nor counts provided -> error
             if (adults <= 0 && children <= 0) {
                 return res.status(400).json({ message: "Thiếu participants hoặc adults/children counts." });
             }
 
             participantsInput = [];
 
-            // create adults entries (age 30 default)
             for (let i = 0; i < adults; i++) {
                 participantsInput.push({
                     full_name: null,
                     age_provided: 30,
-                    is_primary_contact: i === 0, // first adult can be primary contact
+                    is_primary_contact: i === 0,
                     seat_index: null
                 });
             }
 
-            // create children entries.
-            // If client supplied children_ages array, map them; else use default age 5 (treated as <11 free).
             if (Array.isArray(children_ages) && children_ages.length) {
-                // only take up to children count or length provided
                 for (let i = 0; i < Math.min(children, children_ages.length); i++) {
                     const age = Number(children_ages[i]);
                     participantsInput.push({
@@ -142,7 +140,6 @@ export const createBooking = async (req, res) => {
                         seat_index: null
                     });
                 }
-                // if children count > ages length, create default age entries for remainder
                 for (let i = children_ages.length; i < children; i++) {
                     participantsInput.push({
                         full_name: null,
@@ -163,11 +160,9 @@ export const createBooking = async (req, res) => {
             }
         }
 
-        // --- price calculation using existing computePrice helper ---
         const basePrice = Number(tour.price || 0);
         const { total, normalized } = computePrice({ basePrice, participants: participantsInput });
 
-        // 🔒 SLOT CHECK (tránh overbook) — kiểm tra TRƯỚC khi tạo
         const requested = normalized.filter(p => p.count_slot).length;
         const taken = await getTakenSlots(tour._id, start);
         const remaining = Math.max((Number(tour.max_guests) || 0) - taken, 0);
@@ -179,20 +174,17 @@ export const createBooking = async (req, res) => {
             });
         }
 
-        // Chọn HDV ưu tiên
+        // choose intended guide
         const intendedGuide =
             guide_id ||
             (tour.guide_id ? String(tour.guide_id) : (tour.guides?.[0]?.guideId ? String(tour.guides[0].guideId) : null));
 
-        // Tính end_date nếu client KHÔNG gửi: start_date + (duration - 1) ngày
         const durationDays = Math.max(Number(tour?.duration || 1), 1);
         const computedEnd = end ?? (start ? addDays(start, durationDays - 1) : null);
 
-        // Thời hạn (phút) từ ENV
         const approvalMins = minutesFromEnv("BOOKING_GUIDE_APPROVAL_TIMEOUT_MINUTES", 120);
         const paymentMins = minutesFromEnv("BOOKING_PAYMENT_TIMEOUT_MINUTES", 60);
 
-        // === AUTO-APPROVE: nếu HDV này đã “nhận” CHÍNH tour này ở CÙNG ngày
         let status = "waiting_guide";
         let guide_decision = { status: "pending" };
         let guide_approval_due_at = null;
@@ -218,7 +210,6 @@ export const createBooking = async (req, res) => {
             }
         }
 
-        // Nếu vẫn chờ HDV duyệt → đặt hạn duyệt
         if (status === "waiting_guide") {
             guide_approval_due_at = new Date(Date.now() + approvalMins * 60 * 1000);
         }
@@ -238,15 +229,12 @@ export const createBooking = async (req, res) => {
             payment_due_at,
         });
 
-        // Chuẩn bị meta chung (đảm bảo có bookingCode/bookingUrl/guideBookingUrl)
         const bookingCode = String(booking._id);
         const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
         const guideBookingUrl = `${process.env.APP_BASE_URL}/guide/bookings/${booking._id}`;
         const tourName = tour.name || `#${booking._id}`;
 
-        // Thông báo
         if (status === "awaiting_payment") {
-            // Đã auto-approve → báo KH thanh toán
             await notifyUser({
                 userId,
                 type: "booking:approved",
@@ -262,7 +250,6 @@ export const createBooking = async (req, res) => {
                 },
             }).catch(() => { });
         } else {
-            // Còn chờ HDV duyệt
             if (intendedGuide) {
                 await notifyUser({
                     userId: intendedGuide,
@@ -300,6 +287,9 @@ export const createBooking = async (req, res) => {
     }
 };
 
+/**
+ * Guide approves booking -> awaiting_payment
+ */
 export const guideApproveBooking = async (req, res) => {
     try {
         const user = req.user;
@@ -310,8 +300,8 @@ export const guideApproveBooking = async (req, res) => {
 
         const isGuideOwner =
             booking.intended_guide_id && String(booking.intended_guide_id) === String(user._id);
-        const isAdmin = user?.role === "admin";
-        if (!isGuideOwner && !isAdmin) {
+        const isUserAdmin = user?.role === "admin";
+        if (!isGuideOwner && !isUserAdmin) {
             return res.status(403).json({ message: "Bạn không có quyền duyệt booking này" });
         }
         if (booking.status !== "waiting_guide" || booking.guide_decision?.status !== "pending") {
@@ -381,6 +371,9 @@ export const guideApproveBooking = async (req, res) => {
     }
 };
 
+/**
+ * Guide rejects booking
+ */
 export const guideRejectBooking = async (req, res) => {
     try {
         const user = req.user;
@@ -392,8 +385,8 @@ export const guideRejectBooking = async (req, res) => {
 
         const isGuideOwner =
             booking.intended_guide_id && String(booking.intended_guide_id) === String(user._id);
-        const isAdmin = user?.role === "admin";
-        if (!isGuideOwner && !isAdmin) {
+        const isUserAdmin = user?.role === "admin";
+        if (!isGuideOwner && !isUserAdmin) {
             return res.status(403).json({ message: "Bạn không có quyền từ chối booking này" });
         }
         if (booking.status !== "waiting_guide" || booking.guide_decision?.status !== "pending") {
@@ -412,7 +405,6 @@ export const guideRejectBooking = async (req, res) => {
         };
         await booking.save();
 
-        // Gửi notify kèm lý do trong meta.reason để template email có thể thay thế {{ reason }}
         await notifyUser({
             userId: booking.customer_id,
             type: "booking:rejected",
@@ -435,6 +427,9 @@ export const guideRejectBooking = async (req, res) => {
     }
 };
 
+/**
+ * Get bookings for current user
+ */
 export const getMyBookings = async (req, res) => {
     try {
         const userId = req.user?._id;
@@ -446,14 +441,309 @@ export const getMyBookings = async (req, res) => {
 
         const list = await Booking.find(cond).sort({ createdAt: -1 });
         res.json({ bookings: list });
-    } catch {
+    } catch (e) {
+        console.error(e);
         res.status(500).json({ message: "Lỗi lấy danh sách booking" });
     }
 };
 
+/**
+ * Get single booking
+ */
 export const getBooking = async (req, res) => {
-    const { id } = req.params;
-    const doc = await Booking.findById(id);
-    if (!doc) return res.status(404).json({ message: "Không tìm thấy" });
-    res.json({ booking: doc });
+    try {
+        const { id } = req.params;
+        if (!ObjectId.isValid(id)) return res.status(400).json({ message: "booking id không hợp lệ" });
+        const doc = await Booking.findById(id);
+        if (!doc) return res.status(404).json({ message: "Không tìm thấy" });
+        res.json({ booking: doc });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: "Lỗi lấy booking", error: e.message });
+    }
+};
+
+/* ============================
+   Cancel & Refund Endpoints
+   ============================ */
+
+/**
+ * Owner or admin cancel booking
+ * - If booking.status === waiting_guide || awaiting_payment -> cancel immediately
+ * - If booking.status === paid:
+ *    - If owner: create refund transaction (pending), mark cancel_requested and notify admins
+ *    - If admin: use adminCancelBooking endpoint (can refund immediately)
+ */
+export const cancelBooking = async (req, res) => {
+    try {
+        const user = req.user;
+        const { id } = req.params;
+        const { reason } = req.body || {};
+
+        const booking = await Booking.findById(id);
+        if (!booking) return res.status(404).json({ message: "Booking không tồn tại" });
+
+        if (!isOwner(user, booking) && !isAdmin(user)) {
+            return res.status(403).json({ message: "Bạn không có quyền huỷ booking này" });
+        }
+
+        // If waiting_guide OR awaiting_payment -> cancel now
+        if (booking.status === "waiting_guide" || booking.status === "awaiting_payment") {
+            booking.status = "canceled";
+            booking.canceled_at = new Date();
+            booking.canceled_by = user._id;
+            booking.cancel_reason = reason || null;
+            booking.payment_due_at = null;
+            booking.guide_approval_due_at = null;
+            await booking.save();
+
+            await notifyUser({
+                userId: booking.customer_id,
+                type: "booking:canceled",
+                content: `Booking #${booking._id} đã bị huỷ.`,
+                url: `/booking/${booking._id}`,
+                meta: { bookingId: booking._id, reason: booking.cancel_reason || "" }
+            }).catch(() => { });
+
+            if (booking.intended_guide_id) {
+                await notifyUser({
+                    userId: booking.intended_guide_id,
+                    type: "booking:canceled:guide",
+                    content: `Booking #${booking._id} cho tour đã bị huỷ.`,
+                    url: `/guide/bookings/${booking._id}`,
+                    meta: { bookingId: booking._id }
+                }).catch(() => { });
+            }
+
+            return res.json({ booking });
+        }
+
+        // If paid -> owner requests refund (create pending refund txn)
+        if (booking.status === "paid") {
+            // If already has refund txn, return it
+            if (booking.refund_transaction_id) {
+                const existing = await Transaction.findById(booking.refund_transaction_id);
+                if (existing) {
+                    return res.status(200).json({ message: "Refund request đã tồn tại", transaction: existing });
+                }
+            }
+
+            const amount = booking.total_price ? Number(booking.total_price.toString()) : 0;
+            const txn = await Transaction.create({
+                bookingId: booking._id,
+                userId: booking.customer_id,
+                amount,
+                net_amount: amount,
+                transaction_type: "refund",
+                status: "pending",
+                payment_gateway: booking.payment_session?.gateway || "manual",
+                note: `Customer requested cancel: ${reason || ""}`,
+            });
+
+            booking.refund_transaction_id = txn._id;
+            booking.cancel_requested = true;
+            booking.cancel_requested_at = new Date();
+            booking.cancel_requested_by = user._id;
+            booking.cancel_requested_note = reason || null;
+            await booking.save();
+
+            // Notify admins (email + internal notify)
+            await notifyAdmins({
+                type: "refund:requested",
+                content: `Khách yêu cầu hoàn tiền cho booking #${booking._id}. Vui lòng kiểm tra và xử lý.`,
+                meta: { bookingId: booking._id, transactionId: txn._id, amount },
+            }).catch(() => { });
+
+            // Notify customer confirm request received
+            await notifyUser({
+                userId: booking.customer_id,
+                type: "booking:refund_requested:confirm",
+                content: `Yêu cầu hủy và hoàn tiền cho booking #${booking._id} đã được gửi tới admin.`,
+                url: `/booking/${booking._id}`,
+                meta: { bookingId: booking._id, transactionId: txn._id }
+            }).catch(() => { });
+
+            return res.status(201).json({ message: "Refund request created", transaction: txn, booking });
+        }
+
+        return res.status(400).json({ message: `Không thể huỷ booking ở trạng thái ${booking.status}` });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: "Lỗi huỷ booking", error: e.message });
+    }
+};
+
+/**
+ * Admin cancel booking (can optionally create & confirm refund immediately)
+ */
+export const adminCancelBooking = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!isAdmin(user)) return res.status(403).json({ message: "Chỉ admin" });
+
+        const { id } = req.params;
+        const { reason, createAndConfirmRefund = false } = req.body || {};
+
+        const booking = await Booking.findById(id);
+        if (!booking) return res.status(404).json({ message: "Booking không tồn tại" });
+
+        // If paid and admin chooses to refund immediately
+        if (booking.status === "paid" && createAndConfirmRefund) {
+            const amount = booking.total_price ? Number(booking.total_price.toString()) : 0;
+            const txn = await Transaction.create({
+                bookingId: booking._id,
+                userId: booking.customer_id,
+                amount,
+                net_amount: amount,
+                transaction_type: "refund",
+                status: "confirmed", // admin confirms immediately
+                payment_gateway: booking.payment_session?.gateway || "manual",
+                transaction_code: null,
+                note: `Admin refund on cancel: ${reason || ""}`,
+                confirmed_by: user._id,
+                confirmed_at: new Date(),
+            });
+
+            booking.status = "canceled";
+            booking.canceled_at = new Date();
+            booking.canceled_by = user._id;
+            booking.cancel_reason = reason || null;
+            booking.refund_transaction_id = txn._id;
+            await booking.save();
+
+            await notifyUser({
+                userId: booking.customer_id,
+                type: "booking:refunded",
+                content: `Booking #${booking._id} đã được huỷ và hoàn tiền.`,
+                url: `/booking/${booking._id}`,
+                meta: { bookingId: booking._id, transactionId: txn._id }
+            }).catch(() => { });
+
+            return res.json({ booking, transaction: txn });
+        }
+
+        // Otherwise just cancel (no refund)
+        booking.status = "canceled";
+        booking.canceled_at = new Date();
+        booking.canceled_by = user._id;
+        booking.cancel_reason = reason || null;
+        booking.payment_due_at = null;
+        booking.guide_approval_due_at = null;
+        await booking.save();
+
+        await notifyUser({
+            userId: booking.customer_id,
+            type: "booking:canceled",
+            content: `Booking #${booking._id} đã bị huỷ bởi admin.`,
+            url: `/booking/${booking._id}`,
+            meta: { bookingId: booking._id }
+        }).catch(() => { });
+
+        return res.json({ booking });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: "Lỗi admin cancel", error: e.message });
+    }
+};
+
+/**
+ * Admin create refund request (pending) for a paid booking
+ */
+export const adminCreateRefund = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!isAdmin(user)) return res.status(403).json({ message: "Chỉ admin" });
+
+        const { id } = req.params;
+        const { amount, note } = req.body || {};
+
+        const booking = await Booking.findById(id);
+        if (!booking) return res.status(404).json({ message: "Booking không tồn tại" });
+        if (booking.status !== "paid") return res.status(400).json({ message: "Booking chưa ở trạng thái đã thanh toán" });
+
+        const refundAmount = Number(amount ?? (booking.total_price ? booking.total_price.toString() : 0)) || 0;
+
+        const txn = await Transaction.create({
+            bookingId: booking._id,
+            userId: booking.customer_id,
+            amount: refundAmount,
+            net_amount: refundAmount,
+            transaction_type: "refund",
+            status: "pending",
+            payment_gateway: booking.payment_session?.gateway || "manual",
+            note: note || `Refund requested by admin ${user._id}`,
+        });
+
+        booking.refund_transaction_id = txn._id;
+        await booking.save();
+
+        await notifyUser({
+            userId: booking.customer_id,
+            type: "booking:refund_requested",
+            content: `Yêu cầu hoàn tiền cho booking #${booking._id} đã được tạo.`,
+            url: `/booking/${booking._id}`,
+            meta: { bookingId: booking._id, transactionId: txn._id }
+        }).catch(() => { });
+
+        await notifyAdmins({
+            type: "refund:pending",
+            content: `Refund pending for booking ${booking._id}`,
+            meta: { bookingId: booking._id, transactionId: txn._id }
+        }).catch(() => { });
+
+        return res.json({ transaction: txn, booking });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: "Lỗi tạo refund", error: e.message });
+    }
+};
+
+/**
+ * Admin confirm refund (after manual transfer or gateway refund)
+ * - Confirm txn, set booking canceled, notify user.
+ */
+export const adminConfirmRefund = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!isAdmin(user)) return res.status(403).json({ message: "Chỉ admin" });
+
+        const { txnId } = req.params;
+        const { transaction_code } = req.body || {};
+
+        if (!ObjectId.isValid(txnId)) return res.status(400).json({ message: "txnId không hợp lệ" });
+
+        const txn = await Transaction.findById(txnId);
+        if (!txn) return res.status(404).json({ message: "Transaction không tồn tại" });
+        if (txn.transaction_type !== "refund") return res.status(400).json({ message: "Transaction không phải refund" });
+        if (txn.status === "confirmed") return res.status(400).json({ message: "Refund đã được xác nhận" });
+
+        txn.status = "confirmed";
+        txn.confirmed_by = user._id;
+        txn.confirmed_at = new Date();
+        if (transaction_code) txn.transaction_code = transaction_code;
+        await txn.save();
+
+        // Update booking
+        const booking = await Booking.findById(txn.bookingId);
+        if (booking) {
+            booking.status = "canceled";
+            booking.canceled_at = new Date();
+            booking.canceled_by = user._id;
+            booking.refund_transaction_id = txn._id;
+            await booking.save();
+        }
+
+        await notifyUser({
+            userId: txn.userId,
+            type: "booking:refunded",
+            content: `Hoàn tiền cho booking #${txn.bookingId} đã hoàn tất.`,
+            url: `/booking/${txn.bookingId}`,
+            meta: { bookingId: txn.bookingId, transactionId: txn._id }
+        }).catch(() => { });
+
+        return res.json({ transaction: txn, booking });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: "Lỗi confirm refund", error: e.message });
+    }
 };
