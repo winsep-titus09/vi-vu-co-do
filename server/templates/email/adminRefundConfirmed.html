@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Hoàn tiền đã được xác nhận</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            background: #f2f4f7;
+            margin: 0
+        }
+
+        .card {
+            max-width: 680px;
+            margin: 28px auto;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06)
+        }
+
+        .head {
+            background: #198754;
+            color: #fff;
+            padding: 18px
+        }
+
+        .body {
+            padding: 20px;
+            color: #333
+        }
+
+        .meta {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 12px 0;
+            font-size: 14px;
+            color: #444
+        }
+
+        .footer {
+            padding: 16px;
+            text-align: center;
+            color: #777;
+            background: #fafafa;
+            font-size: 13px
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <div class="head">
+            <h2 style="margin:0">Hoàn tiền đã được xác nhận</h2>
+        </div>
+        <div class="body">
+            <p>Xin chào,</p>
+            <p>Yêu cầu hoàn tiền cho booking <strong>{{bookingCode}}</strong> đã được xác nhận.</p>
+
+            <div class="meta">
+                <div><strong>Booking ID:</strong> {{bookingId}}</div>
+                <div><strong>Transaction ID:</strong> {{transactionId}}</div>
+                <div><strong>Số tiền:</strong> {{amount}}</div>
+                <div><strong>Xác nhận bởi:</strong> {{confirmedBy}}</div>
+                <div><strong>Thời gian:</strong> {{confirmedAt}}</div>
+            </div>
+
+            <p>Chi tiết hơn có thể xem tại: <a href="{{adminUrl}}" target="_blank" rel="noopener">Trang quản trị hoàn
+                    tiền</a>.</p>
+
+            <p style="color:#555">Cảm ơn bạn đã xử lý kịp thời.</p>
+        </div>
+        <div class="footer">© {{year}} ViVu</div>
+    </div>
+</body>
+
+</html>

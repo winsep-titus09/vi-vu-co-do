@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Yêu cầu hoàn tiền bị từ chối</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
+            background: #fff6f6;
+            margin: 0
+        }
+
+        .card {
+            max-width: 680px;
+            margin: 28px auto;
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #ffe5e5
+        }
+
+        h1 {
+            color: #d63384;
+            margin: 0 0 8px
+        }
+
+        .meta {
+            background: #fff3f3;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 12px 0;
+            color: #333
+        }
+
+        .note {
+            color: #444
+        }
+
+        .footer {
+            font-size: 13px;
+            color: #666;
+            margin-top: 14px
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>Yêu cầu hoàn tiền bị từ chối</h1>
+        <p>Xin chào bạn,</p>
+
+        <p class="note">Yêu cầu hoàn tiền cho booking <strong>{{bookingCode}}</strong> đã bị từ chối bởi quản trị viên.
+        </p>
+
+        <div class="meta">
+            <div><strong>Booking ID:</strong> {{bookingId}}</div>
+            <div><strong>Transaction ID:</strong> {{transactionId}}</div>
+            <div><strong>Lý do:</strong> {{reason}}</div>
+        </div>
+
+        <p class="footer">Nếu bạn cần khiếu nại hoặc thắc mắc, vui lòng liên hệ: <a
+                href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+    </div>
+</body>
+
+</html>
