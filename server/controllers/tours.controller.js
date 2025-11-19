@@ -6,6 +6,7 @@ import Location from "../models/Location.js";
 import User from "../models/User.js";
 import TourCategory from "../models/TourCategory.js";
 import GuideProfile from "../models/GuideProfile.js";
+import Review from "../models/Review.js";
 
 import { createTourSchema, updateTourSchema } from "../utils/validator.js";
 import { notifyAdmins, notifyUser } from "../services/notify.js";
@@ -461,5 +462,104 @@ export const listFeaturedTours = async (req, res) => {
     } catch (err) {
         console.error("listFeaturedTours error:", err);
         return res.status(500).json({ message: "Lỗi máy chủ." });
+    }
+};
+
+export const listTopRatedTours = async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 100);
+        const minReviews = Math.max(parseInt(req.query.minReviews, 10) || 1, 0);
+
+        // 1) Aggregation: group reviews by tourId
+        const agg = [
+            {
+                $match: {
+                    $or: [
+                        { tour_id: { $exists: true, $ne: null } },
+                        { tourId: { $exists: true, $ne: null } },
+                        { tour: { $exists: true, $ne: null } }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    _tourId: { $ifNull: ["$tour_id", { $ifNull: ["$tourId", "$tour"] }] },
+                    _rating: { $ifNull: ["$tour_rating", { $ifNull: ["$rating", { $ifNull: ["$rating_value", 0] }] }] }
+                }
+            },
+            {
+                $group: {
+                    _id: "$_tourId",
+                    avgRating: { $avg: "$_rating" },
+                    reviewCount: { $sum: 1 }
+                }
+            },
+            { $match: { reviewCount: { $gte: minReviews } } },
+            { $sort: { avgRating: -1, reviewCount: -1 } },
+            { $limit: limit },
+            {
+                $lookup: {
+                    from: "tours",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "tour"
+                }
+            },
+            { $unwind: "$tour" },
+            {
+                $project: {
+                    tourId: "$tour._id",
+                    name: "$tour.name",
+                    slug: "$tour.slug",
+                    cover_image_url: "$tour.cover_image_url",
+                    categories: "$tour.categories",
+                    locations: "$tour.locations",
+                    guides: "$tour.guides",
+                    avgRating: { $round: ["$avgRating", 2] },
+                    reviewCount: 1,
+                    source: { $literal: "rated" }
+                }
+            }
+        ];
+
+        let rated = await Review.aggregate(agg);
+
+        // 2) If not enough items, fetch fallback tours (featured then recent)
+        if (!Array.isArray(rated)) rated = [];
+        const needed = Math.max(limit - rated.length, 0);
+
+        if (needed > 0) {
+            // collect ids to exclude (already included)
+            const excludeIds = rated.map(r => String(r.tourId));
+            // find fallback candidates:
+            // - featured tours first
+            // - then recent tours
+            const fallbackQuery = { _id: { $nin: excludeIds.map(id => mongoose.Types.ObjectId(id)) }, status: "active" };
+            const fallback = await Tour.find(fallbackQuery)
+                .select("name slug cover_image_url categories locations guides featured createdAt")
+                .sort({ featured: -1, createdAt: -1 })
+                .limit(needed)
+                .lean();
+
+            const fallbackItems = fallback.map(t => ({
+                tourId: t._id,
+                name: t.name,
+                slug: t.slug,
+                cover_image_url: t.cover_image_url,
+                categories: t.categories,
+                locations: t.locations,
+                guides: t.guides,
+                avgRating: null,        // no ratings yet
+                reviewCount: 0,
+                source: "fallback"
+            }));
+
+            rated = rated.concat(fallbackItems);
+        }
+
+        return res.json({ ok: true, items: rated.slice(0, limit), limit, minReviews });
+    } catch (err) {
+        console.error("listTopRatedTours error:", err);
+        return res.status(500).json({ ok: false, message: "Server error", error: err.message });
     }
 };

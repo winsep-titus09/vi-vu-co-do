@@ -1,5 +1,6 @@
 // controllers/guideProfile.controller.js
 import GuideProfile from "../models/GuideProfile.js";
+import Review from "../models/Review.js";
 import { uploadVideoBufferToCloudinary } from "../services/uploader.js";
 import multer from "multer";
 import mongoose from "mongoose";
@@ -105,5 +106,114 @@ export const listFeaturedGuides = async (req, res) => {
     } catch (err) {
         console.error("listFeaturedGuides error:", err);
         return res.status(500).json({ message: "Lỗi máy chủ khi lấy HDV tiêu biểu." });
+    }
+};
+
+export const listTopRatedGuides = async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 100);
+        const minReviews = Math.max(parseInt(req.query.minReviews, 10) || 1, 0);
+
+        const agg = [
+            {
+                $match: {
+                    $or: [
+                        { intended_guide_id: { $exists: true, $ne: null } },
+                        { guide_id: { $exists: true, $ne: null } },
+                        { guideId: { $exists: true, $ne: null } }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    _guideId: { $ifNull: ["$intended_guide_id", { $ifNull: ["$guide_id", "$guideId"] }] },
+                    _rating: { $ifNull: ["$guide_rating", { $ifNull: ["$rating", 0] }] }
+                }
+            },
+            {
+                $group: {
+                    _id: "$_guideId",
+                    avgRating: { $avg: "$_rating" },
+                    reviewCount: { $sum: 1 }
+                }
+            },
+            { $match: { reviewCount: { $gte: minReviews } } },
+            { $sort: { avgRating: -1, reviewCount: -1 } },
+            { $limit: limit },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "user"
+                }
+            },
+            { $unwind: "$user" },
+            {
+                $lookup: {
+                    from: "guideprofiles",
+                    localField: "_id",
+                    foreignField: "user_id",
+                    as: "profile"
+                }
+            },
+            { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    guideId: "$user._id",
+                    name: "$user.name",
+                    avatar_url: "$user.avatar_url",
+                    avgRating: { $round: ["$avgRating", 2] },
+                    reviewCount: 1,
+                    introduction: "$profile.introduction",
+                    is_featured: "$profile.is_featured",
+                    source: { $literal: "rated" }
+                }
+            }
+        ];
+
+        let rated = await Review.aggregate(agg);
+        if (!Array.isArray(rated)) rated = [];
+        const needed = Math.max(limit - rated.length, 0);
+
+        if (needed > 0) {
+            // exclude already present
+            const excludeIds = rated.map(r => String(r.guideId));
+            // fetch fallback guides: approved and featured first, then recent
+            const fallbackProfiles = await GuideProfile.find({
+                status: "approved",
+                user_id: { $nin: excludeIds.map(id => mongoose.Types.ObjectId(id)) }
+            })
+                .select("user_id introduction is_featured createdAt")
+                .sort({ is_featured: -1, createdAt: -1 })
+                .limit(needed)
+                .lean();
+
+            // populate user info for these profiles
+            const userIds = fallbackProfiles.map(p => p.user_id);
+            const users = await User.find({ _id: { $in: userIds } }).select("name avatar_url").lean();
+            const usersMap = new Map(users.map(u => [String(u._id), u]));
+
+            const fallbackItems = fallbackProfiles.map(p => {
+                const u = usersMap.get(String(p.user_id)) || {};
+                return {
+                    guideId: p.user_id,
+                    name: u.name || null,
+                    avatar_url: u.avatar_url || null,
+                    avgRating: null,
+                    reviewCount: 0,
+                    introduction: p.introduction || "",
+                    is_featured: !!p.is_featured,
+                    source: "fallback"
+                };
+            });
+
+            rated = rated.concat(fallbackItems);
+        }
+
+        return res.json({ ok: true, items: rated.slice(0, limit), limit, minReviews });
+    } catch (err) {
+        console.error("listTopRatedGuides error:", err);
+        return res.status(500).json({ ok: false, message: "Server error", error: err.message });
     }
 };
