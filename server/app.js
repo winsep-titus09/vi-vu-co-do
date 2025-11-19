@@ -31,6 +31,8 @@ import adminTourRoutes from "./routes/admin/tours.routes.js";
 import adminTourRequestRoutes from "./routes/admin/tour-requests.routes.js";
 import adminPaymentSettingRoutes from "./routes/admin/paymentSettings.routes.js";
 import adminRefundRoutes from "./routes/admin/refunds.routes.js";
+import adminRevueneRoutes from "./routes/admin/revenue.routes.js";
+import adminPayoutRoutes from "./routes/admin/payouts.routes.js";
 
 // Blog admin
 import adminArticleRoutes from "./routes/admin/articles.routes.js";
@@ -73,6 +75,8 @@ app.use("/api/admin/tours", adminTourRoutes);
 app.use("/api/admin/tour-requests", adminTourRequestRoutes);
 app.use("/api/admin/payment-settings", adminPaymentSettingRoutes);
 app.use("/api/admin/refunds", adminRefundRoutes);
+app.use("/api/admin/revenues", adminRevueneRoutes);
+app.use("/api/admin/payouts", adminPayoutRoutes);
 
 // blog admin
 app.use("/api/admin/articles", adminArticleRoutes);
