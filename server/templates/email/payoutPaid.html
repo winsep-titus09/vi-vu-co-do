@@ -1,0 +1,29 @@
+<!-- server/templates/email/payoutPaid.html -->
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Payout đã được trả</title>
+</head>
+
+<body>
+    <p>Xin chào {{ userName }},</p>
+
+    <p>Yêu cầu thanh toán của bạn cho tour <strong>{{ tourName }}</strong> (ngày {{ tourDate }}) đã được xử lý và thanh
+        toán.</p>
+
+    <p><strong>Số tiền:</strong> {{ amount }}</p>
+
+    {{#if transactionId}}
+    <p><strong>Mã giao dịch:</strong> {{ transactionId }}</p>
+    {{/if}}
+
+    <p>Bạn có thể xem chi tiết tại: <a href="{{ appBaseUrl }}/guide/payouts/{{ payoutId }}">Lịch sử payout</a></p>
+
+    <p>Nếu có thắc mắc, vui lòng liên hệ: {{ supportEmail }}</p>
+
+    <p>Trân trọng,<br>{{ appName }}</p>
+</body>
+
+</html>

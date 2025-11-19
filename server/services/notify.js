@@ -111,6 +111,19 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 await sendAdminEmail({ subject: "Yêu cầu hoàn tiền đã bị từ chối", templateKey: "adminRefundRejected", data });
             }
 
+            // payout admin notifications
+            if (type === "payout:paid_admin" || type === "payout:paid") {
+                const data = buildTemplateData({
+                    payoutId: meta?.payoutId || "",
+                    guideName: meta?.guideName || "",
+                    amount: meta?.amount || "",
+                    tourId: meta?.tourId || "",
+                    tourDate: meta?.tourDate || "",
+                    adminUrl: meta?.adminUrl || `${process.env.APP_BASE_URL}/admin/payouts/${meta?.payoutId || ""}`,
+                }, meta);
+                await sendAdminEmail({ subject: "Payout đã được trả", templateKey: "adminPayoutPaid", data });
+            }
+
             return;
         }
 
@@ -215,6 +228,25 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     to,
                     subject: "Yêu cầu hoàn tiền bị từ chối",
                     templateKey: "bookingRefundRejected",
+                    data: baseMeta
+                });
+                break;
+
+            // payout emails for guides
+            case "payout:created":
+                await sendTemplateEmail({
+                    to,
+                    subject: "Yêu cầu thanh toán đã được tạo",
+                    templateKey: "payoutCreated",
+                    data: baseMeta
+                });
+                break;
+
+            case "payout:paid":
+                await sendTemplateEmail({
+                    to,
+                    subject: "Payout đã được thực hiện",
+                    templateKey: "payoutPaid",
                     data: baseMeta
                 });
                 break;

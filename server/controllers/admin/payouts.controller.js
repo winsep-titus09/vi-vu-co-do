@@ -295,11 +295,92 @@ export async function markPayoutPaid(req, res) {
         if (!payout) return res.status(404).json({ ok: false, message: "Payout not found" });
         if (payout.status === "paid") return res.status(400).json({ ok: false, message: "Payout already paid" });
 
+        // Mark payout as paid
         payout.status = "paid";
         payout.paidAt = new Date();
         payout.paidBy = req.user ? req.user._id : null;
         if (txId) payout.txId = txId;
         await payout.save();
+
+        // --- Create a Transaction record for the payout (ledger) ---
+        // Use first related booking id if available to satisfy Transaction.bookingId required field.
+        let bookingForTx = null;
+        if (Array.isArray(payout.relatedBookingIds) && payout.relatedBookingIds.length > 0) {
+            bookingForTx = payout.relatedBookingIds[0];
+        }
+
+        // Ensure we set a valid bookingId (Transaction schema requires bookingId).
+        // If no booking id available, we will try to set bookingForTx = null and let Transaction creation handle casting.
+        // (If your Transaction schema requires bookingId non-null, ensure payouts always include relatedBookingIds.)
+        try {
+            const tx = await Transaction.create({
+                bookingId: bookingForTx || payout._id, // fallback to payout._id if no booking - helps traceability
+                userId: req.user ? req.user._id : null, // actor (admin)
+                payeeUserId: payout.guideId,
+                amount: payout.payoutAmount,
+                commission_fee: 0,
+                net_amount: payout.payoutAmount,
+                transaction_type: "payout",
+                status: "confirmed",
+                payment_gateway: "manual",
+                transaction_code: txId || `payout-${payout.reference || payout._id}`,
+                note: `Payout for guide ${String(payout.guideId)} for tour ${String(payout.tourId)} on ${toYMD(payout.tourDate)}`
+            });
+
+            // attach transaction id to payout for reference
+            payout.transactionId = tx._id;
+            await payout.save();
+        } catch (txErr) {
+            console.error("markPayoutPaid: failed to create Transaction:", txErr);
+            // We proceed but inform admin that ledger creation failed
+            // Optionally revert payout.status back to pending or set status 'failed' depending on policy.
+        }
+
+        // --- Notify the guide ---
+        try {
+            // Get guide info for message
+            const guide = await User.findById(payout.guideId).lean().catch(() => null);
+            const tourDoc = await Tour.findById(payout.tourId).lean().catch(() => null);
+            const tourName = tourDoc?.title || tourDoc?.name || `#${payout.tourId}`;
+
+            await notifyUser({
+                userId: payout.guideId,
+                type: "payout:paid",
+                content: `Yêu cầu thanh toán cho tour "${tourName}" ngày ${toYMD(payout.tourDate)} đã được trả: ${payout.payoutAmount}.`,
+                url: `/guide/payouts/${payout._id}`,
+                meta: {
+                    payoutId: payout._id,
+                    tourId: payout.tourId,
+                    tourDate: toYMD(payout.tourDate),
+                    amount: payout.payoutAmount,
+                    transactionId: payout.transactionId || null,
+                    paidBy: req.user ? (req.user.name || req.user._id) : null,
+                    paidAt: payout.paidAt ? payout.paidAt.toISOString() : null,
+                },
+            }).catch((e) => {
+                console.error("notifyUser payout:paid error:", e);
+            });
+        } catch (notifyErr) {
+            console.error("markPayoutPaid: notify guide error:", notifyErr);
+        }
+
+        // --- Notify admins as well (optional) ---
+        try {
+            await notifyAdmins({
+                type: "payout:paid_admin",
+                content: `Payout ${String(payout._id)} paid for guide ${String(payout.guideId)}: ${payout.payoutAmount}.`,
+                meta: {
+                    payoutId: payout._id,
+                    tourId: payout.tourId,
+                    tourDate: toYMD(payout.tourDate),
+                    amount: payout.payoutAmount,
+                    paidBy: req.user ? (req.user.name || req.user._id) : null,
+                    paidAt: payout.paidAt ? payout.paidAt.toISOString() : null,
+                }
+            }).catch(() => { });
+        } catch (e) {
+            console.error("markPayoutPaid: notifyAdmins error:", e);
+        }
 
         return res.json({ ok: true, payout });
     } catch (err) {
