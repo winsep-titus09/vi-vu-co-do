@@ -4,6 +4,8 @@ import Booking from "../../models/Booking.js";
 import Tour from "../../models/Tour.js";
 import Payout from "../../models/Payout.js";
 import User from "../../models/User.js";
+import Transaction from "../../models/Transaction.js";
+import { notifyUser, notifyAdmins } from "../../services/notify.js";
 
 const ObjectId = mongoose.Types.ObjectId;
 
@@ -11,7 +13,6 @@ const ObjectId = mongoose.Types.ObjectId;
 function toYMD(date) {
     // Trả về "YYYY-MM-DD" theo timezone Asia/Ho_Chi_Minh
     const d = new Date(date);
-    // toLocaleDateString 'en-CA' trả định dạng YYYY-MM-DD
     return d.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
 }
 
@@ -23,9 +24,6 @@ function debugLog(...args) {
 
 /**
  * Compute total net revenue and booking ids for an occurrence (tourId, tourDate).
- * - Tries group-by-date using total_price/paid_amount (Decimal128 -> double)
- * - Fallback: unwind participants.price_applied
- * - Subtracts refunds if refunds collection exists
  */
 export async function computeOccurrenceRevenue(tourId, tourDate) {
     if (!mongoose.isValidObjectId(tourId)) return { totalNet: 0, bookingIds: [] };
@@ -142,9 +140,6 @@ export async function computeOccurrenceRevenue(tourId, tourDate) {
 
 /**
  * Get participating guides for an occurrence.
- * Priority:
- * 1) distinct intended_guide_id from bookings
- * 2) fallback to tour.guides array
  */
 export async function getParticipatingGuides(tourId, tourDate) {
     if (!mongoose.isValidObjectId(tourId)) return [];
@@ -179,10 +174,12 @@ export async function getParticipatingGuides(tourId, tourDate) {
 
 /**
  * Core: create payouts for an occurrence (manual trigger).
- * - Idempotent: skip if Payout exists for tourId+tourDate+guideId.
- * - Enforces occurrence end + 3 days unless force = true.
+ * - Idempotent with respect to paid payouts: skip if already paid.
+ * - If an existing payout exists but status !== 'paid', behavior:
+ *    - default: skip (keeps pending records)
+ *    - if forceReplace === true: delete existing and recreate
  */
-export async function createPayoutsForOccurrence({ tourId, tourDate, createdBy = null, percentage = 0.1, force = false }) {
+export async function createPayoutsForOccurrence({ tourId, tourDate, createdBy = null, percentage = 0.1, force = false, forceReplace = false }) {
     if (!mongoose.isValidObjectId(tourId)) throw new Error("Invalid tourId");
     const occDate = new Date(tourDate);
     occDate.setHours(0, 0, 0, 0);
@@ -196,11 +193,18 @@ export async function createPayoutsForOccurrence({ tourId, tourDate, createdBy =
     let endDate = new Date(occDate);
     const duration = (tourDoc && Number(tourDoc.duration)) ? Number(tourDoc.duration) : 1;
     endDate.setDate(endDate.getDate() + (duration - 1));
+
+    // Allow overriding holdback days via env PAYOUT_HOLDBACK_DAYS (default 3)
+    const holdbackDays = Number(process.env.PAYOUT_HOLDBACK_DAYS ?? 3);
     const eligibleDate = new Date(endDate);
-    eligibleDate.setDate(eligibleDate.getDate() + 3);
+    eligibleDate.setDate(eligibleDate.getDate() + holdbackDays);
+
     const now = new Date();
 
-    if (now < eligibleDate && !force) {
+    // Allow skipping holdback entirely via env PAYOUT_SKIP_HOLDBACK=true
+    const skipHoldback = String(process.env.PAYOUT_SKIP_HOLDBACK || "").toLowerCase() === "true";
+
+    if (now < eligibleDate && !force && !skipHoldback) {
         return { created: [], skipped: [], totalNet, message: `Occurrence not eligible for payout until ${eligibleDate.toISOString().slice(0, 10)}` };
     }
 
@@ -214,12 +218,40 @@ export async function createPayoutsForOccurrence({ tourId, tourDate, createdBy =
             continue;
         }
 
-        const exists = await Payout.findOne({ tourId: tourId, tourDate: occDate, guideId: guideId });
+        let exists = await Payout.findOne({ tourId: tourId, tourDate: occDate, guideId: guideId });
         if (exists) {
-            skipped.push({ guideId, existingId: exists._id });
-            continue;
+            // Nếu đã paid thì skip luôn
+            if (String(exists.status) === "paid") {
+                skipped.push({ guideId, reason: "already paid", existingId: exists._id });
+                continue;
+            }
+
+            // Nếu tồn tại nhưng chưa paid -> cập nhật thay vì skip
+            try {
+                const payoutAmount = Math.round(totalNet * percentage);
+                const update = {
+                    $set: {
+                        baseAmount: totalNet,
+                        percentage,
+                        payoutAmount,
+                        relatedBookingIds: bookingIds,
+                        // giữ status (pending/failed) như hiện tại hoặc reset thành pending
+                        status: exists.status || "pending",
+                        updatedAt: new Date()
+                    }
+                };
+                await Payout.updateOne({ _id: exists._id }, update);
+                // trả về existing id như created (hoặc bạn có thể đưa vào list createdUpdated)
+                created.push(await Payout.findById(exists._id));
+                continue;
+            } catch (upErr) {
+                console.error("createPayoutsForOccurrence: failed to update existing payout:", upErr);
+                skipped.push({ guideId, existingId: exists._id, reason: "failed to update existing", error: upErr.message });
+                continue;
+            }
         }
 
+        // create payout
         const payoutAmount = Math.round(totalNet * percentage);
 
         const payout = await Payout.create({
@@ -243,11 +275,11 @@ export async function createPayoutsForOccurrence({ tourId, tourDate, createdBy =
 
 /**
  * POST /api/admin/payouts/manual
- * Body: { tourId, tourDate, guideId?, force? }
+ * Body: { tourId, tourDate, guideId?, force?, forceReplace? }
  */
 export async function createManualPayout(req, res) {
     try {
-        const { tourId, tourDate, guideId, force = false } = req.body;
+        const { tourId, tourDate, guideId, force = false, forceReplace = false } = req.body;
         debugLog("createManualPayout body:", req.body);
 
         if (!tourId || !tourDate) return res.status(400).json({ ok: false, message: "tourId and tourDate required" });
@@ -257,8 +289,8 @@ export async function createManualPayout(req, res) {
 
         if (guideId) {
             if (!mongoose.isValidObjectId(guideId)) return res.status(400).json({ ok: false, message: "Invalid guideId" });
-            const result = await createPayoutsForOccurrence({ tourId, tourDate, createdBy, percentage: 0.1, force });
-            const createdForGuide = (result.created || []).filter(p => p.guideId.toString() === guideId.toString());
+            const result = await createPayoutsForOccurrence({ tourId, tourDate, createdBy, percentage: 0.1, force, forceReplace });
+            const createdForGuide = (result.created || []).filter(p => String(p.guideId) === String(guideId));
             if (createdForGuide.length === 0) {
                 const existing = await Payout.findOne({ tourId, tourDate: new Date(new Date(tourDate).setHours(0, 0, 0, 0)), guideId });
                 if (existing) return res.status(409).json({ ok: false, message: "Payout already exists", payout: existing });
@@ -267,7 +299,7 @@ export async function createManualPayout(req, res) {
             return res.status(201).json({ ok: true, created: createdForGuide, totalNet: result.totalNet });
         }
 
-        const result = await createPayoutsForOccurrence({ tourId, tourDate, createdBy, percentage: 0.1, force });
+        const result = await createPayoutsForOccurrence({ tourId, tourDate, createdBy, percentage: 0.1, force, forceReplace });
         if ((result.created || []).length === 0) {
             return res.status(400).json({ ok: false, message: result.message || "No payouts created", detail: result });
         }
@@ -284,6 +316,7 @@ export async function createManualPayout(req, res) {
 /**
  * PATCH /api/admin/payouts/:id/mark-paid
  * Body: { txId? }
+ * Note: this implementation attempts to create Transaction ledger and will revert payout.status to pending if ledger creation fails.
  */
 export async function markPayoutPaid(req, res) {
     try {
@@ -303,23 +336,35 @@ export async function markPayoutPaid(req, res) {
         await payout.save();
 
         // --- Create a Transaction record for the payout (ledger) ---
-        // Use first related booking id if available to satisfy Transaction.bookingId required field.
         let bookingForTx = null;
         if (Array.isArray(payout.relatedBookingIds) && payout.relatedBookingIds.length > 0) {
             bookingForTx = payout.relatedBookingIds[0];
         }
 
-        // Ensure we set a valid bookingId (Transaction schema requires bookingId).
-        // If no booking id available, we will try to set bookingForTx = null and let Transaction creation handle casting.
-        // (If your Transaction schema requires bookingId non-null, ensure payouts always include relatedBookingIds.)
+        // Ensure we have acting admin user to record ledger
+        const actingUserId = req.user ? req.user._id : null;
         try {
+            if (!actingUserId) {
+                // Revert payout
+                payout.status = "pending";
+                payout.paidAt = null;
+                payout.paidBy = null;
+                await payout.save().catch(() => { });
+                return res.status(403).json({ ok: false, message: "Missing authenticated admin user to create ledger transaction." });
+            }
+
+            // Use Decimal128 strings to be safe
+            const amountStr = String(payout.payoutAmount ?? 0);
+            const netStr = amountStr;
+            const commStr = "0";
+
             const tx = await Transaction.create({
-                bookingId: bookingForTx || payout._id, // fallback to payout._id if no booking - helps traceability
-                userId: req.user ? req.user._id : null, // actor (admin)
+                bookingId: bookingForTx || null,
+                userId: actingUserId,
                 payeeUserId: payout.guideId,
-                amount: payout.payoutAmount,
-                commission_fee: 0,
-                net_amount: payout.payoutAmount,
+                amount: mongoose.Types.Decimal128.fromString(amountStr),
+                commission_fee: mongoose.Types.Decimal128.fromString(commStr),
+                net_amount: mongoose.Types.Decimal128.fromString(netStr),
                 transaction_type: "payout",
                 status: "confirmed",
                 payment_gateway: "manual",
@@ -332,13 +377,16 @@ export async function markPayoutPaid(req, res) {
             await payout.save();
         } catch (txErr) {
             console.error("markPayoutPaid: failed to create Transaction:", txErr);
-            // We proceed but inform admin that ledger creation failed
-            // Optionally revert payout.status back to pending or set status 'failed' depending on policy.
+            // revert payout.status so admin knows ledger creation failed
+            payout.status = "pending";
+            payout.paidAt = null;
+            payout.paidBy = null;
+            await payout.save().catch(() => { });
+            return res.status(500).json({ ok: false, message: "Failed to create ledger transaction. payout reverted to pending.", error: txErr.message });
         }
 
         // --- Notify the guide ---
         try {
-            // Get guide info for message
             const guide = await User.findById(payout.guideId).lean().catch(() => null);
             const tourDoc = await Tour.findById(payout.tourId).lean().catch(() => null);
             const tourName = tourDoc?.title || tourDoc?.name || `#${payout.tourId}`;
@@ -391,7 +439,6 @@ export async function markPayoutPaid(req, res) {
 
 /**
  * GET /api/admin/payouts
- * Query: tourId, tourDate, guideId, status, page, limit
  */
 export async function listPayouts(req, res) {
     try {
@@ -422,7 +469,6 @@ export async function listPayouts(req, res) {
 
 /**
  * GET /api/admin/payouts/preview
- * Query: tourId, tourDate
  */
 export async function previewPayout(req, res) {
     try {
