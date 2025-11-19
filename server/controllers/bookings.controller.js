@@ -862,3 +862,106 @@ export const adminConfirmRefund = async (req, res) => {
         res.status(500).json({ message: "Lỗi confirm refund", error: e.message });
     }
 };
+
+export const getGuideBookings = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+        const { status, page = 1, limit = 50, grouped = "false" } = req.query;
+        const pg = Math.max(Number(page) || 1, 1);
+        const lm = Math.min(Math.max(Number(limit) || 50, 1), 200);
+
+        // parse status string -> array of tokens; supports commas, pipes, parentheses
+        function parseStatusTokens(s) {
+            if (!s) return null;
+            let raw = String(s).trim();
+            // replace parentheses with commas so accepted(completed) -> "accepted,completed"
+            raw = raw.replace(/[()]/g, ",");
+            const parts = raw.split(/[,|]/).map(p => p.trim()).filter(Boolean);
+            return parts;
+        }
+
+        const tokens = parseStatusTokens(status);
+
+        // Base condition: bookings assigned to this guide
+        const baseCond = { intended_guide_id: userId };
+
+        // If no tokens -> return all bookings for guide (paginated)
+        if (!tokens || tokens.length === 0) {
+            const total = await Booking.countDocuments(baseCond);
+            const items = await Booking.find(baseCond)
+                .populate("tour_id", "name slug cover_image_url")
+                .populate("customer_id", "name email avatar_url")
+                .sort({ createdAt: -1 })
+                .skip((pg - 1) * lm)
+                .limit(lm)
+                .lean();
+
+            if (String(grouped).toLowerCase() === "true") {
+                const groups = { received: [], canceled: [], completed: [], others: [] };
+                for (const b of items) {
+                    const s = (b.status || "").toString();
+                    if (b?.guide_decision?.status === "accepted" || ["accepted", "awaiting_payment", "paid"].includes(s)) groups.received.push(b);
+                    else if (["canceled", "rejected"].includes(s)) groups.canceled.push(b);
+                    else if (s === "completed") groups.completed.push(b);
+                    else groups.others.push(b);
+                }
+                return res.json({ ok: true, total, page: pg, limit: lm, grouped: true, groups });
+            }
+
+            return res.json({ ok: true, total, page: pg, limit: lm, bookings: items });
+        }
+
+        // tokens present -> construct OR clauses supporting aliases
+        const orClauses = [];
+        for (const t of tokens) {
+            const key = String(t).toLowerCase();
+            if (key === "accepted" || key === "received") {
+                // accepted: either guide_decision.status == 'accepted' OR booking.status in awaiting_payment/paid/accepted
+                orClauses.push({ "guide_decision.status": "accepted" });
+                orClauses.push({ status: { $in: ["awaiting_payment", "paid", "accepted"] } });
+            } else if (key === "completed") {
+                orClauses.push({ status: "completed" });
+            } else if (key === "paid") {
+                orClauses.push({ status: "paid" });
+            } else if (key === "awaiting_payment") {
+                orClauses.push({ status: "awaiting_payment" });
+            } else if (key === "canceled" || key === "cancelled" || key === "rejected") {
+                orClauses.push({ status: { $in: ["canceled", "rejected"] } });
+            } else {
+                // literal status fallback
+                orClauses.push({ status: key });
+            }
+        }
+
+        // final condition = assigned to guide AND (one of orClauses)
+        const cond = { ...baseCond, $or: orClauses };
+
+        const total = await Booking.countDocuments(cond);
+        const items = await Booking.find(cond)
+            .populate("tour_id", "name slug cover_image_url")
+            .populate("customer_id", "name email avatar_url")
+            .sort({ createdAt: -1 })
+            .skip((pg - 1) * lm)
+            .limit(lm)
+            .lean();
+
+        if (String(grouped).toLowerCase() === "true") {
+            const groups = { received: [], canceled: [], completed: [], others: [] };
+            for (const b of items) {
+                const s = (b.status || "").toString();
+                if (b?.guide_decision?.status === "accepted" || ["accepted", "awaiting_payment", "paid"].includes(s)) groups.received.push(b);
+                else if (["canceled", "rejected"].includes(s)) groups.canceled.push(b);
+                else if (s === "completed") groups.completed.push(b);
+                else groups.others.push(b);
+            }
+            return res.json({ ok: true, total, page: pg, limit: lm, grouped: true, groups });
+        }
+
+        return res.json({ ok: true, total, page: pg, limit: lm, bookings: items });
+    } catch (err) {
+        console.error("getGuideBookings error:", err);
+        return res.status(500).json({ ok: false, message: "Server error", error: err.message });
+    }
+};

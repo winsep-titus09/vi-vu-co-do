@@ -1,8 +1,11 @@
+// Thay đổi: thêm import và route GET /bookings (đặt trong file routes/guides.routes.js)
+
 import express from "express";
 import { auth } from "../middleware/auth.js";
 import { authorize } from "../middleware/auth.js";
 import { applyGuide, getMyGuideApplication } from "../controllers/guideApplication.controller.js";
 import { getMyGuideProfile, updateMyGuideProfile, uploadGuideVideo, getPublicGuideProfile, listFeaturedGuides, listTopRatedGuides } from "../controllers/guideProfile.controller.js";
+import { getGuideBookings } from "../controllers/bookings.controller.js"; // <-- thêm import
 
 const router = express.Router();
 
@@ -11,6 +14,9 @@ router.get("/apply/me", auth, getMyGuideApplication);
 
 router.get("/profile/me", auth, authorize("guide"), getMyGuideProfile);
 router.put("/profile/me", auth, authorize("guide"), uploadGuideVideo, updateMyGuideProfile);
+
+// Guide-specific endpoints
+router.get("/bookings", auth, authorize("guide"), getGuideBookings);
 
 router.get("/featured", listFeaturedGuides);
 router.get("/top-rated", listTopRatedGuides);
