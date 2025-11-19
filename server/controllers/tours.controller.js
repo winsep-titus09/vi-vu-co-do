@@ -470,6 +470,16 @@ export const listTopRatedTours = async (req, res) => {
         const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 100);
         const minReviews = Math.max(parseInt(req.query.minReviews, 10) || 1, 0);
 
+        // optional category filter: accept categoryId (ObjectId) or categorySlug
+        const { categoryId, categorySlug } = req.query;
+        let categoryIdObj = null;
+        if (categoryId && mongoose.isValidObjectId(categoryId)) {
+            categoryIdObj = new mongoose.Types.ObjectId(categoryId);
+        } else if (categorySlug) {
+            const cat = await TourCategory.findOne({ slug: categorySlug }).lean();
+            if (cat) categoryIdObj = new mongoose.Types.ObjectId(cat._id);
+        }
+
         // 1) Aggregation: group reviews by tourId
         const agg = [
             {
@@ -497,6 +507,7 @@ export const listTopRatedTours = async (req, res) => {
             { $match: { reviewCount: { $gte: minReviews } } },
             { $sort: { avgRating: -1, reviewCount: -1 } },
             { $limit: limit },
+            // lookup tour
             {
                 $lookup: {
                     from: "tours",
@@ -506,35 +517,55 @@ export const listTopRatedTours = async (req, res) => {
                 }
             },
             { $unwind: "$tour" },
-            {
-                $project: {
-                    tourId: "$tour._id",
-                    name: "$tour.name",
-                    slug: "$tour.slug",
-                    cover_image_url: "$tour.cover_image_url",
-                    categories: "$tour.categories",
-                    locations: "$tour.locations",
-                    guides: "$tour.guides",
-                    avgRating: { $round: ["$avgRating", 2] },
-                    reviewCount: 1,
-                    source: { $literal: "rated" }
-                }
-            }
         ];
+
+        // If category filter requested, add match on tour's category fields
+        if (categoryIdObj) {
+            agg.push({
+                $match: {
+                    $or: [
+                        { "tour.category_id": categoryIdObj },
+                        { "tour.categories": categoryIdObj }
+                    ]
+                }
+            });
+        }
+
+        // final projection
+        agg.push({
+            $project: {
+                tourId: "$tour._id",
+                name: "$tour.name",
+                slug: "$tour.slug",
+                cover_image_url: "$tour.cover_image_url",
+                categories: "$tour.categories",
+                locations: "$tour.locations",
+                guides: "$tour.guides",
+                avgRating: { $round: ["$avgRating", 2] },
+                reviewCount: 1,
+                source: { $literal: "rated" }
+            }
+        });
 
         let rated = await Review.aggregate(agg);
 
-        // 2) If not enough items, fetch fallback tours (featured then recent)
+        // 2) If not enough items, fetch fallback tours (featured then recent) within same category when requested
         if (!Array.isArray(rated)) rated = [];
-        const needed = Math.max(limit - rated.length, 0);
+        let needed = Math.max(limit - rated.length, 0);
 
         if (needed > 0) {
             // collect ids to exclude (already included)
             const excludeIds = rated.map(r => String(r.tourId));
-            // find fallback candidates:
-            // - featured tours first
-            // - then recent tours
-            const fallbackQuery = { _id: { $nin: excludeIds.map(id => mongoose.Types.ObjectId(id)) }, status: "active" };
+            const fallbackQuery = {
+                _id: { $nin: excludeIds.map(id => mongoose.Types.ObjectId(id)) },
+                status: "active"
+            };
+            // if category filter requested, limit fallback to that category
+            if (categoryIdObj) {
+                // match either legacy category_id or new categories array
+                fallbackQuery.$or = [{ category_id: categoryIdObj }, { categories: categoryIdObj }];
+            }
+
             const fallback = await Tour.find(fallbackQuery)
                 .select("name slug cover_image_url categories locations guides featured createdAt")
                 .sort({ featured: -1, createdAt: -1 })
@@ -557,7 +588,7 @@ export const listTopRatedTours = async (req, res) => {
             rated = rated.concat(fallbackItems);
         }
 
-        return res.json({ ok: true, items: rated.slice(0, limit), limit, minReviews });
+        return res.json({ ok: true, items: rated.slice(0, limit), limit, minReviews, categoryFiltered: !!categoryIdObj });
     } catch (err) {
         console.error("listTopRatedTours error:", err);
         return res.status(500).json({ ok: false, message: "Server error", error: err.message });
