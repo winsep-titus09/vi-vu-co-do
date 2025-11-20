@@ -1,0 +1,335 @@
+// src/pages/Blog/index.jsx
+
+import React, { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
+import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
+import BlogCard from "../../components/Cards/BlogCard";
+
+// Import Icons
+import { IconSearch } from "../../icons/IconSearch.jsx";
+import { IconChevronDown } from "../../icons/IconChevronDown.jsx";
+import IconInstagram from "../../icons/IconInstagram.jsx"; // [NEW] Import Icon Instagram
+
+// --- MOCK DATA ---
+const categories = [
+  { id: "all", label: "Tất cả chủ đề" },
+  { id: "food", label: "Ẩm thực Huế" },
+  { id: "culture", label: "Văn hóa & Di sản" },
+  { id: "tips", label: "Kinh nghiệm du lịch" },
+  { id: "art", label: "Nghệ thuật & Nhiếp ảnh" },
+];
+
+const blogPosts = [
+  {
+    id: 1,
+    title: "10 trải nghiệm về đêm 'không ngủ' tại Cố đô Huế",
+    slug: "10-trai-nghiem-ve-dem-hue",
+    date: "15 Th3, 2025",
+    image:
+      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/cautrangtien1.jpg",
+    categoryId: "tips",
+  },
+  {
+    id: 2,
+    title: "Truy tìm quán Bún Bò Huế chuẩn vị người bản địa",
+    slug: "quan-bun-bo-hue-chuan-vi",
+    date: "12 Th3, 2025",
+    image:
+      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
+    categoryId: "food",
+  },
+  {
+    id: 3,
+    title: "Bí ẩn phong thủy lăng Tự Đức: Khi kiến trúc kể chuyện",
+    slug: "phong-thuy-lang-tu-duc",
+    date: "10 Th3, 2025",
+    image:
+      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
+    categoryId: "culture",
+  },
+  {
+    id: 4,
+    title: "Một ngày làm nông dân tại làng rau Trà Quế",
+    slug: "lang-rau-thuy-bieu",
+    date: "08 Th3, 2025",
+    image:
+      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg",
+    categoryId: "art",
+  },
+  {
+    id: 5,
+    title: "Check-in làng hương Thủy Xuân rực rỡ",
+    slug: "lang-huong-thuy-xuan",
+    date: "05 Th3, 2025",
+    image:
+      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuatuhieu1.jpg",
+    categoryId: "tips",
+  },
+  {
+    id: 6,
+    title: "Thưởng trà & Nghe pháp thoại tại chùa Từ Hiếu",
+    slug: "thien-tra-tu-hieu",
+    date: "01 Th3, 2025",
+    image:
+      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/ngomon_3d_placeholder.jpg",
+    categoryId: "culture",
+  },
+];
+
+// Mock Gallery
+const galleryImages = [
+  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
+  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/hoanghon.jpg",
+  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuatuhieu1.jpg",
+  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
+  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
+  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg",
+];
+
+export default function BlogPage() {
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [isTopicOpen, setIsTopicOpen] = useState(false);
+  const topicRef = useRef(null);
+
+  const filteredPosts = blogPosts.filter((post) => {
+    const matchCategory =
+      activeCategory === "all" || post.categoryId === activeCategory;
+    const matchSearch = post.title
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    return matchCategory && matchSearch;
+  });
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (topicRef.current && !topicRef.current.contains(event.target)) {
+        setIsTopicOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-bg-main pb-0 pt-6 overflow-x-hidden">
+      <div className="container-main space-y-10">
+        {/* 1. HEADER & TOOLBAR */}
+        <div className="space-y-6">
+          <Breadcrumbs items={[{ label: "Cẩm nang du lịch" }]} />
+
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+            <div className="max-w-2xl space-y-3">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-secondary">
+                Blog & Tin tức
+              </p>
+              <h1 className="text-4xl md:text-5xl font-heading font-bold text-text-primary leading-tight">
+                Góc nhìn thổ địa
+              </h1>
+              <p className="text-text-secondary text-lg leading-relaxed max-w-xl">
+                Khám phá văn hóa, ẩm thực và những bí kíp du lịch Huế độc đáo
+                được chia sẻ bởi cộng đồng hướng dẫn viên địa phương.
+              </p>
+            </div>
+
+            {/* TOOLBAR */}
+            <div className="w-full lg:w-auto flex flex-col md:flex-row gap-3">
+              {/* Dropdown Chủ đề */}
+              <div className="relative w-full md:w-48" ref={topicRef}>
+                <div
+                  onClick={() => setIsTopicOpen(!isTopicOpen)}
+                  className={`
+                    w-full h-[52px] px-4 flex items-center justify-between cursor-pointer rounded-2xl border transition-all select-none bg-white
+                    ${
+                      isTopicOpen
+                        ? "border-primary ring-1 ring-primary"
+                        : "border-border-light hover:border-primary/50"
+                    }
+                  `}
+                >
+                  <span className="text-sm font-medium text-text-primary truncate">
+                    {categories.find((c) => c.id === activeCategory)?.label ||
+                      "Chủ đề"}
+                  </span>
+                  <IconChevronDown
+                    className={`w-4 h-4 text-text-secondary transition-transform ${
+                      isTopicOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </div>
+
+                {isTopicOpen && (
+                  <div className="absolute top-full right-0 w-full mt-2 bg-white rounded-2xl shadow-xl border border-border-light py-2 z-50 animate-fade-in-up">
+                    {categories.map((cat) => (
+                      <div
+                        key={cat.id}
+                        onClick={() => {
+                          setActiveCategory(cat.id);
+                          setIsTopicOpen(false);
+                        }}
+                        className={`
+                          px-4 py-2.5 text-sm cursor-pointer transition-colors
+                          ${
+                            activeCategory === cat.id
+                              ? "bg-primary/10 text-primary font-bold"
+                              : "text-text-primary hover:bg-bg-main hover:text-primary"
+                          }
+                        `}
+                      >
+                        {cat.label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Search Box */}
+              <div className="relative w-full md:w-72">
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm bài viết..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-[52px] pl-12 pr-4 rounded-2xl border border-border-light bg-white shadow-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-text-secondary/60"
+                />
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary">
+                  <IconSearch className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. CATEGORY TABS (Desktop) */}
+        <div className="hidden md:flex flex-wrap items-center gap-3 pb-2 border-b border-border-light/60">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              className={`
+                px-6 py-2.5 rounded-full text-sm font-bold transition-all border
+                ${
+                  activeCategory === cat.id
+                    ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
+                    : "bg-white text-text-secondary border-border-light hover:border-primary hover:text-primary"
+                }
+              `}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 3. BLOG GRID */}
+        {filteredPosts.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
+            {filteredPosts.map((post) => (
+              <div key={post.id}>
+                <BlogCard post={post} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-border-light">
+            <p className="text-text-secondary">Không tìm thấy bài viết nào.</p>
+            <button
+              onClick={() => {
+                setActiveCategory("all");
+                setSearchQuery("");
+              }}
+              className="text-primary font-bold hover:underline mt-2"
+            >
+              Xem tất cả
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 4. INFINITE GALLERY MARQUEE (Updated Background) */}
+      <div className="w-full border-t border-border-light py-16 overflow-hidden relative bg-bg-main/30">
+        {/* [NEW] Background Map Image */}
+        <div className="absolute inset-0 z-0 pointer-events-none mix-blend-multiply">
+          <img
+            src="/images/placeholders/map-bg.png"
+            alt="Map Pattern"
+            className="w-full h-full object-cover"
+          />
+        </div>
+
+        <div className="container-main mb-8 flex justify-between items-end relative z-10">
+          <div>
+            {/* [NEW] Icon Instagram */}
+            <div className="flex items-center gap-2 mb-2 text-secondary">
+              <IconInstagram className="w-5 h-5" />
+              <p className="text-xs font-bold uppercase tracking-[0.2em]">
+                Instagram
+              </p>
+            </div>
+            <h3 className="text-3xl font-heading font-bold text-text-primary">
+              Khoảnh khắc Vi Vu
+            </h3>
+          </div>
+          <a
+            href="#"
+            className="text-sm font-bold text-primary hover:underline"
+          >
+            @vivucodo.hue
+          </a>
+        </div>
+
+        {/* Marquee Container */}
+        <div className="relative w-full flex overflow-hidden group z-10">
+          {/* Dải ảnh chạy */}
+          <div className="flex gap-4 animate-marquee whitespace-nowrap py-4">
+            {[...galleryImages, ...galleryImages].map((src, idx) => (
+              <div
+                key={idx}
+                className="relative w-64 h-80 rounded-2xl overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
+              >
+                <img
+                  src={src}
+                  alt={`Gallery ${idx}`}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/10 hover:bg-transparent transition-colors"></div>
+              </div>
+            ))}
+          </div>
+          {/* Dải ảnh lặp lại (Duplicate) */}
+          <div
+            className="flex gap-4 animate-marquee whitespace-nowrap py-4"
+            aria-hidden="true"
+          >
+            {[...galleryImages, ...galleryImages].map((src, idx) => (
+              <div
+                key={`dup-${idx}`}
+                className="relative w-64 h-80 rounded-2xl overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
+              >
+                <img
+                  src={src}
+                  alt={`Gallery ${idx}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Animation Style */}
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-100%); }
+        }
+        .animate-marquee {
+          animation: marquee 40s linear infinite;
+        }
+        .group:hover .animate-marquee {
+          animation-play-state: paused;
+        }
+      `}</style>
+    </div>
+  );
+}

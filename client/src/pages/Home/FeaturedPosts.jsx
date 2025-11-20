@@ -3,7 +3,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import BlogCard from "../../components/Cards/BlogCard";
-import { IconMapPin } from "../../icons/IconMapPin"; // Dùng icon Map Pin làm điểm nhấn header
+import { IconMapPin } from "../../icons/IconBox.jsx"; // Dùng icon Map Pin làm điểm nhấn header
 
 // Mock Data: Bài viết (Cập nhật nội dung du lịch)
 const posts = [

@@ -5,9 +5,8 @@ import { Link } from "react-router-dom";
 import IconArrowRight from "../../icons/IconArrowRight.jsx";
 import IconBookOpen from "../../icons/IconBookOpen.jsx";
 import IconShieldCheck from "../../icons/IconShieldCheck.jsx";
-import Icon3D from "../../icons/Icon3D.jsx";
+import { Icon3D, IconStar } from "../../icons/IconBox.jsx";
 import IconLang from "../../icons/IconLang.jsx";
-import IconStar from "../../icons/IconStar.jsx";
 import IconArrowUpRight from "../../icons/IconArrowUpRight.jsx";
 
 /**
