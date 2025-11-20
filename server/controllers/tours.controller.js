@@ -37,7 +37,7 @@ async function resolveRoleName(user) {
 
 // helper cho regex an toàn
 function escapeRegex(str = "") {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return str.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&");
 }
 
 // helper: parse danh sách id từ string CSV hoặc array
@@ -76,8 +76,6 @@ export const listTours = async (req, res) => {
         if (q) filter.name = { $regex: q, $options: "i" };
 
         // Lọc theo DANH MỤC:
-        // - Nếu chọn 1 danh mục: chấp nhận tour có category_id == id hoặc categories chứa id (giữ tương thích cũ).
-        // - Nếu chọn >= 2 danh mục: yêu cầu tour chứa TẤT CẢ các danh mục đã chọn.
         const rawCatIds = [
             ...toArrayIds(req.query.category_ids),
             ...toArrayIds(req.query.categories),
@@ -90,21 +88,18 @@ export const listTours = async (req, res) => {
 
         if (catObjIds.length === 1) {
             const cid = catObjIds[0];
-            // 1 danh mục -> OR cho tương thích cũ
             filter.$or = [{ category_id: cid }, { categories: cid }];
         } else if (catObjIds.length > 1) {
-            // >= 2 danh mục -> bắt buộc chứa TẤT CẢ danh mục đã chọn
-            // Dùng $expr + $setIsSubset để kiểm tra tập {category_id} ∪ categories có chứa toàn bộ catObjIds
             const categoriesUnionExpr = {
                 $setUnion: [
-                    ["$category_id"],                // bọc scalar thành mảng (nếu null -> [null], không ảnh hưởng tới subset)
-                    { $ifNull: ["$categories", []] } // nếu không có mảng categories thì dùng []
+                    ["$category_id"],
+                    { $ifNull: ["$categories", []] }
                 ]
             };
             filter.$expr = { $setIsSubset: [catObjIds, categoriesUnionExpr] };
         }
 
-        // khoảng giá (Mongoose cast Number -> Decimal128 OK)
+        // khoảng giá
         const pmin = Number(price_min);
         const pmax = Number(price_max);
         if (Number.isFinite(pmin) || Number.isFinite(pmax)) {
@@ -236,6 +231,8 @@ export const createTour = async (req, res) => {
             name: data.name,
             description: data.description,
             duration: data.duration,
+            // accept and store duration_hours if provided
+            duration_hours: (typeof data.duration_hours !== "undefined") ? (data.duration_hours === null ? null : Number(data.duration_hours)) : null,
             price: data.price,
             max_guests: data.max_guests,
             category_id: data.category_id || null,

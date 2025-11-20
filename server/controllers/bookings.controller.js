@@ -5,30 +5,24 @@ import Tour from "../models/Tour.js";
 import Transaction from "../models/Transaction.js";
 import User from "../models/User.js";
 import { notifyAdmins, notifyUser } from "../services/notify.js";
-import { getTakenSlots, isGuideBusy, hasGuideLockedThisTourDate } from "../helpers/bookings.helper.js";
+import {
+    getTakenSlots,
+    isGuideBusy,
+    hasGuideLockedThisTourDate,
+    toDateOrNull,
+    addHours,
+    getDurationHoursFromTour,
+} from "../helpers/bookings.helper.js";
 
 const ObjectId = mongoose.Types.ObjectId;
 
 /**
- * Helpers
+ * Price computation: children <11 free (no slot)
  */
-
-// Parse date or return null. Accepts YYYY-MM-DD (interpreted as +07:00) or full ISO.
-function toDateOrNull(input) {
-    if (!input) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
-        return new Date(`${input}T00:00:00+07:00`);
-    }
-    const t = Date.parse(input);
-    if (!Number.isNaN(t)) return new Date(t);
-    return null;
-}
-
-// Price computation: children <11 free (no slot)
 function computePrice({ basePrice, participants }) {
     let total = 0;
-    const normalized = participants.map(p => {
-        const isFree = (typeof p.age_provided === "number") ? (p.age_provided < 11) : false;
+    const normalized = participants.map((p) => {
+        const isFree = typeof p.age_provided === "number" ? p.age_provided < 11 : false;
         const price = isFree ? 0 : Number(basePrice);
         if (!isFree) total += price;
         return {
@@ -44,21 +38,17 @@ function computePrice({ basePrice, participants }) {
     return { total, normalized };
 }
 
-// add days helper
-function addDays(d, days) {
-    const x = new Date(d);
-    x.setDate(x.getDate() + days);
-    return x;
-}
-
 // read minutes from env (fallback)
 function minutesFromEnv(name, fallback) {
     const v = Number(process.env[name]);
     return Number.isFinite(v) && v > 0 ? v : fallback;
 }
-
-function isAdmin(user) { return user?.role_id?.name === "admin" || user?.role === "admin"; }
-function isOwner(user, booking) { return String(user?._id) === String(booking.customer_id); }
+function isAdmin(user) {
+    return user?.role_id?.name === "admin" || user?.role === "admin";
+}
+function isOwner(user, booking) {
+    return String(user?._id) === String(booking.customer_id);
+}
 
 /**
  * Create booking
@@ -75,7 +65,7 @@ export const createBooking = async (req, res) => {
             adults: adultsCountFromBody,
             children: childrenCountFromBody,
             children_ages,
-            contact = {}
+            contact = {},
         } = req.body;
 
         const start = toDateOrNull(start_date);
@@ -84,21 +74,20 @@ export const createBooking = async (req, res) => {
         if (start_date && !start) {
             return res.status(400).json({
                 message: "start_date không hợp lệ. Dùng 'YYYY-MM-DD' hoặc ISO 8601.",
-                received: start_date
+                received: start_date,
             });
         }
         if (end_date && !end) {
             return res.status(400).json({
                 message: "end_date không hợp lệ. Dùng 'YYYY-MM-DD' hoặc ISO 8601.",
-                received: end_date
+                received: end_date,
             });
         }
 
-        // no past start
+        // no past start (compare to current moment)
         const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        if (start && start < todayStart) {
-            return res.status(400).json({ message: "start_date phải ở tương lai (không được chọn ngày quá khứ)." });
+        if (start && start < now) {
+            return res.status(400).json({ message: "start_date phải ở tương lai (không được chọn thời điểm quá khứ)." });
         }
 
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
@@ -127,7 +116,7 @@ export const createBooking = async (req, res) => {
                     full_name: null,
                     age_provided: 30,
                     is_primary_contact: i === 0,
-                    seat_index: null
+                    seat_index: null,
                 });
             }
 
@@ -138,7 +127,7 @@ export const createBooking = async (req, res) => {
                         full_name: null,
                         age_provided: Number.isFinite(age) ? age : 5,
                         is_primary_contact: false,
-                        seat_index: null
+                        seat_index: null,
                     });
                 }
                 for (let i = children_ages.length; i < children; i++) {
@@ -146,7 +135,7 @@ export const createBooking = async (req, res) => {
                         full_name: null,
                         age_provided: 5,
                         is_primary_contact: false,
-                        seat_index: null
+                        seat_index: null,
                     });
                 }
             } else {
@@ -155,7 +144,7 @@ export const createBooking = async (req, res) => {
                         full_name: null,
                         age_provided: 5,
                         is_primary_contact: false,
-                        seat_index: null
+                        seat_index: null,
                     });
                 }
             }
@@ -164,24 +153,25 @@ export const createBooking = async (req, res) => {
         const basePrice = Number(tour.price || 0);
         const { total, normalized } = computePrice({ basePrice, participants: participantsInput });
 
-        const requested = normalized.filter(p => p.count_slot).length;
+        const requested = normalized.filter((p) => p.count_slot).length;
         const taken = await getTakenSlots(tour._id, start);
         const remaining = Math.max((Number(tour.max_guests) || 0) - taken, 0);
 
         if (requested > remaining) {
             return res.status(409).json({
                 message: `Không đủ chỗ. Còn ${remaining} slot, nhưng yêu cầu ${requested}.`,
-                meta: { remaining, requested }
+                meta: { remaining, requested },
             });
         }
 
         // choose intended guide
         const intendedGuide =
             guide_id ||
-            (tour.guide_id ? String(tour.guide_id) : (tour.guides?.[0]?.guideId ? String(tour.guides[0].guideId) : null));
+            (tour.guide_id ? String(tour.guide_id) : tour.guides?.[0]?.guideId ? String(tour.guides[0].guideId) : null);
 
-        const durationDays = Math.max(Number(tour?.duration || 1), 1);
-        const computedEnd = end ?? (start ? addDays(start, durationDays - 1) : null);
+        // Compute end based on duration_hours (if present) or fallback to days->hours
+        const durationHours = getDurationHoursFromTour(tour);
+        const computedEnd = end ?? (start ? addHours(start, durationHours) : null);
 
         const approvalMins = minutesFromEnv("BOOKING_GUIDE_APPROVAL_TIMEOUT_MINUTES", 120);
         const paymentMins = minutesFromEnv("BOOKING_PAYMENT_TIMEOUT_MINUTES", 60);
@@ -195,7 +185,7 @@ export const createBooking = async (req, res) => {
             const busy = await isGuideBusy(intendedGuide, start, computedEnd, null, tour._id);
             if (busy) {
                 return res.status(409).json({
-                    message: "HDV đã bận thời gian này với tour khác. Vui lòng chọn ngày khác hoặc HDV khác.",
+                    message: "HDV đã bận thời gian này với tour khác. Vui lòng chọn thời gian khác hoặc HDV khác.",
                 });
             }
 
@@ -299,8 +289,7 @@ export const guideApproveBooking = async (req, res) => {
         const booking = await Booking.findById(id);
         if (!booking) return res.status(404).json({ message: "Booking không tồn tại" });
 
-        const isGuideOwner =
-            booking.intended_guide_id && String(booking.intended_guide_id) === String(user._id);
+        const isGuideOwner = booking.intended_guide_id && String(booking.intended_guide_id) === String(user._id);
         const isUserAdmin = user?.role === "admin" || user?.role_id?.name === "admin";
         if (!isGuideOwner && !isUserAdmin) {
             return res.status(403).json({ message: "Bạn không có quyền duyệt booking này" });
@@ -313,14 +302,14 @@ export const guideApproveBooking = async (req, res) => {
         if (!tourDoc) return res.status(404).json({ message: "Tour không tồn tại" });
         const tourName = tourDoc?.name || `#${booking._id}`;
 
-        const requested = (booking.participants || []).filter(p => p.count_slot).length;
+        const requested = (booking.participants || []).filter((p) => p.count_slot).length;
         const taken = await getTakenSlots(booking.tour_id, booking.start_date);
         const remaining = Math.max((Number(tourDoc.max_guests) || 0) - taken, 0);
 
         if (requested > remaining) {
             return res.status(409).json({
                 message: `Không đủ chỗ để duyệt. Còn ${remaining} slot, cần ${requested}.`,
-                meta: { remaining, requested }
+                meta: { remaining, requested },
             });
         }
 
@@ -384,8 +373,7 @@ export const guideRejectBooking = async (req, res) => {
         const booking = await Booking.findById(id);
         if (!booking) return res.status(404).json({ message: "Booking không tồn tại" });
 
-        const isGuideOwner =
-            booking.intended_guide_id && String(booking.intended_guide_id) === String(user._id);
+        const isGuideOwner = booking.intended_guide_id && String(booking.intended_guide_id) === String(user._id);
         const isUserAdmin = user?.role === "admin" || user?.role_id?.name === "admin";
         if (!isGuideOwner && !isUserAdmin) {
             return res.status(403).json({ message: "Bạn không có quyền từ chối booking này" });
@@ -417,7 +405,7 @@ export const guideRejectBooking = async (req, res) => {
                 tourId: booking.tour_id,
                 tourName,
                 reason: note || "",
-                bookingUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}`
+                bookingUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}`,
             },
         }).catch(() => { });
 
@@ -470,10 +458,6 @@ export const getBooking = async (req, res) => {
 
 /**
  * Owner or admin cancel booking
- * - If booking.status === waiting_guide || awaiting_payment -> cancel immediately
- * - If booking.status === paid:
- *    - If owner: create refund transaction (pending), mark cancel_requested and notify admins
- *    - If admin: use adminCancelBooking endpoint (can refund immediately)
  */
 export const cancelBooking = async (req, res) => {
     try {
@@ -503,7 +487,7 @@ export const cancelBooking = async (req, res) => {
                 type: "booking:canceled",
                 content: `Booking #${booking._id} đã bị huỷ.`,
                 url: `/booking/${booking._id}`,
-                meta: { bookingId: booking._id, reason: booking.cancel_reason || "" }
+                meta: { bookingId: booking._id, reason: booking.cancel_reason || "" },
             }).catch(() => { });
 
             if (booking.intended_guide_id) {
@@ -512,7 +496,7 @@ export const cancelBooking = async (req, res) => {
                     type: "booking:canceled:guide",
                     content: `Booking #${booking._id} cho tour đã bị huỷ.`,
                     url: `/guide/bookings/${booking._id}`,
-                    meta: { bookingId: booking._id }
+                    meta: { bookingId: booking._id },
                 }).catch(() => { });
             }
 
@@ -553,7 +537,7 @@ export const cancelBooking = async (req, res) => {
             const bookingCode = String(booking._id);
             const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
             const adminUrl = `${process.env.APP_BASE_URL}/admin/refunds/${txn._id}`;
-            const requestedAt = (booking.cancel_requested_at || new Date()).toLocaleString();
+            const requestedAt = booking.cancel_requested_at ? booking.cancel_requested_at.toLocaleString() : new Date().toLocaleString();
 
             const adminMeta = {
                 bookingId: booking._id,
@@ -566,7 +550,7 @@ export const cancelBooking = async (req, res) => {
                 requestedAt,
                 bookingUrl,
                 adminUrl,
-                supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+                supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || "",
             };
 
             // Notify admins (email + internal notify)
@@ -585,14 +569,14 @@ export const cancelBooking = async (req, res) => {
                 requestedAt,
                 bookingUrl,
                 transactionId: txn._id,
-                supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+                supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || "",
             };
             await notifyUser({
                 userId: booking.customer_id,
                 type: "booking:refund_requested:confirm",
                 content: `Yêu cầu hủy và hoàn tiền cho booking #${booking._id} đã được gửi tới admin.`,
                 url: `/booking/${booking._id}`,
-                meta: userMeta
+                meta: userMeta,
             }).catch(() => { });
 
             return res.status(201).json({ message: "Refund request created", transaction: txn, booking });
@@ -658,7 +642,7 @@ export const adminCancelBooking = async (req, res) => {
                 confirmedBy: user.name || user._id,
                 confirmedAt: txn.confirmed_at ? txn.confirmed_at.toLocaleString() : new Date().toLocaleString(),
                 bookingUrl,
-                supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+                supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || "",
             };
 
             await notifyUser({
@@ -666,7 +650,7 @@ export const adminCancelBooking = async (req, res) => {
                 type: "booking:refunded",
                 content: `Booking #${booking._id} đã được huỷ và hoàn tiền.`,
                 url: `/booking/${booking._id}`,
-                meta: userMeta
+                meta: userMeta,
             }).catch(() => { });
 
             // notify admins for audit
@@ -677,8 +661,8 @@ export const adminCancelBooking = async (req, res) => {
                     bookingId: booking._id,
                     transactionId: txn._id,
                     amount,
-                    confirmedBy: user.name || user._id
-                }
+                    confirmedBy: user.name || user._id,
+                },
             }).catch(() => { });
 
             return res.json({ booking, transaction: txn });
@@ -698,7 +682,7 @@ export const adminCancelBooking = async (req, res) => {
             type: "booking:canceled",
             content: `Booking #${booking._id} đã bị huỷ bởi admin.`,
             url: `/booking/${booking._id}`,
-            meta: { bookingId: booking._id }
+            meta: { bookingId: booking._id },
         }).catch(() => { });
 
         return res.json({ booking });
@@ -752,7 +736,7 @@ export const adminCreateRefund = async (req, res) => {
             bookingUrl,
             transactionId: txn._id,
             requestedAt: new Date().toLocaleString(),
-            supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+            supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || "",
         };
 
         await notifyUser({
@@ -760,7 +744,7 @@ export const adminCreateRefund = async (req, res) => {
             type: "booking:refund_requested",
             content: `Yêu cầu hoàn tiền cho booking #${booking._id} đã được tạo.`,
             url: `/booking/${booking._id}`,
-            meta: userMeta
+            meta: userMeta,
         }).catch(() => { });
 
         await notifyAdmins({
@@ -773,8 +757,8 @@ export const adminCreateRefund = async (req, res) => {
                 transactionId: txn._id,
                 customerName: customer?.name || "",
                 customerEmail: customer?.email || "",
-                adminUrl
-            }
+                adminUrl,
+            },
         }).catch(() => { });
 
         return res.json({ transaction: txn, booking });
@@ -786,7 +770,6 @@ export const adminCreateRefund = async (req, res) => {
 
 /**
  * Admin confirm refund (after manual transfer or gateway refund)
- * - Confirm txn, set booking canceled, notify user.
  */
 export const adminConfirmRefund = async (req, res) => {
     try {
@@ -821,7 +804,7 @@ export const adminConfirmRefund = async (req, res) => {
 
         // rich meta for user notify
         const customer = await User.findById(txn.userId).lean().catch(() => null);
-        const bookingCode = booking ? String(booking._id) : (txn.bookingId ? String(txn.bookingId) : "");
+        const bookingCode = booking ? String(booking._id) : txn.bookingId ? String(txn.bookingId) : "";
         const bookingUrl = `${process.env.APP_BASE_URL}/booking/${txn.bookingId || ""}`;
 
         const userMeta = {
@@ -833,7 +816,7 @@ export const adminConfirmRefund = async (req, res) => {
             confirmedBy: user.name || user._id,
             confirmedAt: txn.confirmed_at ? txn.confirmed_at.toLocaleString() : new Date().toLocaleString(),
             bookingUrl,
-            supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+            supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || "",
         };
 
         await notifyUser({
@@ -841,7 +824,7 @@ export const adminConfirmRefund = async (req, res) => {
             type: "booking:refunded",
             content: `Hoàn tiền cho booking #${txn.bookingId} đã hoàn tất.`,
             url: `/booking/${txn.bookingId}`,
-            meta: userMeta
+            meta: userMeta,
         }).catch(() => { });
 
         // notify admins for audit
@@ -852,8 +835,8 @@ export const adminConfirmRefund = async (req, res) => {
                 bookingId: txn.bookingId,
                 transactionId: txn._id,
                 amount: txn.amount ? txn.amount.toString() : "",
-                confirmedBy: user.name || user._id
-            }
+                confirmedBy: user.name || user._id,
+            },
         }).catch(() => { });
 
         return res.json({ transaction: txn, booking });
@@ -863,6 +846,9 @@ export const adminConfirmRefund = async (req, res) => {
     }
 };
 
+/**
+ * Get bookings assigned to guide (with optional filters)
+ */
 export const getGuideBookings = async (req, res) => {
     try {
         const userId = req.user?._id;
@@ -878,7 +864,7 @@ export const getGuideBookings = async (req, res) => {
             let raw = String(s).trim();
             // replace parentheses with commas so accepted(completed) -> "accepted,completed"
             raw = raw.replace(/[()]/g, ",");
-            const parts = raw.split(/[,|]/).map(p => p.trim()).filter(Boolean);
+            const parts = raw.split(/[,|]/).map((p) => p.trim()).filter(Boolean);
             return parts;
         }
 
@@ -902,7 +888,8 @@ export const getGuideBookings = async (req, res) => {
                 const groups = { received: [], canceled: [], completed: [], others: [] };
                 for (const b of items) {
                     const s = (b.status || "").toString();
-                    if (b?.guide_decision?.status === "accepted" || ["accepted", "awaiting_payment", "paid"].includes(s)) groups.received.push(b);
+                    if (b?.guide_decision?.status === "accepted" || ["accepted", "awaiting_payment", "paid"].includes(s))
+                        groups.received.push(b);
                     else if (["canceled", "rejected"].includes(s)) groups.canceled.push(b);
                     else if (s === "completed") groups.completed.push(b);
                     else groups.others.push(b);
@@ -951,7 +938,8 @@ export const getGuideBookings = async (req, res) => {
             const groups = { received: [], canceled: [], completed: [], others: [] };
             for (const b of items) {
                 const s = (b.status || "").toString();
-                if (b?.guide_decision?.status === "accepted" || ["accepted", "awaiting_payment", "paid"].includes(s)) groups.received.push(b);
+                if (b?.guide_decision?.status === "accepted" || ["accepted", "awaiting_payment", "paid"].includes(s))
+                    groups.received.push(b);
                 else if (["canceled", "rejected"].includes(s)) groups.canceled.push(b);
                 else if (s === "completed") groups.completed.push(b);
                 else groups.others.push(b);

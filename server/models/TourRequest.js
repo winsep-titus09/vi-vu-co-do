@@ -16,13 +16,16 @@ const TourRequestSchema = new mongoose.Schema(
         // Cơ bản
         name: { type: String, required: true, trim: true },
         description: String,
-        duration: { type: Number, default: 1 },
+        duration: { type: Number }, // legacy: days
+        // NEW: duration in hours (optional)
+        duration_hours: { type: Number, default: null },
+
         price: { type: Decimal128, required: true },
         max_guests: { type: Number, default: 0 },
 
-        // Danh mục
+        // Danh mục (NEW: hỗ trợ nhiều categories)
         category_id: { type: ObjectId, ref: "TourCategory" },
-        categories: [{ type: ObjectId, ref: "TourCategory" }],
+        categories: [{ type: ObjectId, ref: "TourCategory" }], // <-- ADDED
 
         // Media + hành trình
         cover_image_url: { type: String, default: null },
@@ -41,6 +44,7 @@ const TourRequestSchema = new mongoose.Schema(
         fixed_departure_time: { type: String, default: "08:00" }, // "HH:mm"
         min_days_before_start: { type: Number, default: 0 },
         max_days_advance: { type: Number, default: 180 },
+
         closed_weekdays: [{ type: Number, min: 0, max: 6, default: [] }],
         blackout_dates: [{ type: Date, default: [] }],
         per_date_capacity: { type: Number, default: null }, // null => dùng max_guests

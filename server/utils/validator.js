@@ -94,7 +94,13 @@ export const departureItemSchema = z.object({
 export const createTourSchema = z.object({
     name: z.string().min(1),
     description: z.string().optional(),
+
+    // legacy: duration in days (kept for backward compatibility)
     duration: z.number().int().positive().default(1),
+
+    // new: duration in hours. Optional. If provided, backend will use duration_hours to compute end_date.
+    duration_hours: z.number().positive().optional().nullable(),
+
     price: z.number().nonnegative(),
     max_guests: z.number().int().nonnegative().default(0),
 
@@ -149,7 +155,13 @@ export const tourRequestDepartureSchema = z.object({
 export const createTourRequestSchema = z.object({
     name: z.string().min(1),
     description: z.string().optional(),
+
+    // legacy days
     duration: z.number().int().positive().default(1),
+
+    // support hours in request too
+    duration_hours: z.number().positive().optional().nullable(),
+
     price: z.number().nonnegative(),
     max_guests: z.number().int().nonnegative().default(0),
 

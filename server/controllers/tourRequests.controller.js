@@ -29,82 +29,73 @@ export const submitTourRequest = async (req, res) => {
             return res.status(403).json({ message: "Chỉ HDV mới được gửi yêu cầu tạo tour." });
         }
 
-        // Validator mới KHÔNG bắt buộc departures
         const parsed = createTourRequestSchema.safeParse(req.body || {});
         if (!parsed.success) {
-            return res.status(400).json({ message: "Dữ liệu không hợp lệ.", errors: parsed.error.flatten() });
-        }
-        const data = parsed.data;
-
-        // validate locations (bắt buộc)
-        const locations = normalizeLocations(data.locations);
-        if (!locations.length) {
-            return res.status(400).json({ message: "Cần chọn ít nhất 1 địa điểm." });
-        }
-        const locIds = locations.map(l => l.locationId);
-        const locCount = await Location.countDocuments({ _id: { $in: locIds } });
-        if (locCount !== locIds.length) return res.status(400).json({ message: "Có địa điểm không tồn tại." });
-
-        // validate categories (multi | single)
-        const categories = (data.categories && data.categories.length)
-            ? data.categories
-            : (data.category_id ? [data.category_id] : []);
-        if (categories.length) {
-            const catCount = await TourCategory.countDocuments({ _id: { $in: categories } });
-            if (catCount !== categories.length) return res.status(400).json({ message: "Có danh mục không tồn tại." });
+            return res.status(400).json({ message: "Dữ liệu không hợp lệ", detail: parsed.error.format() });
         }
 
-        // Flexible-date defaults (đảm bảo có khi validator chưa set)
-        const allow_custom_date = (data.allow_custom_date !== undefined) ? !!data.allow_custom_date : true;
-        const fixed_departure_time = data.fixed_departure_time || "08:00";
-        const min_days_before_start = Number.isInteger(data.min_days_before_start) ? data.min_days_before_start : 0;
-        const max_days_advance = Number.isInteger(data.max_days_advance) ? data.max_days_advance : 180;
-        const closed_weekdays = Array.isArray(data.closed_weekdays) ? data.closed_weekdays : [];
-        const blackout_dates = Array.isArray(data.blackout_dates) ? data.blackout_dates : [];
-        const per_date_capacity = (data.per_date_capacity === null || data.per_date_capacity === undefined)
-            ? null
-            : Number(data.per_date_capacity);
-
-        // Lưu request (KHÔNG còn departures)
-        const doc = await TourRequest.create({
-            // cơ bản
-            name: data.name,
-            description: data.description,
-            duration: data.duration,
-            price: data.price,
-            max_guests: data.max_guests,
-            category_id: data.category_id || null,
+        const {
+            name,
+            description,
+            duration,
+            duration_hours,
+            price,
+            max_guests,
             categories,
-            cover_image_url: data.cover_image_url || null,
-            gallery: data.gallery || [],
-            itinerary: data.itinerary || [],
-            featured: !!data.featured,
-            free_under_age: data.free_under_age ?? 11,
-
-            // quan hệ
-            guide_id: req.user._id,          // giữ tương thích ngược
-            created_by: req.user._id,        // mới (nếu schema có)
-            guides: (Array.isArray(data.guides) && data.guides.length)
-                ? data.guides
-                : [{ guideId: req.user._id, isMain: true }],
+            cover_image_url,
+            gallery,
+            itinerary,
+            featured,
+            free_under_age,
+            guides,
             locations,
-
-            // ngày linh hoạt + giờ cố định
             allow_custom_date,
             fixed_departure_time,
             min_days_before_start,
             max_days_advance,
             closed_weekdays,
             blackout_dates,
-            per_date_capacity,
+            per_date_capacity
+        } = parsed.data;
 
-            // quy trình duyệt (đơn giản hoá về status)
+        // normalize locations & validate existence
+        const locIds = (Array.isArray(locations) ? locations.map(l => l.locationId) : []).filter(Boolean);
+        if (locIds.length === 0) {
+            return res.status(400).json({ message: "Danh sách địa điểm rỗng." });
+        }
+        const locCnt = await Location.countDocuments({ _id: { $in: locIds } });
+        if (locCnt !== locIds.length) return res.status(400).json({ message: "Danh sách địa điểm có phần tử không tồn tại." });
+
+        const doc = await TourRequest.create({
+            name,
+            description,
+            duration: Number(duration || 1),
+            duration_hours: typeof duration_hours !== "undefined" ? (duration_hours === null ? null : Number(duration_hours)) : null,
+            price,
+            max_guests: Number(max_guests || 0),
+            category_id: (categories && categories.length) ? categories[0] : null,
+            categories: categories || [],
+            cover_image_url: cover_image_url || null,
+            gallery: gallery || [],
+            itinerary: itinerary || [],
+            featured: !!featured,
+            free_under_age: Number(free_under_age || 11),
+            guides: (Array.isArray(guides) && guides.length) ? guides : [{ guideId: req.user._id, isMain: true }],
+            locations: normalizeLocations(locations),
+            allow_custom_date: allow_custom_date !== false,
+            fixed_departure_time: fixed_departure_time || "08:00",
+            min_days_before_start: Number.isInteger(min_days_before_start) ? min_days_before_start : 0,
+            max_days_advance: Number.isInteger(max_days_advance) ? max_days_advance : 180,
+            closed_weekdays: Array.isArray(closed_weekdays) ? closed_weekdays : [],
+            blackout_dates: Array.isArray(blackout_dates) ? blackout_dates : [],
+            per_date_capacity: per_date_capacity ?? null,
             status: "pending",
             reviewed_by: null,
             reviewed_at: null,
             reason_rejected: null,
             notes: null,
-            notify_url: `/admin/tour-requests`, // sẽ chỉnh thành /:id khi admin mở
+            created_by: req.user._id,
+            notify_url: `/admin/tour-requests`
         });
 
         // 🔔 Thông báo cho Admin
@@ -132,20 +123,32 @@ export const submitTourRequest = async (req, res) => {
 // GET /admin/tour-requests?status=pending&page=&limit=
 export const listPendingTourRequests = async (req, res) => {
     try {
-        const { status = "pending" } = req.query;
+        const { status = "pending", page = 1, limit = 50 } = req.query;
         const filter = {};
         if (status) filter.status = status; // dùng status, không dùng review.status
 
-        const items = await TourRequest.find(filter)
-            .populate("guide_id", "name avatar_url")
-            .populate("categories", "name slug")
-            .populate("locations.locationId", "name slug")
-            .sort({ createdAt: -1 })
-            .lean();
+        const pg = Math.max(Number(page) || 1, 1);
+        const lm = Math.min(Math.max(Number(limit) || 50, 1), 200);
 
-        return res.json(items);
+        const [items, total] = await Promise.all([
+            TourRequest.find(filter)
+                .populate("created_by", "name avatar_url")
+                .populate("guides.guideId", "name avatar_url")
+                .populate("categories", "name slug")
+                .populate("locations.locationId", "name slug")
+                .sort({ createdAt: -1 })
+                .skip((pg - 1) * lm)
+                .limit(lm)
+                .lean(),
+            TourRequest.countDocuments(filter)
+        ]);
+
+        return res.json({ items, total, page: pg, pageSize: lm });
     } catch (err) {
         console.error("listPendingTourRequests error:", err);
+        if (err && err.name === "StrictPopulateError") {
+            return res.status(500).json({ message: "Populate failed: check populated fields against schema.", detail: err.message });
+        }
         return res.status(500).json({ message: "Lỗi máy chủ." });
     }
 };
@@ -156,10 +159,12 @@ export const getTourRequest = async (req, res) => {
         const { id } = req.params;
         if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "ID không hợp lệ." });
         const r = await TourRequest.findById(id)
-            .populate("guide_id", "name avatar_url")
+            .populate("created_by", "name avatar_url")
+            .populate("guides.guideId", "name avatar_url")
             .populate("categories", "name slug")
             .populate("locations.locationId", "name slug")
             .lean();
+
         if (!r) return res.status(404).json({ message: "Không tìm thấy yêu cầu." });
         return res.json(r);
     } catch (err) {
@@ -192,11 +197,15 @@ export const approveTourRequest = async (req, res) => {
 
             // Tạo Tour từ request (ngày linh hoạt)
             const slug = await makeUniqueSlug(Tour, r.name);
+
             const [tourDoc] = await Tour.create([{
                 slug,
                 name: r.name,
                 description: r.description,
-                duration: r.duration,
+                // keep legacy duration (days) for compatibility – derive from duration_hours if necessary
+                duration: r.duration || Math.max(1, Math.ceil((r.duration_hours ?? 24) / 24)),
+                // store duration_hours explicitly if provided
+                duration_hours: (typeof r.duration_hours !== "undefined") ? (r.duration_hours === null ? null : r.duration_hours) : null,
                 price: r.price,
                 max_guests: r.max_guests,
                 category_id: r.category_id || null,
@@ -207,13 +216,8 @@ export const approveTourRequest = async (req, res) => {
                 featured: !!r.featured,
                 status: "active",
 
-                created_by: r.created_by || r.guide_id,
+                created_by: r.created_by || (Array.isArray(r.guides) && r.guides[0] ? r.guides[0].guideId : null),
                 created_by_role: "guide",
-
-                approval: { status: "approved", reviewed_by: req.user._id, reviewed_at: new Date(), notes: req.body?.notes || null },
-
-                guides: (r.guides && r.guides.length) ? r.guides : [{ guideId: r.guide_id, isMain: true }],
-                locations: r.locations || [],
 
                 // Flexible date config
                 allow_custom_date: r.allow_custom_date !== false,
@@ -223,29 +227,32 @@ export const approveTourRequest = async (req, res) => {
                 closed_weekdays: Array.isArray(r.closed_weekdays) ? r.closed_weekdays : [],
                 blackout_dates: Array.isArray(r.blackout_dates) ? r.blackout_dates : [],
                 per_date_capacity: r.per_date_capacity ?? null,
+
+                guides: (r.guides && r.guides.length) ? r.guides : [],
+                locations: r.locations || []
             }], { session });
 
             // cập nhật request
             r.status = "approved";
-            r.reviewed_by = req.user._id;
+            r.reviewed_by = req.user ? req.user._id : null;
             r.reviewed_at = new Date();
-            r.reason_rejected = null;
-            r.notes = req.body?.notes || null;
-            r.tour_id = tourDoc._id;
-            r.notify_url = `/admin/tour-requests/${r._id}`;
             await r.save({ session });
 
-            // 🔔 Thông báo cho HDV
-            await notifyUser({
-                userId: r.created_by || r.guide_id,
-                type: "tour_request:approved",
-                content: `Yêu cầu tạo tour “${r.name}” đã được duyệt`,
-                url: `/tours/${tourDoc.slug}`,
-                meta: { tourId: tourDoc._id.toString(), requestId: r._id.toString() },
-            });
-        });
+            // notify guide (creator)
+            try {
+                await notifyUser({
+                    userId: r.created_by,
+                    type: "tour_request:approved",
+                    content: `Yêu cầu tạo tour "${r.name}" đã được phê duyệt.`,
+                    url: `/guide/tour-requests/${r._id}`,
+                    meta: { requestId: r._id, tourId: tourDoc._id }
+                });
+            } catch (e) {
+                console.warn("notifyUser tour_request:approved failed:", e?.message);
+            }
 
-        return res.json({ message: "Đã duyệt yêu cầu và tạo tour thành công." });
+            return res.json({ message: "Yêu cầu đã được phê duyệt.", tourId: tourDoc._id });
+        });
     } catch (err) {
         if (err.message === "NOT_FOUND") return res.status(404).json({ message: "Không tìm thấy yêu cầu." });
         if (err.message === "ALREADY_PROCESSED") return res.status(409).json({ message: "Yêu cầu đã được xử lý." });
@@ -262,27 +269,30 @@ export const rejectTourRequest = async (req, res) => {
     try {
         const { id } = req.params;
         const { notes } = req.body || {};
-        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "ID không hợp lệ." });
 
+        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "ID không hợp lệ." });
         const r = await TourRequest.findById(id);
         if (!r) return res.status(404).json({ message: "Không tìm thấy yêu cầu." });
         if (r.status !== "pending") return res.status(409).json({ message: "Yêu cầu đã được xử lý." });
 
         r.status = "rejected";
-        r.reviewed_by = req.user._id;
+        r.reviewed_by = req.user ? req.user._id : null;
         r.reviewed_at = new Date();
-        r.reason_rejected = notes || "Không đạt yêu cầu";
-        r.notify_url = `/admin/tour-requests/${r._id}`;
+        r.reason_rejected = notes || null;
         await r.save();
 
-        // 🔔 Thông báo cho HDV
-        await notifyUser({
-            userId: r.created_by || r.guide_id,
-            type: "tour_request:rejected",
-            content: `Yêu cầu tạo tour “${r.name}” đã bị từ chối`,
-            url: `/guide/tour-requests/${r._id}`,
-            meta: { requestId: r._id.toString(), notes: r.reason_rejected },
-        });
+        // notify guide
+        try {
+            await notifyUser({
+                userId: r.created_by,
+                type: "tour_request:rejected",
+                content: `Yêu cầu tạo tour “${r.name}” đã bị từ chối`,
+                url: `/guide/tour-requests/${r._id}`,
+                meta: { requestId: r._id.toString(), notes: r.reason_rejected },
+            });
+        } catch (e) {
+            console.warn("notifyUser tour_request:rejected failed:", e?.message);
+        }
 
         return res.json({ message: "Đã từ chối yêu cầu tạo tour." });
     } catch (err) {
@@ -298,7 +308,8 @@ export const listMyTourRequests = async (req, res) => {
     try {
         if (roleNameOf(req.user) !== "guide") return res.status(403).json({ message: "Chỉ HDV." });
         const { status, page = 1, limit = 12 } = req.query;
-        const filter = { $or: [{ created_by: req.user._id }, { guide_id: req.user._id }] };
+
+        const filter = { $or: [{ created_by: req.user._id }, { "guides.guideId": req.user._id }] };
         if (status) filter.status = status;
 
         const pg = Math.max(parseInt(page) || 1, 1);
@@ -326,61 +337,33 @@ export const listMyTourRequests = async (req, res) => {
 export const updateTourRequest = async (req, res) => {
     try {
         const { id } = req.params;
-        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "ID không hợp lệ." });
-
-        if (roleNameOf(req.user) !== "guide") return res.status(403).json({ message: "Chỉ HDV." });
-
-        const doc = await TourRequest.findOne({ _id: id, $or: [{ created_by: req.user._id }, { guide_id: req.user._id }] });
-        if (!doc) return res.status(404).json({ message: "Không tìm thấy yêu cầu." });
-        if (doc.status !== "pending") return res.status(403).json({ message: "Chỉ sửa khi còn pending." });
-
         const parsed = updateTourRequestSchema.safeParse(req.body || {});
-        if (!parsed.success) {
-            return res.status(400).json({ message: "Dữ liệu không hợp lệ.", errors: parsed.error.flatten() });
-        }
-        const data = parsed.data;
+        if (!parsed.success) return res.status(400).json({ message: "Dữ liệu không hợp lệ", detail: parsed.error.format() });
 
-        // validate locations nếu có
-        if (data.locations?.length) {
-            const normalized = normalizeLocations(data.locations);
-            const ids = normalized.map(x => x.locationId);
-            const cnt = await Location.countDocuments({ _id: { $in: ids } });
-            if (cnt !== ids.length) return res.status(400).json({ message: "Danh sách địa điểm có phần tử không tồn tại." });
-            data.locations = normalized;
-        }
+        const r = await TourRequest.findById(id);
+        if (!r) return res.status(404).json({ message: "Không tìm thấy yêu cầu." });
+        if (r.status !== "pending") return res.status(409).json({ message: "Chỉ có thể cập nhật khi trạng thái pending." });
+        if (String(r.created_by) !== String(req.user._id)) return res.status(403).json({ message: "Bạn không có quyền sửa yêu cầu này." });
 
-        // validate categories nếu có
-        if (data.categories?.length) {
-            const catCount = await TourCategory.countDocuments({ _id: { $in: data.categories } });
-            if (catCount !== data.categories.length) {
-                return res.status(400).json({ message: "Danh sách danh mục có phần tử không tồn tại." });
-            }
-        }
-
-        Object.assign(doc, data);
-        await doc.save();
-
-        return res.json(doc);
+        Object.assign(r, parsed.data);
+        await r.save();
+        return res.json({ message: "Đã cập nhật yêu cầu.", request: r });
     } catch (err) {
         console.error("updateTourRequest error:", err);
         return res.status(500).json({ message: "Lỗi máy chủ." });
     }
 };
 
-// DELETE /api/tour-requests/:id   (guide chỉ khi pending)
 export const deleteTourRequest = async (req, res) => {
     try {
         const { id } = req.params;
-        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "ID không hợp lệ." });
+        const r = await TourRequest.findById(id);
+        if (!r) return res.status(404).json({ message: "Không tìm thấy yêu cầu." });
+        if (String(r.created_by) !== String(req.user._id)) return res.status(403).json({ message: "Bạn không có quyền xóa yêu cầu này." });
+        if (r.status !== "pending") return res.status(409).json({ message: "Chỉ có thể xóa khi trạng thái pending." });
 
-        if (roleNameOf(req.user) !== "guide") return res.status(403).json({ message: "Chỉ HDV." });
-
-        const doc = await TourRequest.findOne({ _id: id, $or: [{ created_by: req.user._id }, { guide_id: req.user._id }] });
-        if (!doc) return res.status(404).json({ message: "Không tìm thấy yêu cầu." });
-        if (doc.status !== "pending") return res.status(403).json({ message: "Chỉ hủy khi còn pending." });
-
-        await doc.deleteOne();
-        return res.json({ message: "Đã xoá yêu cầu." });
+        await r.deleteOne();
+        return res.json({ message: "Đã xóa yêu cầu." });
     } catch (err) {
         console.error("deleteTourRequest error:", err);
         return res.status(500).json({ message: "Lỗi máy chủ." });

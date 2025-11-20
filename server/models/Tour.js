@@ -53,39 +53,52 @@ const TourLocationSchema = new mongoose.Schema(
 
 const TourSchema = new mongoose.Schema(
     {
-        name: { type: String, required: true, trim: true },
-        slug: { type: String, unique: true, index: true },
-        description: String,
-        duration: { type: Number, default: 1 },
-        price: { type: Decimal128, required: true },
+        name: { type: String, required: true },
+        slug: { type: String, index: true },
+        description: { type: String },
+        price: { type: mongoose.Schema.Types.Decimal128, default: 0 },
         max_guests: { type: Number, default: 0 },
 
-        // tương thích cũ
-        category_id: { type: ObjectId, ref: "TourCategory" },
+        // Legacy: duration in days (kept for backward compatibility)
+        duration: { type: Number, default: 1 },
 
-        // mới: hỗ trợ nhiều danh mục (nếu bạn dùng)
-        categories: [{ type: ObjectId, ref: "TourCategory" }],
+        // New: duration in hours. If set (>0), backend uses this to compute end_date.
+        duration_hours: { type: Number, default: null },
 
-        cover_image_url: { type: String, default: null },
+        // Optional: indicate unit; could be 'days' or 'hours'
+        duration_unit: { type: String, enum: ["days", "hours"], default: "days" },
+
+        // relations
+        guides: [{ guideId: { type: mongoose.Types.ObjectId, ref: "User" }, isMain: { type: Boolean, default: false } }],
+        guide_id: { type: mongoose.Types.ObjectId, ref: "User" },
+        cover_image_url: String,
         gallery: [{ type: String }],
         itinerary: [{ day: Number, title: String, details: String }],
-
+        category_id: { type: mongoose.Types.ObjectId, ref: "TourCategory", default: null },
+        categories: [{ type: mongoose.Types.ObjectId, ref: "TourCategory" }],
+        locations: [{ locationId: { type: mongoose.Types.ObjectId, ref: "Location" }, order: Number }],
         featured: { type: Boolean, default: false },
         status: { type: String, enum: ["active", "inactive"], default: "active" },
-        free_under_age: { type: Number, default: 11 },
 
-        // guides & locations
-        guides: [{ guideId: { type: ObjectId, ref: "User" }, isMain: { type: Boolean, default: false } }],
-        locations: [TourLocationSchema],
+        // approval & metadata
+        approval: {
+            status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+            reviewed_by: { type: mongoose.Types.ObjectId, ref: "User", default: null },
+            reviewed_at: { type: Date, default: null },
+            notes: { type: String, default: null },
+        },
 
-        // ---- NGÀY LINH HOẠCH + GIỜ CỐ ĐỊNH ----
-        allow_custom_date: { type: Boolean, default: true, index: true },
-        fixed_departure_time: { type: String, default: "08:00" }, // "HH:mm"
+        created_by: { type: mongoose.Types.ObjectId, ref: "User", default: null },
+        created_by_role: { type: String, default: null },
+
+        // date/time/booking configs
+        allow_custom_date: { type: Boolean, default: true },
+        fixed_departure_time: { type: String, default: "08:00" },
         min_days_before_start: { type: Number, default: 0 },
         max_days_advance: { type: Number, default: 180 },
-        closed_weekdays: [{ type: Number, min: 0, max: 6, default: [] }], // 0=CN..6=T7
+        closed_weekdays: [{ type: Number, min: 0, max: 6, default: [] }],
         blackout_dates: [{ type: Date, default: [] }],
-        per_date_capacity: { type: Number, default: null }, // nếu null dùng max_guests
+        per_date_capacity: { type: Number, default: null },
     },
     { timestamps: true, collection: "tours" }
 );
