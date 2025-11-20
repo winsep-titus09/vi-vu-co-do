@@ -1,4 +1,5 @@
 // server/controllers/payments.controller.js
+import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import Transaction from "../models/Transaction.js";
 import Tour from "../models/Tour.js";
@@ -72,7 +73,7 @@ export const createCheckout = async (req, res) => {
         }
 
         // 2) Tạo orderId duy nhất (tránh MoMo resultCode 41)
-        const amount = Number(booking.total_price);
+        const amount = Number(booking.total_price || 0);
         const orderId = `${booking._id}-${Date.now()}`;
         const orderInfo = `Thanh toán booking ${orderId}`;
         const returnUrl = req.query.return || process.env.PAYMENT_RETURN_URL;
@@ -151,96 +152,144 @@ export const ipnHandler = async (req, res) => {
 
         const success = resultCode === 0;
 
-        await Transaction.create({
-            bookingId: booking._id,
-            userId: booking.customer_id,
-            amount: booking.total_price,
-            commission_fee: 0,
-            net_amount: booking.total_price,
-            transaction_type: "charge",
-            status: success ? "confirmed" : "failed",
-            payment_gateway: "momo",
-            transaction_code: txnCode,
-            note: `MoMo resultCode ${resultCode}`,
-        });
-
-        // Lấy thông tin tour + customer để enrich meta
-        let tourName = `#${booking._id}`;
+        // --- Begin improved atomic flow: create Transaction + update Booking in one Mongo transaction ---
+        const mongooseSession = await mongoose.startSession();
+        await mongooseSession.startTransaction();
         try {
-            const tourDoc = await Tour.findById(booking.tour_id).lean();
-            if (tourDoc?.name) tourName = tourDoc.name;
-        } catch { /* ignore */ }
+            // Compute commission (tour override -> env fallback)
+            let commissionRate = 0;
+            try {
+                const tourDoc = await Tour.findById(booking.tour_id).lean().catch(() => null);
+                if (tourDoc && typeof tourDoc.commission_percentage !== "undefined" && !Number.isNaN(Number(tourDoc.commission_percentage))) {
+                    commissionRate = Number(tourDoc.commission_percentage);
+                } else {
+                    commissionRate = Number(process.env.COMMISSION_RATE ?? 0) || 0;
+                }
+            } catch (e) {
+                commissionRate = Number(process.env.COMMISSION_RATE ?? 0) || 0;
+            }
 
-        let customerName = "";
-        let customerEmail = "";
-        try {
-            const u = await User.findById(booking.customer_id).lean();
-            customerName = u?.name || "";
-            customerEmail = u?.email || "";
-        } catch { /* ignore */ }
+            const amountValue = Number(booking.total_price || 0);
+            // keep two decimals for commission calculation; you can adjust the rounding strategy if needed
+            const commissionValue = Math.round((amountValue * commissionRate) * 100) / 100;
+            const netValue = Math.round((amountValue - commissionValue) * 100) / 100;
 
-        if (success) {
-            booking.status = "paid";
-            if (booking.payment_session) booking.payment_session.status = "paid";
-            await booking.save();
-
-            // Notify user
-            await notifyUser({
+            // Create transaction (use Decimal128)
+            const txDocs = await Transaction.create([{
+                bookingId: booking._id,
                 userId: booking.customer_id,
-                type: "booking:paid",
-                content: `Thanh toán đơn đặt tour "${tourName}" thành công.`,
-                url: `/booking/${booking._id}`,
-                meta: {
-                    bookingId: booking._id,
-                    tourId: booking.tour_id,
-                    tourName,
-                    startDate: booking.start_date ? new Date(booking.start_date).toLocaleDateString("vi-VN") : "",
-                    bookingUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}`,
-                    customerName,
-                    customerEmail
-                },
-            }).catch(() => { });
+                payeeUserId: booking.intended_guide_id || null,
+                amount: mongoose.Types.Decimal128.fromString(String(Number(amountValue.toFixed(2)))),
+                commission_fee: mongoose.Types.Decimal128.fromString(String(Number(commissionValue.toFixed(2)))),
+                net_amount: mongoose.Types.Decimal128.fromString(String(Number(netValue.toFixed(2)))),
+                transaction_type: "charge",
+                status: success ? "confirmed" : "failed",
+                payment_gateway: "momo",
+                transaction_code: txnCode,
+                note: `MoMo resultCode ${resultCode}`,
+            }], { session: mongooseSession });
 
-            // Notify admin (KHI ĐÃ THANH TOÁN THÀNH CÔNG)
-            await notifyAdmins({
-                type: "booking:paid",
-                content: `Đơn #${booking._id} đã được thanh toán.`,
-                url: `/admin/bookings/${booking._id}`,
-                meta: {
-                    bookingId: booking._id,
-                    tourId: booking.tour_id,
-                    tourName,
-                    bookingCode: booking._id,
-                    customerName,
-                    customerEmail
-                },
-            }).catch(() => { });
+            const tx = txDocs[0];
 
-            // (tuỳ chọn) Notify guide
-            if (booking.intended_guide_id) {
+            // Update booking atomically (attach transactionId)
+            if (success) {
+                booking.status = "paid";
+                booking.paidAt = booking.paidAt || new Date();
+                booking.payment = booking.payment || {};
+                booking.payment.transactionId = tx._id;
+                if (booking.payment_session) booking.payment_session.status = "paid";
+            } else {
+                if (booking.payment_session) booking.payment_session.status = "failed";
+            }
+
+            await booking.save({ session: mongooseSession });
+
+            await mongooseSession.commitTransaction();
+            mongooseSession.endSession();
+
+            // Enrich meta for notifications (outside transaction)
+            let tourName = `#${booking._id}`;
+            try {
+                const tourDoc = await Tour.findById(booking.tour_id).lean();
+                if (tourDoc?.name) tourName = tourDoc.name;
+            } catch { /* ignore */ }
+
+            let customerName = "";
+            let customerEmail = "";
+            try {
+                const u = await User.findById(booking.customer_id).lean();
+                customerName = u?.name || "";
+                customerEmail = u?.email || "";
+            } catch { /* ignore */ }
+
+            if (success) {
+                // Notify user
                 await notifyUser({
-                    userId: booking.intended_guide_id,
-                    type: "booking:paid_guide",
-                    content: `Đơn của khách đã thanh toán: "${tourName}".`,
-                    url: `/guide/bookings/${booking._id}`,
+                    userId: booking.customer_id,
+                    type: "booking:paid",
+                    content: `Thanh toán đơn đặt tour "${tourName}" thành công.`,
+                    url: `/booking/${booking._id}`,
+                    meta: {
+                        bookingId: booking._id,
+                        tourId: booking.tour_id,
+                        tourName,
+                        startDate: booking.start_date ? new Date(booking.start_date).toLocaleDateString("vi-VN") : "",
+                        bookingUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}`,
+                        customerName,
+                        customerEmail
+                    },
+                }).catch(() => { });
+
+                // Notify admin
+                await notifyAdmins({
+                    type: "booking:paid",
+                    content: `Đơn #${booking._id} đã được thanh toán.`,
+                    url: `/admin/bookings/${booking._id}`,
+                    meta: {
+                        bookingId: booking._id,
+                        tourId: booking.tour_id,
+                        tourName,
+                        bookingCode: booking._id,
+                        customerName,
+                        customerEmail
+                    },
+                }).catch(() => { });
+
+                // Notify guide (optional)
+                if (booking.intended_guide_id) {
+                    await notifyUser({
+                        userId: booking.intended_guide_id,
+                        type: "booking:paid_guide",
+                        content: `Đơn của khách đã thanh toán: "${tourName}".`,
+                        url: `/guide/bookings/${booking._id}`,
+                        meta: { bookingId: booking._id, tourId: booking.tour_id, tourName },
+                    }).catch(() => { });
+                }
+            } else {
+                // Failed payment path already updated booking.payment_session.status above
+                await notifyUser({
+                    userId: booking.customer_id,
+                    type: "booking:payment_failed",
+                    content: `Thanh toán thất bại cho booking "${tourName}".`,
+                    url: `/booking/${booking._id}/pay`,
                     meta: { bookingId: booking._id, tourId: booking.tour_id, tourName },
                 }).catch(() => { });
             }
-        } else {
-            if (booking.payment_session) booking.payment_session.status = "failed";
-            await booking.save();
 
-            // Gửi thông báo thất bại cho khách
-            await notifyUser({
-                userId: booking.customer_id,
-                type: "booking:payment_failed",
-                content: `Thanh toán thất bại cho booking "${tourName}".`,
-                url: `/booking/${booking._id}/pay`,
-                meta: { bookingId: booking._id, tourId: booking.tour_id, tourName },
+            return res.status(200).json({ resultCode: 0, message: "OK" });
+        } catch (txErr) {
+            // rollback
+            await mongooseSession.abortTransaction().catch(() => { });
+            mongooseSession.endSession();
+            console.error("ipnHandler: tx/booking update failed:", txErr);
+            await notifyAdmins({
+                type: "payment:error",
+                content: `IPN processing failed for booking ${bookingId}: ${txErr.message}`,
+                meta: { bookingId, txnCode: txnCode ?? null }
             }).catch(() => { });
+            return res.status(200).json({ resultCode: 99, message: "Server error" });
         }
-
-        return res.status(200).json({ resultCode: 0, message: "OK" });
+        // --- End atomic flow ---
     } catch (e) {
         console.error(e);
         return res.status(200).json({ resultCode: 99, message: "Server error" });
