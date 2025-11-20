@@ -2,7 +2,7 @@
 
 import React from "react";
 import ButtonSvgMask from "../../components/Forms/ButtonSvgMask";
-import { IconMapPin } from "../../icons/IconMapPin";
+import { IconMapPin } from "../../icons/IconBox.jsx";
 
 // Dữ liệu thống kê (Mock data phù hợp với Vi Vu Cố Đô)
 const stats = [

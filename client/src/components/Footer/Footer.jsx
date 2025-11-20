@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
-import { IconMapPin } from "../../icons/IconMapPin";
+import { IconMapPin } from "../../icons/IconBox.jsx";
 import IconMail from "../../icons/IconMail.jsx";
 import IconPhone from "../../icons/IconPhone.jsx";
 import IconArrowRight from "../../icons/IconArrowRight.jsx";
