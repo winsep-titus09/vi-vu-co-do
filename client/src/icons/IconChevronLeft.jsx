@@ -1,4 +1,4 @@
-export default function IconClock({ className }) {
+export default function IconChevronLeft({ className }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -10,8 +10,7 @@ export default function IconClock({ className }) {
       strokeLinejoin="round"
       className={className}
     >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
+      <path d="m15 18-6-6 6-6" />
     </svg>
   );
 }

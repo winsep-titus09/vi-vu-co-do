@@ -2,14 +2,18 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
-import { IconMapPin } from "../../icons/IconMapPin";
-import IconClock from "../../icons/IconClock.jsx";
-import IconStar from "../../icons/IconStar.jsx";
+import {
+  IconMapPin,
+  IconClock,
+  IconStar,
+  Icon3D,
+} from "../../icons/IconBox.jsx";
 import IconArrowRight from "../../icons/IconArrowRight.jsx";
 
 /**
  * TourCard - Style: Transparent + Border + Artistic Image
  */
+
 export default function TourCard({ tour }) {
   return (
     // 1. WRAPPER:
@@ -36,7 +40,13 @@ export default function TourCard({ tour }) {
 
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-
+          {/* === CẬP NHẬT: Badge 3D (Góc trên trái) === */}
+          {/* Giả sử data tour có trường 'has3D' hoặc ta mặc định hiện để demo */}
+          <div className="absolute top-3 left-3 z-20">
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-[10px] font-bold text-white uppercase tracking-wider shadow-sm">
+              <Icon3D className="w-3 h-3" /> 3D View
+            </span>
+          </div>
           {/* Badges (Vị trí & Thời gian) */}
           <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white font-medium">
             <span className="inline-flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1 border border-white/10">
