@@ -105,7 +105,7 @@ const relatedTours = [
 ];
 
 export default function PlaceDetail() {
-  const { id } = useParams();
+  useParams();
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
 
   useEffect(() => {
