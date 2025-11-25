@@ -13,6 +13,8 @@ import HomePage from "../pages/Home/index";
 const ToursPage = lazy(() => import("../pages/Tours/index"));
 const TourDetailPage = lazy(() => import("../pages/Tours/Detail/index"));
 const PlacesPage = lazy(() => import("../pages/Places/index"));
+const PlaceDetailPage = lazy(() => import("../pages/Places/PlaceDetail"));
+const GuidesPage = lazy(() => import("../pages/Guides/index"));
 const GuideProfilePage = lazy(() => import("../pages/Guides/Profile/index"));
 const BlogPage = lazy(() => import("../pages/Blog/index"));
 const PostDetailPage = lazy(() => import("../pages/Blog/PostDetail"));
@@ -62,6 +64,22 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <PlacesPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "places/:id",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <PlaceDetailPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "guides",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuidesPage />
           </Suspense>
         ),
       },
