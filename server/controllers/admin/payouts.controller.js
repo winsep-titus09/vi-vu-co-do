@@ -6,9 +6,6 @@ import Payout from "../../models/Payout.js";
 import User from "../../models/User.js";
 import Transaction from "../../models/Transaction.js";
 import { notifyUser, notifyAdmins } from "../../services/notify.js";
-// Helpers: date helpers and duration helper
-import { toDateOrNull, addHours, toYMDLocal } from "../../helpers/date.helper.js";
-import { getDurationHoursFromTour } from "../../helpers/bookings.helper.js";
 
 const ObjectId = mongoose.Types.ObjectId;
 
@@ -27,72 +24,11 @@ function debugLog(...args) {
 
 /**
  * Compute total net revenue and booking ids for an occurrence (tourId, tourDate).
- * This version:
- * - If tourDate can be parsed as a full datetime, attempts exact-occurrence matching using tour.duration_hours (or fallback duration*24h)
- * - If exact-match fails, falls back to legacy YMD grouping pipelines.
  */
 export async function computeOccurrenceRevenue(tourId, tourDate) {
     if (!mongoose.isValidObjectId(tourId)) return { totalNet: 0, bookingIds: [] };
-    debugLog("computeOccurrenceRevenue called", { tourId, tourDate });
-
-    // Try parse tourDate as full datetime (accepts ISO or YYYY-MM-DD)
-    let occStart = toDateOrNull(tourDate);
-    if (!occStart) {
-        // If parse failed but looks like YYYY-MM-DD, interpret as local start of day
-        try {
-            occStart = new Date(`${tourDate}T00:00:00+07:00`);
-        } catch (e) {
-            occStart = null;
-        }
-    }
-
-    // If we have occStart (datetime), try exact-occurrence matching using tour duration_hours
-    if (occStart) {
-        debugLog("computeOccurrenceRevenue: trying exact occurrence match for datetime", occStart.toISOString());
-        const tourDoc = await Tour.findById(tourId).select("duration duration_hours").lean().catch(() => null);
-        const durationHours = getDurationHoursFromTour(tourDoc);
-        const occEnd = addHours(occStart, durationHours);
-
-        // Match bookings whose start_date is within occStart..occEnd window (paid)
-        const match = {
-            $and: [
-                { $or: [{ tour_id: ObjectId(tourId) }, { tourId: ObjectId(tourId) }, { tour: ObjectId(tourId) }] },
-                { start_date: { $gte: occStart, $lt: occEnd } },
-                { $or: [{ status: "paid" }, { payment_status: "paid" }, { "payment_session.status": "paid" }, { "payment.status": "paid" }] }
-            ]
-        };
-
-        const pipeline = [
-            { $match: match },
-            {
-                $addFields: {
-                    _paidAmount: {
-                        $ifNull: [
-                            "$paid_amount",
-                            { $ifNull: ["$paidAmount", { $ifNull: ["$total_price", { $ifNull: ["$totalPrice", 0] }] }] }
-                        ]
-                    }
-                }
-            },
-            { $addFields: { _paidAmountDouble: { $toDouble: "$_paidAmount" } } },
-            { $group: { _id: null, totalNet: { $sum: "$_paidAmountDouble" }, bookingIds: { $push: "$_id" } } }
-        ];
-
-        try {
-            const res = await Booking.aggregate(pipeline);
-            debugLog("exact-occurrence aggregation result:", JSON.stringify(res, null, 2));
-            if (res && res.length > 0 && Number(res[0].totalNet) > 0) {
-                return { totalNet: Number(res[0].totalNet || 0), bookingIds: res[0].bookingIds || [] };
-            }
-        } catch (e) {
-            debugLog("exact occurrence aggregation failed:", e);
-            // fall through to legacy pipelines
-        }
-    }
-
-    // FALLBACK: legacy date-only grouping by local YMD
-    const dateStr = toYMDLocal(occStart || new Date(tourDate || Date.now()));
-    debugLog("computeOccurrenceRevenue: falling back to YMD grouping", { dateStr });
+    const dateStr = toYMD(tourDate);
+    debugLog("computeOccurrenceRevenue called", { tourId, tourDate, dateStr });
 
     const tourIdObj = new ObjectId(tourId);
     const tourMatch = { $or: [{ tour_id: tourIdObj }, { tourId: tourIdObj }, { tour: tourIdObj }] };
@@ -198,7 +134,7 @@ export async function computeOccurrenceRevenue(tourId, tourDate) {
         return { totalNet: Number(resB[0].totalNet || 0), bookingIds: resB[0].bookingIds || [] };
     }
 
-    debugLog("computeOccurrenceRevenue: totalNet 0 for", tourId, tourDate);
+    debugLog("computeOccurrenceRevenue: totalNet 0 for", tourId, dateStr);
     return { totalNet: 0, bookingIds: [] };
 }
 

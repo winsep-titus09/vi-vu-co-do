@@ -60,7 +60,7 @@ const TourSchema = new mongoose.Schema(
         max_guests: { type: Number, default: 0 },
 
         // Legacy: duration in days (kept for backward compatibility)
-        duration: { type: Number, default: 1 },
+        duration: { type: Number },
 
         // New: duration in hours. If set (>0), backend uses this to compute end_date.
         duration_hours: { type: Number, default: null },
@@ -69,7 +69,11 @@ const TourSchema = new mongoose.Schema(
         duration_unit: { type: String, enum: ["days", "hours"], default: "days" },
 
         // relations
-        guides: [{ guideId: { type: mongoose.Types.ObjectId, ref: "User" }, isMain: { type: Boolean, default: false } }],
+        guides: [{
+            guideId: { type: mongoose.Types.ObjectId, ref: "User" },
+            isMain: { type: Boolean, default: false },
+            percentage: { type: Number, default: 0.10 } // mặc định 10% (0.1)
+        }],
         guide_id: { type: mongoose.Types.ObjectId, ref: "User" },
         cover_image_url: String,
         gallery: [{ type: String }],

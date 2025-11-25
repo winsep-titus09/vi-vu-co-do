@@ -33,6 +33,7 @@ import adminPaymentSettingRoutes from "./routes/admin/paymentSettings.routes.js"
 import adminRefundRoutes from "./routes/admin/refunds.routes.js";
 import adminRevueneRoutes from "./routes/admin/revenue.routes.js";
 import adminPayoutRoutes from "./routes/admin/payouts.routes.js";
+import adminDashboardRoutes from "./routes/admin/dashboard.routes.js";
 
 // Blog admin
 import adminArticleRoutes from "./routes/admin/articles.routes.js";
@@ -77,6 +78,7 @@ app.use("/api/admin/payment-settings", adminPaymentSettingRoutes);
 app.use("/api/admin/refunds", adminRefundRoutes);
 app.use("/api/admin/revenues", adminRevueneRoutes);
 app.use("/api/admin/payouts", adminPayoutRoutes);
+app.use("/api/admin/dashboard", adminDashboardRoutes);
 
 // blog admin
 app.use("/api/admin/articles", adminArticleRoutes);
