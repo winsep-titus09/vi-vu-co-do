@@ -365,7 +365,7 @@ export async function markPayoutPaid(req, res) {
                 amount: mongoose.Types.Decimal128.fromString(amountStr),
                 commission_fee: mongoose.Types.Decimal128.fromString(commStr),
                 net_amount: mongoose.Types.Decimal128.fromString(netStr),
-                transaction_type: "payout",
+                transaction_type: "withdraw",
                 status: "confirmed",
                 payment_gateway: "manual",
                 transaction_code: txId || `payout-${payout.reference || payout._id}`,

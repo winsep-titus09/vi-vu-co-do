@@ -16,7 +16,7 @@ const store =
 /** 1) Global: thoáng cho toàn bộ /api */
 export const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 300,
+    max: 400,
     standardHeaders: true,
     legacyHeaders: false,
     message: { status: 429, message: "Too many requests, please try again later." },

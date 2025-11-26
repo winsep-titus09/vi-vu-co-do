@@ -10,6 +10,8 @@ const UserSchema = new mongoose.Schema(
         phone_number: { type: String, trim: true },
         role_id: { type: mongoose.Schema.Types.ObjectId, ref: "Role", required: true },
         status: { type: String, enum: ["active", "inactive", "banned"], default: "active" },
+        // Số dư HDV (VNĐ)
+        balance: { type: Number, default: 0 },
     },
     { timestamps: true }
 );

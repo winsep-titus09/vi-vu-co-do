@@ -20,6 +20,7 @@ const GuideProfileSchema = new mongoose.Schema(
         languages: [{ type: String }],            // ["vi", "en"]
         bank_account: BankSchema,                 // tài khoản ngân hàng
         certificates: [CertificateSchema],        // chứng chỉ nghề/ngôn ngữ
+        expertise: { type: String, default: null, trim: true, maxlength: 200 }, //chuyên môn
         is_featured: { type: Boolean, default: false },
         status: { type: String, default: "approved" },
     },

@@ -103,8 +103,14 @@ export async function isGuideBusy(guideId, candidateStart, candidateEnd, exclude
         end_date: { $gt: start },
     };
 
+    // Use Mongoose validation and casting; create ObjectId instance with `new` when needed
     if (excludeBookingId && mongoose.isValidObjectId(excludeBookingId)) {
-        cond._id = { $ne: ObjectId(excludeBookingId) };
+        try {
+            cond._id = { $ne: new ObjectId(excludeBookingId) };
+        } catch (e) {
+            // fallback to raw id if casting fails for some reason
+            cond._id = { $ne: excludeBookingId };
+        }
     }
 
     // Find overlapping bookings

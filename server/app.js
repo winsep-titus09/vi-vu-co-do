@@ -17,6 +17,7 @@ import tourRequestRoutes from "./routes/tour-requests.routes.js";
 import bookingsRoutes from "./routes/bookings.routes.js";
 import paymentsRoutes from "./routes/payments.routes.js";
 import reviewRoutes from "./routes/reviews.routes.js";
+import payoutsRoutes from "./routes/payouts.routes.js";
 
 // Blog public
 import articleRoutes from "./routes/articles.routes.js";
@@ -62,6 +63,7 @@ app.use("/api/tour-requests", tourRequestRoutes);
 app.use("/api/bookings", bookingsRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/payouts", payoutsRoutes);
 
 // blog public
 app.use("/api/articles", articleRoutes);

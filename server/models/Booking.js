@@ -57,7 +57,13 @@ const BookingSchema = new mongoose.Schema(
         start_date: Date,
         end_date: Date,
 
+        // Tổng khách phải trả (tính theo số người) - dùng để charge customer
         total_price: { type: Decimal128, required: true },
+
+        // Giá cố định của tour (copy từ Tour.price khi tạo booking)
+        // Dùng để tính payout cho HDV (không phụ thuộc số người)
+        tour_price: { type: Decimal128, required: true, default: 0 },
+
         currency: { type: String, default: "VND" },
 
         // Trạng thái theo yêu cầu:
@@ -92,6 +98,14 @@ const BookingSchema = new mongoose.Schema(
         cancel_requested_at: { type: Date, default: null },
         cancel_requested_by: { type: ObjectId, ref: "User", default: null },
         cancel_requested_note: { type: String, default: null },
+
+        // MỚI: liên kết tới payout occurrence (nếu đã attach)
+        payoutId: { type: ObjectId, ref: "Payout", default: null },
+
+        // MỚI: thông tin payout cho HDV sau khi booking completed
+        platformFee: { type: Number, default: 0 },     // VNĐ, phí sàn (10%)
+        guideEarning: { type: Number, default: 0 },    // VNĐ, sau khi trừ phí
+        payoutProcessed: { type: Boolean, default: false }, // đã credit vào balance HDV chưa
 
     },
     { timestamps: true, collection: "bookings" }

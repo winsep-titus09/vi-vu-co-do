@@ -9,7 +9,7 @@ const TransactionSchema = new mongoose.Schema(
         amount: { type: Decimal128, required: true },
         commission_fee: { type: Decimal128, default: 0 },
         net_amount: { type: Decimal128, required: true },
-        transaction_type: { type: String, enum: ["charge", "refund", "payout"], required: true },
+        transaction_type: { type: String, enum: ["charge", "refund", "payout", "withdraw"], required: true },
         status: { type: String, enum: ["pending", "confirmed", "failed"], default: "pending" },
         payment_gateway: { type: String, enum: ["momo", "vnpay", "manual"], default: "momo" },
         transaction_code: { type: String, default: null },

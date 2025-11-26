@@ -11,6 +11,7 @@ import {
     adminCancelBooking,
     adminCreateRefund,
     adminConfirmRefund,
+    completeBooking
 } from "../controllers/bookings.controller.js";
 
 const router = express.Router();
@@ -22,6 +23,9 @@ router.get("/:id", auth, getBooking);
 // Guide actions
 router.post("/:id/approve", auth, guideApproveBooking);
 router.post("/:id/reject", auth, guideRejectBooking);
+
+// Guide or admin mark complete after tour
+router.post("/:id/complete", auth, completeBooking);
 
 // Cancel / Refund actions
 // Owner or admin cancels (owner uses this)

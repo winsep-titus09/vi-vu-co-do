@@ -45,6 +45,7 @@ export const updateMyGuideProfile = async (req, res) => {
             ...(body.languages && { languages: parseMaybeJson(body.languages) }),
             ...(body.bank_account && { bank_account: parseMaybeJson(body.bank_account) }),
             ...(body.certificates && { certificates: parseMaybeJson(body.certificates) }),
+            ...(typeof body.expertise !== "undefined" && { expertise: (body.expertise || "").trim() || null }),
         };
 
         // Nếu có file video

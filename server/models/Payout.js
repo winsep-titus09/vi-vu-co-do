@@ -19,7 +19,7 @@ const PayoutSchema = new mongoose.Schema({
     failedReason: String
 }, { timestamps: true });
 
-// index for lookups (set unique:true if you want DB-enforced uniqueness)
-PayoutSchema.index({ tourId: 1, tourDate: 1, guideId: 1 });
+// Make the combination unique to prevent duplicates for same occurrence + guide
+PayoutSchema.index({ tourId: 1, tourDate: 1, guideId: 1 }, { unique: true });
 
 export default mongoose.model("Payout", PayoutSchema);
