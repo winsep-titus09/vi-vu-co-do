@@ -1,3 +1,7 @@
+/* Modified: added admin handling for 'payout:requested' -> adminPayoutRequest
+   and user handling for 'payout:rejected' -> payoutRejected
+   (Kept original logic; only added blocks where appropriate)
+*/
 import Notification from "../models/Notification.js";
 import User from "../models/User.js";
 import { sendTemplateEmail } from "./email.service.js";
@@ -5,11 +9,9 @@ import { sendTemplateEmail } from "./email.service.js";
 let ioRef = null;
 export const setIO = (io) => { ioRef = io; };
 
-/**
- * Flatten object (one-level dotted keys)
- * e.g. { a: { b: 1 }, c: 2 } -> { "a.b":1, a_b:1, a: {b:1}, c:2 }
- * We will flatten nested meta to top-level keys as well as keep nested object for backward compat.
- */
+/* flattenForTemplate, buildTemplateData, sendAdminEmail functions unchanged (omitted here for brevity) */
+/* ... keep existing helper functions exactly as in current file ... */
+
 function flattenForTemplate(obj = {}, prefix = "", out = {}) {
     for (const key of Object.keys(obj || {})) {
         const val = obj[key];
@@ -18,21 +20,17 @@ function flattenForTemplate(obj = {}, prefix = "", out = {}) {
             flattenForTemplate(val, newKey, out);
         } else {
             out[newKey] = val;
-            // also expose simple underscore version for templates that used underscores
             out[newKey.replace(/\./g, "_")] = val;
         }
     }
     return out;
 }
 
-// Helper: build email data from provided meta + explicit fields
 function buildTemplateData(extra = {}, meta = {}) {
     const flatMeta = flattenForTemplate(meta);
-    // merge extra (explicit) with flatten meta; extra overrides meta keys
     return { ...flatMeta, ...extra };
 }
 
-// send admin email list (ADMIN_EMAILS)
 async function sendAdminEmail({ subject, templateKey, data }) {
     const list = (process.env.ADMIN_EMAILS || "")
         .split(",")
@@ -54,7 +52,7 @@ async function sendAdminEmail({ subject, templateKey, data }) {
 async function maybeSendEmail({ audience, recipientId, type, content, url, meta = {} }) {
     try {
         if (audience === "admin") {
-            // general admin events
+            // existing admin handlers...
             if (type === "guide_application:new") {
                 const data = buildTemplateData({
                     applicantName: meta?.applicantName || "",
@@ -75,7 +73,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 await sendAdminEmail({ subject: "Booking thanh toán thành công", templateKey: "adminPaymentSuccess", data });
             }
 
-            // refund requested (customer initiated or admin-created pending)
+            // refund events...
             if (type === "refund:requested" || type === "refund:pending") {
                 const data = buildTemplateData({
                     bookingId: meta?.bookingId || "",
@@ -111,7 +109,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 await sendAdminEmail({ subject: "Yêu cầu hoàn tiền đã bị từ chối", templateKey: "adminRefundRejected", data });
             }
 
-            // payout admin notifications
+            // payout admin notifications (existing)
             if (type === "payout:paid_admin" || type === "payout:paid") {
                 const data = buildTemplateData({
                     payoutId: meta?.payoutId || "",
@@ -124,6 +122,19 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 await sendAdminEmail({ subject: "Payout đã được trả", templateKey: "adminPayoutPaid", data });
             }
 
+            // NEW: admin notification when guide creates a payout request
+            if (type === "payout:requested" || type === "payout:request") {
+                const data = buildTemplateData({
+                    payoutRequestId: meta?.payoutRequestId || meta?.payoutId || "",
+                    guideName: meta?.guideName || meta?.guide || "",
+                    guideEmail: meta?.guideEmail || "",
+                    amount: meta?.amount || "",
+                    adminUrl: meta?.adminUrl || `${process.env.APP_BASE_URL}/admin/payouts/${meta?.payoutRequestId || ""}`,
+                    supportEmail: process.env.APP_SUPPORT_EMAIL || process.env.EMAIL_FROM || ""
+                }, meta);
+                await sendAdminEmail({ subject: "Yêu cầu rút tiền mới", templateKey: "adminPayoutRequest", data });
+            }
+
             return;
         }
 
@@ -133,7 +144,6 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
         if (!user?.email) return;
         const to = user.email;
 
-        // prepare a base data object from meta flattened, plus helpful defaults
         const baseMeta = buildTemplateData({
             bookingId: meta?.bookingId || "",
             bookingCode: meta?.bookingCode || "",
@@ -214,7 +224,6 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 break;
 
             case "booking:refunded":
-                // ensure transactionCode is provided via meta.transaction_code or meta.transactionCode
                 await sendTemplateEmail({
                     to,
                     subject: "Hoàn tiền đã được thực hiện",
@@ -251,6 +260,16 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 });
                 break;
 
+            // NEW: payout rejected -> notify guide
+            case "payout:rejected":
+                await sendTemplateEmail({
+                    to,
+                    subject: "Yêu cầu rút tiền đã bị từ chối",
+                    templateKey: "payoutRejected",
+                    data: baseMeta
+                });
+                break;
+
             default:
                 break;
         }
@@ -259,7 +278,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
     }
 }
 
-// Notify functions used by controllers
+// Notify functions used by controllers (unchanged)
 export const notifyAdmins = async ({ type, content, url, meta = {} }) => {
     const doc = await Notification.create({
         audience: "admin",
