@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { IconCheck, IconClock } from "../../../icons/IconBox";
 import { IconUser } from "../../../icons/IconUser";
 
-// Inline IconBell
+// Inline Icons
 const IconBell = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -15,12 +15,11 @@ const IconBell = ({ className }) => (
     strokeLinejoin="round"
     className={className}
   >
-    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </svg>
 );
 
-// Inline IconWallet
 const IconWallet = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -32,12 +31,12 @@ const IconWallet = ({ className }) => (
     strokeLinejoin="round"
     className={className}
   >
-    <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
-    <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+    <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
   </svg>
 );
 
-// Inline IconInfo
 const IconInfo = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -55,7 +54,6 @@ const IconInfo = ({ className }) => (
   </svg>
 );
 
-// Inline IconTrash
 const IconTrash = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -73,72 +71,61 @@ const IconTrash = ({ className }) => (
   </svg>
 );
 
-// Inline Icon Ticket (Nếu chưa có trong IconBox)
-const IconTicket = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
-    <path d="M13 5v2" />
-    <path d="M13 17v2" />
-    <path d="M13 11v2" />
-  </svg>
-);
-
-// --- MOCK DATA: THÔNG BÁO CỦA DU KHÁCH ---
+// --- MOCK DATA ---
 const notificationsData = [
   {
     id: 1,
-    type: "booking_confirmed",
-    title: "Đặt tour thành công!",
+    type: "booking", // booking, payment, system, review
+    title: "Yêu cầu đặt tour mới",
     message:
-      "Hướng dẫn viên Minh Hương đã chấp nhận yêu cầu đặt tour 'Bí mật Hoàng cung Huế'. Vui lòng thanh toán để giữ chỗ.",
-    time: "10 phút trước",
+      "Du khách Nguyễn Văn A đã đặt tour 'Bí mật Hoàng cung Huế'. Chờ xác nhận.",
+    time: "15 phút trước",
     isRead: false,
-    link: "/dashboard/tourist/history", // Link tới lịch sử để thanh toán
+    link: "/dashboard/guide/booking/BK-901",
   },
   {
     id: 2,
-    type: "payment_success",
-    title: "Thanh toán thành công",
-    message:
-      "Bạn đã thanh toán 500.000đ cho tour 'Food Tour: Ẩm thực đường phố'.",
-    time: "1 ngày trước",
+    type: "payment",
+    title: "Tiền đã về ví",
+    message: "Bạn nhận được 1.620.000đ từ tour 'Thiền trà tại Chùa Từ Hiếu'.",
+    time: "2 giờ trước",
     isRead: false,
-    link: "/dashboard/tourist/history",
+    link: "/dashboard/guide/earnings",
   },
   {
     id: 3,
-    type: "reminder",
-    title: "Nhắc nhở lịch trình",
+    type: "review",
+    title: "Đánh giá mới 5 sao",
     message:
-      "Ngày mai (20/05) bạn có chuyến tham quan Đại Nội lúc 08:00. Hãy chuẩn bị sẵn sàng nhé!",
-    time: "2 ngày trước",
+      "Sarah Jenkins đã viết nhận xét về tour của bạn: 'Amazing experience...'",
+    time: "1 ngày trước",
     isRead: true,
-    link: "/dashboard/tourist",
+    link: "/dashboard/guide/reviews",
   },
   {
     id: 4,
     type: "system",
-    title: "Chào mừng bạn mới",
-    message:
-      "Cảm ơn bạn đã tham gia Vi Vu Cố Đô. Hãy cập nhật hồ sơ để có trải nghiệm tốt nhất.",
-    time: "1 tuần trước",
+    title: "Cập nhật chính sách",
+    message: "Hệ thống sẽ bảo trì vào lúc 02:00 AM ngày mai. Vui lòng lưu ý.",
+    time: "3 ngày trước",
     isRead: true,
-    link: "/dashboard/tourist/profile",
+    link: "#",
+  },
+  {
+    id: 5,
+    type: "booking",
+    title: "Tour sắp diễn ra",
+    message:
+      "Đừng quên tour 'Bí mật Hoàng cung' sẽ bắt đầu vào 08:00 sáng mai.",
+    time: "1 ngày trước",
+    isRead: true,
+    link: "/dashboard/guide/schedule",
   },
 ];
 
-export default function TouristNotifications() {
+export default function GuideNotifications() {
   const [notifications, setNotifications] = useState(notificationsData);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("all"); // all, unread
 
   const filteredNotis = notifications.filter(
     (n) => filter === "all" || (filter === "unread" && !n.isRead)
@@ -158,58 +145,68 @@ export default function TouristNotifications() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
+  // Helper render icon
   const getIcon = (type) => {
     switch (type) {
-      case "booking_confirmed":
+      case "booking":
         return (
-          <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0">
-            <IconCheck className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+            <IconUser className="w-5 h-5" />
           </div>
         );
-      case "booking_cancelled":
+      case "payment":
         return (
-          <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
-            <IconTrash className="w-5 h-5" />
-          </div>
-        );
-      case "payment_success":
-        return (
-          <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
             <IconWallet className="w-5 h-5" />
           </div>
         );
-      case "reminder":
+      case "review":
         return (
-          <div className="w-10 h-10 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center shrink-0">
-            <IconClock className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center">
+            <IconStar className="w-5 h-5" />
           </div>
         );
       case "system":
         return (
-          <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center">
             <IconInfo className="w-5 h-5" />
           </div>
         );
       default:
         return (
-          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
             <IconBell className="w-5 h-5" />
           </div>
         );
     }
   };
 
+  // Helper icon star inline
+  const IconStar = ({ className }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+
   return (
-    // [FIX] Thêm 'w-full' và 'min-h-screen' (hoặc min-h-[800px]) để giữ khung layout không bị co lại khi ít nội dung
-    <div className="space-y-8 w-full">
+    <div className="max-w-4xl mx-auto pb-20 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-heading font-bold text-text-primary">
             Thông báo
           </h1>
           <p className="text-text-secondary text-sm">
-            Cập nhật quan trọng về chuyến đi của bạn.
+            Cập nhật mới nhất về hoạt động của bạn.
           </p>
         </div>
         <div className="flex gap-2">
@@ -218,7 +215,7 @@ export default function TouristNotifications() {
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
               filter === "all"
                 ? "bg-primary text-white"
-                : "bg-white border border-border-light text-text-secondary hover:bg-bg-main"
+                : "bg-white text-text-secondary hover:bg-bg-main"
             }`}
           >
             Tất cả
@@ -228,7 +225,7 @@ export default function TouristNotifications() {
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
               filter === "unread"
                 ? "bg-primary text-white"
-                : "bg-white border border-border-light text-text-secondary hover:bg-bg-main"
+                : "bg-white text-text-secondary hover:bg-bg-main"
             }`}
           >
             Chưa đọc
@@ -237,7 +234,7 @@ export default function TouristNotifications() {
       </div>
 
       {/* Actions Bar */}
-      <div className="flex justify-end border-b border-border-light pb-2">
+      <div className="flex justify-end">
         <button
           onClick={markAllRead}
           className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
@@ -247,7 +244,7 @@ export default function TouristNotifications() {
       </div>
 
       {/* List */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {filteredNotis.length > 0 ? (
           filteredNotis.map((noti) => (
             <div
@@ -262,14 +259,14 @@ export default function TouristNotifications() {
                     `}
             >
               {/* Icon */}
-              {getIcon(noti.type)}
+              <div className="shrink-0">{getIcon(noti.type)}</div>
 
               {/* Content */}
               <div className="flex-1 min-w-0 pt-1">
                 <div className="flex justify-between items-start">
                   <h4
                     className={`text-sm font-bold mb-1 ${
-                      noti.isRead ? "text-text-primary" : "text-blue-900"
+                      noti.isRead ? "text-text-primary" : "text-blue-800"
                     }`}
                   >
                     {noti.title}
@@ -287,15 +284,13 @@ export default function TouristNotifications() {
                 </p>
 
                 {/* Action Link */}
-                {noti.link && (
-                  <Link
-                    to={noti.link}
-                    onClick={() => markAsRead(noti.id)}
-                    className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1"
-                  >
-                    Xem chi tiết
-                  </Link>
-                )}
+                <Link
+                  to={noti.link}
+                  onClick={() => markAsRead(noti.id)}
+                  className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  Xem chi tiết
+                </Link>
               </div>
 
               {/* Dot Unread */}
@@ -317,15 +312,12 @@ export default function TouristNotifications() {
             </div>
           ))
         ) : (
-          <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-border-light">
-            <div className="w-16 h-16 bg-bg-main rounded-full flex items-center justify-center mx-auto mb-3 text-text-secondary">
+          <div className="py-12 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-400">
               <IconBell className="w-8 h-8" />
             </div>
-            <p className="text-text-primary font-bold">
-              Bạn không có thông báo nào.
-            </p>
             <p className="text-text-secondary text-sm">
-              Các cập nhật về chuyến đi sẽ xuất hiện ở đây.
+              Không có thông báo nào.
             </p>
           </div>
         )}

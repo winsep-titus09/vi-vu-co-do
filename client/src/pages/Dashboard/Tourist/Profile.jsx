@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { IconUser } from "../../../icons/IconUser";
 import {
   IconCalendar,
@@ -280,9 +281,12 @@ export default function ProfilePage() {
                 <IconWallet className="w-5 h-5 text-primary" /> Phương thức
                 thanh toán
               </h3>
-              <button className="text-xs font-bold text-text-secondary hover:text-primary">
+              <Link
+                to="/dashboard/tourist/transaction-history"
+                className="text-xs font-bold text-text-secondary hover:text-primary"
+              >
                 Lịch sử giao dịch
-              </button>
+              </Link>
             </div>
 
             <div className="space-y-4">
