@@ -28,6 +28,9 @@ const SignInPage = lazy(() => import("../pages/Auth/SignIn"));
 const SignUpPage = lazy(() => import("../pages/Auth/SignUp"));
 // const SignOutPage = lazy(() => import("../pages/Auth/SignOut"));
 
+// --- Pages: Booking ---
+const BookingStepPayment = lazy(() => import("../pages/Booking/StepPayment"));
+
 // --- Pages: Dashboard (3 Roles) ---
 
 // 1. Tourist Dashboard Pages
@@ -37,10 +40,40 @@ const TouristProfile = lazy(() => import("../pages/Dashboard/Tourist/Profile"));
 const TouristSettings = lazy(() =>
   import("../pages/Dashboard/Tourist/Settings")
 );
+const TouristNotifications = lazy(() =>
+  import("../pages/Dashboard/Tourist/Notifications")
+);
+const TouristTransactionHistory = lazy(() =>
+  import("../pages/Dashboard/Tourist/TransactionHistory")
+);
 
 // 2. Guide Dashboard Pages
 const GuideDashboard = lazy(() => import("../pages/Dashboard/Guide/index"));
-// const GuideTours = lazy(() => import("../pages/Dashboard/Guide/MyTours")); // Ví dụ quản lý tour
+const GuideMyTours = lazy(() => import("../pages/Dashboard/Guide/MyTours"));
+const GuideCreateTour = lazy(() =>
+  import("../pages/Dashboard/Guide/CreateTour")
+);
+const GuideEditTour = lazy(() => import("../pages/Dashboard/Guide/EditTour"));
+const GuideSchedule = lazy(() => import("../pages/Dashboard/Guide/Schedule"));
+const GuideEarnings = lazy(() => import("../pages/Dashboard/Guide/Earnings"));
+const GuideProfileSettings = lazy(() =>
+  import("../pages/Dashboard/Guide/ProfileSettings")
+);
+const GuideReviews = lazy(() => import("../pages/Dashboard/Guide/Reviews"));
+const GuideMyPosts = lazy(() => import("../pages/Dashboard/Guide/MyPosts"));
+const GuideCreatePost = lazy(() =>
+  import("../pages/Dashboard/Guide/CreatePost")
+);
+const GuideEditPost = lazy(() => import("../pages/Dashboard/Guide/EditPost"));
+const GuideBookingRequests = lazy(() =>
+  import("../pages/Dashboard/Guide/BookingRequests")
+);
+const GuideBookingDetail = lazy(() =>
+  import("../pages/Dashboard/Guide/BookingDetail")
+);
+const GuideNotifications = lazy(() =>
+  import("../pages/Dashboard/Guide/Notifications")
+);
 
 // 3. Admin Dashboard Pages
 const AdminDashboard = lazy(() => import("../pages/Dashboard/Admin/index"));
@@ -164,6 +197,16 @@ const router = createBrowserRouter([
         ),
       },
 
+      // Booking
+      {
+        path: "booking/payment",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <BookingStepPayment />
+          </Suspense>
+        ),
+      },
+
       // Test Error Page
       {
         path: "500",
@@ -218,6 +261,22 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
+      {
+        path: "notifications",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <TouristNotifications />
+          </Suspense>
+        ),
+      },
+      {
+        path: "transaction-history",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <TouristTransactionHistory />
+          </Suspense>
+        ),
+      },
       // Các route con khác của Tourist sẽ thêm ở đây (ví dụ: wishlist...)
     ],
   },
@@ -240,7 +299,111 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
-      // Các route con của Guide: schedule, earnings, tours...
+      {
+        path: "my-tours",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideMyTours />
+          </Suspense>
+        ),
+      },
+      {
+        path: "create-tour",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideCreateTour />
+          </Suspense>
+        ),
+      },
+      {
+        path: "edit-tour/:id",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideEditTour />
+          </Suspense>
+        ),
+      },
+      {
+        path: "schedule",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideSchedule />
+          </Suspense>
+        ),
+      },
+      {
+        path: "earnings",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideEarnings />
+          </Suspense>
+        ),
+      },
+      {
+        path: "profile-settings",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideProfileSettings />
+          </Suspense>
+        ),
+      },
+      {
+        path: "reviews",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideReviews />
+          </Suspense>
+        ),
+      },
+      {
+        path: "posts",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideMyPosts />
+          </Suspense>
+        ),
+      },
+      {
+        path: "create-post",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideCreatePost />
+          </Suspense>
+        ),
+      },
+      {
+        path: "edit-post/:id",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideEditPost />
+          </Suspense>
+        ),
+      },
+      {
+        path: "requests",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideBookingRequests />
+          </Suspense>
+        ),
+      },
+      {
+        path: "requests/:id",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideBookingDetail />
+          </Suspense>
+        ),
+      },
+      {
+        path: "notifications",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideNotifications />
+          </Suspense>
+        ),
+      },
+      // Các route con khác của Guide sẽ thêm ở đây...
     ],
   },
 

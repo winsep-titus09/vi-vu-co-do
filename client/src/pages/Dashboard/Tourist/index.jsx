@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   IconClock,
@@ -8,6 +8,7 @@ import {
 } from "../../../icons/IconBox";
 import IconArrowRight from "../../../icons/IconArrowRight";
 import { IconUser } from "../../../icons/IconUser";
+import TicketModal from "../../../components/Modals/TicketModal";
 // --- ICONS INLINE (Chỉ giữ lại những icon cần thiết cho trang này) ---
 const IconTicket = ({ className }) => (
   <svg
@@ -102,8 +103,11 @@ const getStatusBadge = (status) => {
 };
 
 export default function TouristDashboard() {
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+
   return (
     <div className="space-y-8">
+      {/* pb-20 removed to avoid huge bottom spacing */}
       {/* 1. WELCOME HEADER */}
       {/* Loại bỏ thống kê điểm thưởng để bám sát FC-TOURIST */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white p-6 rounded-3xl border border-border-light shadow-sm">
@@ -199,7 +203,10 @@ export default function TouristDashboard() {
 
                   <div className="mt-6 pt-4 border-t border-border-light flex gap-3">
                     {/* FC-TOURIST-07: Xem hóa đơn/Vé */}
-                    <button className="flex-1 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-all">
+                    <button
+                      onClick={() => setIsTicketModalOpen(true)}
+                      className="flex-1 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-all"
+                    >
                       Xem vé điện tử
                     </button>
                     {/* FC-TOURIST-08: Liên hệ HDV */}
@@ -282,6 +289,12 @@ export default function TouristDashboard() {
           </div>
         </section>
       </div>
+
+      <TicketModal
+        isOpen={isTicketModalOpen}
+        onClose={() => setIsTicketModalOpen(false)}
+        booking={upcomingTrip}
+      />
     </div>
   );
 }

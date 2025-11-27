@@ -91,6 +91,22 @@ const IconSettings = ({ className }) => (
   </svg>
 );
 
+const IconBell = ({ className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+  </svg>
+);
+
 const MENU = [
   {
     label: "Tổng quan",
@@ -172,11 +188,20 @@ export default function TouristLayout() {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div className="overflow-hidden">
+                <div className="flex-1 overflow-hidden">
                   <p className="font-heading font-bold text-text-primary truncate">
                     Hoàng Nam
                   </p>
                 </div>
+                <NavLink
+                  to="/dashboard/tourist/notifications"
+                  className="relative p-2 text-text-secondary hover:text-primary hover:bg-bg-main rounded-full transition-all"
+                  title="Thông báo"
+                >
+                  <IconBell className="w-5 h-5" />
+                  {/* Badge cho thông báo chưa đọc */}
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                </NavLink>
               </div>
 
               {/* Navigation Menu */}

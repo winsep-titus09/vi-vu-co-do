@@ -8,6 +8,8 @@ import {
 } from "../../../icons/IconBox";
 import { IconUser } from "../../../icons/IconUser";
 import { IconSearch } from "../../../icons/IconSearch";
+import ReviewModal from "../../../components/Modals/ReviewModal";
+import TicketModal from "../../../components/Modals/TicketModal";
 
 // --- MOCK DATA: BOOKING HISTORY ---
 const bookings = [
@@ -78,6 +80,9 @@ const tabs = [
 export default function HistoryPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
 
   const filteredBookings = bookings.filter((item) => {
     const matchTab = activeTab === "all" || item.status === activeTab;
@@ -237,7 +242,13 @@ export default function HistoryPage() {
                         <button className="flex-1 md:flex-none px-5 py-2 rounded-xl border border-border-light text-sm font-bold text-text-secondary hover:text-red-500 hover:border-red-200 transition-colors whitespace-nowrap">
                           Hủy tour
                         </button>
-                        <button className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 whitespace-nowrap">
+                        <button
+                          onClick={() => {
+                            setSelectedBooking(item);
+                            setIsTicketModalOpen(true);
+                          }}
+                          className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 whitespace-nowrap"
+                        >
                           Xem vé điện tử
                         </button>
                       </>
@@ -249,7 +260,13 @@ export default function HistoryPage() {
                           Đặt lại
                         </button>
                         {!item.isRated ? (
-                          <button className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-secondary text-white text-sm font-bold hover:bg-secondary/90 transition-colors shadow-lg flex items-center justify-center gap-2 whitespace-nowrap">
+                          <button
+                            onClick={() => {
+                              setSelectedBooking(item);
+                              setIsReviewModalOpen(true);
+                            }}
+                            className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-secondary text-white text-sm font-bold hover:bg-secondary/90 transition-colors shadow-lg flex items-center justify-center gap-2 whitespace-nowrap"
+                          >
                             <IconStar className="w-4 h-4" /> Viết đánh giá
                           </button>
                         ) : (
@@ -291,6 +308,25 @@ export default function HistoryPage() {
           </div>
         )}
       </div>
+
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => {
+          setIsReviewModalOpen(false);
+          setSelectedBooking(null);
+        }}
+        booking={selectedBooking}
+      />
+
+      {/* Ticket Modal */}
+      <TicketModal
+        isOpen={isTicketModalOpen}
+        onClose={() => {
+          setIsTicketModalOpen(false);
+        }}
+        booking={selectedBooking}
+      />
     </div>
   );
 }
