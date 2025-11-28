@@ -1,400 +1,451 @@
-// server/controllers/articles.controller.js
-// CRUD + quản lý ảnh đại diện (feature image)
-// - Create/Update: chấp nhận JSON hoặc multipart/form-data (nếu route gắn upload.single('feature_image'))
-// - Content chỉ chữ: tự động loại bỏ thẻ <img> khi tạo/cập nhật
-
 import mongoose from "mongoose";
+import sanitizeHtml from "sanitize-html";
 import Article from "../models/Article.js";
-import ArticleCategory from "../models/ArticleCategory.js";
-import { ensureUniqueSlug, toSlug } from "../utils/slug.js";
-import {
-    uploadBufferToCloudinary,
-    uploadFromUrlToCloudinary,
-    deleteFromCloudinary,
-} from "../services/uploader.js";
+import { stripImageTags, excerptText, extractImageUrls } from "../utils/html.js";
+import { notifyUser, notifyAdmins } from "../services/notify.js";
 
-/* Helpers */
-const toObjectId = (id) => {
-    try {
-        return new mongoose.Types.ObjectId(id);
-    } catch {
-        return null;
-    }
+/* Allowed tags/attrs for sanitizer */
+const DEFAULT_ALLOWED_TAGS = sanitizeHtml.defaults.allowedTags.concat([
+    "img",
+    "h1",
+    "h2",
+    "h3",
+    "iframe",
+    "figure",
+    "figcaption"
+]);
+const DEFAULT_ALLOWED_ATTRS = {
+    a: ["href", "name", "target", "rel"],
+    img: ["src", "alt", "title", "width", "height"],
+    iframe: ["src", "width", "height", "frameborder", "allow", "allowfullscreen"],
+    "*": ["class", "style"]
 };
-const parseBoolLoose = (v) => {
-    if (typeof v === "boolean") return v;
-    if (typeof v === "string") return ["1", "true", "yes", "on"].includes(v.toLowerCase());
-    return undefined;
-};
-// Loại bỏ <img ...> trong content
-const stripImageTags = (html = "") => String(html || "").replace(/<img[\s\S]*?>/gi, "");
 
-// Validate + resolve categoryId (nếu có)
-async function resolveCategoryId(categoryId) {
-    if (typeof categoryId === "undefined") return undefined;
-    if (categoryId === null || categoryId === "") return null;
-    const cid = toObjectId(categoryId);
-    if (!cid) {
-        const e = new Error("CategoryId không hợp lệ.");
-        e.status = 400;
-        throw e;
-    }
-    const exists = await ArticleCategory.findById(cid).lean();
-    if (!exists) {
-        const e = new Error("Danh mục không tồn tại.");
-        e.status = 404;
-        throw e;
-    }
-    return cid;
+function sanitizeContent(rawHtml = "") {
+    return sanitizeHtml(rawHtml, {
+        allowedTags: DEFAULT_ALLOWED_TAGS,
+        allowedAttributes: DEFAULT_ALLOWED_ATTRS,
+        allowedSchemes: ["http", "https", "data"],
+        transformTags: {
+            img: (tagName, attribs) => {
+                return {
+                    tagName: "img",
+                    attribs: {
+                        src: attribs.src || "",
+                        alt: attribs.alt || "",
+                        title: attribs.title || "",
+                        loading: "lazy",
+                        width: attribs.width || "",
+                        height: attribs.height || ""
+                    }
+                };
+            }
+        }
+    });
 }
 
-const populateDoc = async (id) =>
-    Article.findById(id)
-        .populate("authorId", "name email")
-        .populate("categoryId", "name slug")
-        .lean();
-
-/* PUBLIC (tham khảo) */
+/** Public: list approved articles */
 export const listArticlesPublic = async (req, res) => {
     try {
         const page = Math.max(parseInt(req.query.page || "1", 10), 1);
-        const limit = Math.min(Math.max(parseInt(req.query.limit || "10", 10), 1), 100);
+        const limit = Math.min(parseInt(req.query.limit || "10", 10), 100);
         const skip = (page - 1) * limit;
 
-        const q = (req.query.q || "").trim();
-        const categoryId = req.query.categoryId ? toObjectId(req.query.categoryId) : undefined;
-        const categorySlug = (req.query.categorySlug || "").trim().toLowerCase();
-        const featuredStr = req.query.featured;
-        const featured =
-            typeof featuredStr !== "undefined" ? ["1", "true", "yes"].includes(String(featuredStr).toLowerCase()) : undefined;
+        const filter = {
+            "approval.status": "approved",
+            status: "active",
+            authorId: { $exists: true, $ne: null }
+        };
 
-        const sort = (() => {
-            const s = String(req.query.sort || "");
-            if (!s) return { publishedAt: -1, createdAt: -1 };
-            const [field, dir] = s.split(":");
-            const direction = dir === "asc" ? 1 : -1;
-            const allowed = ["publishedAt", "createdAt", "updatedAt", "title", "featured"];
-            if (!allowed.includes(field)) return { publishedAt: -1, createdAt: -1 };
-            return { [field]: direction };
-        })();
-
-        const filter = { status: "published" };
-        if (q) filter.$or = [{ title: { $regex: q, $options: "i" } }, { slug: { $regex: toSlug(q), $options: "i" } }];
-        if (categoryId) filter.categoryId = categoryId;
-        if (categorySlug) {
-            const cat = await ArticleCategory.findOne({ slug: categorySlug }).lean();
-            filter.categoryId = cat?._id || null;
+        if (req.query.q) {
+            const q = req.query.q.trim();
+            filter.$or = [{ title: new RegExp(q, "i") }, { summary: new RegExp(q, "i") }];
         }
-        if (typeof featured === "boolean") filter.featured = featured;
 
         const [items, total] = await Promise.all([
             Article.find(filter)
-                .populate("authorId", "name avatar_url")
-                .populate("categoryId", "name slug")
-                .sort(sort)
+                .sort({ publishedAt: -1, createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
+                .populate("authorId", "name avatar_url")
                 .lean(),
-            Article.countDocuments(filter),
+            Article.countDocuments(filter)
         ]);
 
-        res.json({ data: items, meta: { total, page, limit, pages: Math.ceil(total / limit) || 1 } });
+        return res.json({ items, page, limit, total });
     } catch (err) {
         console.error("listArticlesPublic error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+        return res.status(500).json({ message: "Server error", error: err.message });
     }
 };
 
+/** Public: get single article (only approved + has author) */
 export const getArticlePublic = async (req, res) => {
     try {
-        const id = toObjectId(req.params.id);
-        if (!id) return res.status(400).json({ message: "ID không hợp lệ." });
-        const item = await Article.findOne({ _id: id, status: "published" })
-            .populate("authorId", "name avatar_url")
-            .populate("categoryId", "name slug")
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
+
+        const doc = await Article.findOne({
+            _id: id,
+            "approval.status": "approved",
+            status: "active",
+            authorId: { $exists: true, $ne: null }
+        })
+            .populate("authorId", "name avatar_url bio")
             .lean();
-        if (!item) return res.status(404).json({ message: "Bài viết không tồn tại hoặc chưa được xuất bản." });
-        res.json(item);
+
+        if (!doc) return res.status(404).json({ message: "Article not found or not approved" });
+        return res.json(doc);
     } catch (err) {
         console.error("getArticlePublic error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+        return res.status(500).json({ message: "Server error", error: err.message });
     }
 };
 
-export const getArticleBySlugPublic = async (req, res) => {
-    try {
-        const slug = (req.params.slug || "").toLowerCase();
-        if (!slug) return res.status(400).json({ message: "Slug không hợp lệ." });
-        const item = await Article.findOne({ slug, status: "published" })
-            .populate("authorId", "name avatar_url")
-            .populate("categoryId", "name slug")
-            .lean();
-        if (!item) return res.status(404).json({ message: "Bài viết không tồn tại hoặc chưa được xuất bản." });
-        res.json(item);
-    } catch (err) {
-        console.error("getArticleBySlugPublic error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
-    }
-};
-
-/* CREATE (unified JSON/multipart) */
+/** Guide: create article (author forced to req.user._id; approval = pending) */
 export const createArticle = async (req, res) => {
     try {
+        const user = req.user;
+        if (!user) return res.status(401).json({ message: "Unauthorized" });
+
         const body = req.body || {};
-        const title = (body.title || "").trim();
-        const content = body.content;
-
-        if (!title) return res.status(400).json({ message: "Tiêu đề là bắt buộc." });
-        if (typeof content !== "string") return res.status(400).json({ message: "Nội dung là bắt buộc." });
-
-        const categoryRef = await resolveCategoryId(body.categoryId);
-        const slug = await ensureUniqueSlug(Article, body.slug || title);
-
-        const status = body.status ? String(body.status) : "published";
-        if (!["draft", "published"].includes(status)) {
-            return res.status(400).json({ message: "Trạng thái không hợp lệ." });
-        }
-        const publishedAt = status === "published" ? (body.publishedAt ? new Date(body.publishedAt) : new Date()) : undefined;
+        const rawHtml = String(body.content_html || "");
+        const content = sanitizeContent(rawHtml);
+        const excerptRaw = stripImageTags(content);
+        const excerpt = excerptText(excerptRaw, 300);
+        const images = extractImageUrls(content);
 
         const doc = await Article.create({
-            title,
-            slug,
-            content: stripImageTags(content),
-            authorId: req.user._id,
-            ...(typeof categoryRef !== "undefined" && { categoryId: categoryRef }),
-            featured: !!parseBoolLoose(body.featured),
-            status,
-            ...(publishedAt && { publishedAt }),
+            title: String(body.title || "").trim(),
+            slug: body.slug ? String(body.slug).trim() : undefined,
+            summary: body.summary ? String(body.summary).trim() : undefined,
+            content_html: content,
+            excerpt,
+            cover_image: body.cover_image || images[0] || null,
+            images,
+            categoryId: body.categoryId || null,
+            authorId: user._id,
+            createdBy: user._id,
+            status: "pending",
+            approval: { status: "pending" }
         });
 
-        const hasFile = !!req.file;
-        const featureImageUrl = body.featureImageUrl ? String(body.featureImageUrl).trim() : "";
-        if (hasFile || featureImageUrl) {
-            const uploaded = hasFile
-                ? await uploadBufferToCloudinary(req.file.buffer, `articles/${doc._id}/feature`, {
-                    transformation: [{ quality: "auto", fetch_format: "auto" }],
-                })
-                : await uploadFromUrlToCloudinary(featureImageUrl, `articles/${doc._id}/feature`, {
-                    transformation: [{ quality: "auto", fetch_format: "auto" }],
-                });
-
-            await Article.findByIdAndUpdate(doc._id, {
-                $set: { feature_image_url: uploaded.secure_url, feature_image_public_id: uploaded.public_id },
+        // notify admins that a new article needs review
+        try {
+            await notifyAdmins({
+                type: "article:created",
+                content: `Bài viết mới "${doc.title}" cần duyệt`,
+                meta: { articleId: doc._id, articleTitle: doc.title, guideName: user.name, guideEmail: user.email }
             });
+        } catch (e) {
+            console.warn("notifyAdmins for article create failed:", e);
         }
 
-        const populated = await populateDoc(doc._id);
-        return res.status(201).json({ message: "Tạo bài viết thành công", data: populated });
+        return res.status(201).json({ message: "Bài viết đã gửi để duyệt", data: doc });
     } catch (err) {
-        if (err.status) return res.status(err.status).json({ message: err.message });
-        if (err?.code === 11000) return res.status(409).json({ message: "Slug bài viết đã tồn tại." });
-        console.error("createArticleUnified error:", err);
-        return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+        console.error("createArticle error:", err);
+        return res.status(500).json({ message: "Server error", error: err.message });
     }
 };
 
-/* UPDATE (unified JSON/multipart) */
-export const updateArticle = async (req, res) => {
+/** Guide: list own articles */
+export const listMyArticles = async (req, res) => {
     try {
-        const id = toObjectId(req.params.id);
-        if (!id) return res.status(400).json({ message: "ID không hợp lệ." });
+        const user = req.user;
+        if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+        const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+        const limit = Math.min(parseInt(req.query.limit || "20", 10), 200);
+        const skip = (page - 1) * limit;
+
+        const filter = { authorId: user._id };
+
+        const [items, total] = await Promise.all([
+            Article.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+            Article.countDocuments(filter)
+        ]);
+
+        return res.json({ items, page, limit, total });
+    } catch (err) {
+        console.error("listMyArticles error:", err);
+        return res.status(500).json({ message: "Server error", error: err.message });
+    }
+};
+
+/** Guide: update own article (resets approval to pending) */
+export const updateMyArticle = async (req, res) => {
+    try {
+        const user = req.user;
+        const { id } = req.params;
+        if (!user) return res.status(401).json({ message: "Unauthorized" });
+        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
 
         const doc = await Article.findById(id);
-        if (!doc) return res.status(404).json({ message: "Không tìm thấy bài viết." });
+        if (!doc) return res.status(404).json({ message: "Article not found" });
+        if (!doc.authorId || String(doc.authorId) !== String(user._id)) return res.status(403).json({ message: "Không có quyền chỉnh sửa" });
 
         const body = req.body || {};
-        let titleChanged = false;
+        const rawHtml = String(body.content_html || doc.content_html || "");
+        const content = sanitizeContent(rawHtml);
+        const excerpt = excerptText(stripImageTags(content), 300);
+        const images = extractImageUrls(content);
 
-        if (typeof body.title === "string") {
-            const t = body.title.trim();
-            if (!t) return res.status(400).json({ message: "Tiêu đề không được để trống." });
-            if (t !== doc.title) titleChanged = true;
-            doc.title = t;
-        }
-        if (typeof body.content === "string") {
-            doc.content = stripImageTags(body.content);
-        }
+        // update allowed fields only
+        doc.title = body.title ? String(body.title).trim() : doc.title;
+        doc.slug = body.slug ? String(body.slug).trim() : doc.slug;
+        doc.summary = body.summary ? String(body.summary).trim() : doc.summary;
+        doc.content_html = content;
+        doc.excerpt = excerpt;
+        doc.cover_image = body.cover_image || images[0] || doc.cover_image;
+        doc.images = images.length ? images : doc.images;
 
-        if (typeof body.categoryId !== "undefined") {
-            const categoryRef = await resolveCategoryId(body.categoryId);
-            if (categoryRef === null) doc.categoryId = undefined;
-            else if (categoryRef !== undefined) doc.categoryId = categoryRef;
-        }
-
-        if (typeof body.featured !== "undefined") {
-            doc.featured = !!parseBoolLoose(body.featured);
-        }
-
-        if (typeof body.status !== "undefined") {
-            if (!["draft", "published"].includes(body.status)) {
-                return res.status(400).json({ message: "Trạng thái không hợp lệ." });
-            }
-            doc.status = body.status;
-            if (doc.status === "published") {
-                doc.publishedAt = body.publishedAt ? new Date(body.publishedAt) : new Date();
-            } else {
-                doc.publishedAt = undefined;
-            }
-        } else if (typeof body.publishedAt !== "undefined") {
-            if (doc.status !== "published") {
-                return res.status(400).json({ message: "Không thể đặt publishedAt khi bài viết đang ở trạng thái nháp." });
-            }
-            doc.publishedAt = body.publishedAt ? new Date(body.publishedAt) : doc.publishedAt || new Date();
-        }
-
-        if (typeof body.slug !== "undefined" || titleChanged) {
-            const base = body.slug || doc.title;
-            if (!base) return res.status(400).json({ message: "Slug không hợp lệ." });
-            doc.slug = await ensureUniqueSlug(Article, base, doc._id);
-        }
-
+        // reset approval so admin re-reviews
+        doc.approval = { status: "pending", reviewed_by: null, reviewed_at: null, notes: null };
+        doc.status = "pending";
         await doc.save();
 
-        // Ảnh: nếu có file hoặc featureImageUrl, thay ảnh
-        const hasFile = !!req.file;
-        const featureImageUrl = body.featureImageUrl ? String(body.featureImageUrl).trim() : "";
-        if (hasFile || typeof body.featureImageUrl !== "undefined") {
-            if (doc.feature_image_public_id) {
-                await deleteFromCloudinary(doc.feature_image_public_id, "image");
-                doc.feature_image_public_id = null;
-                doc.feature_image_url = null;
-            }
-
-            if (hasFile) {
-                const r = await uploadBufferToCloudinary(req.file.buffer, `articles/${doc._id}/feature`, {
-                    transformation: [{ quality: "auto", fetch_format: "auto" }],
-                });
-                doc.feature_image_url = r.secure_url;
-                doc.feature_image_public_id = r.public_id;
-            } else if (featureImageUrl) {
-                const r = await uploadFromUrlToCloudinary(featureImageUrl, `articles/${doc._id}/feature`, {
-                    transformation: [{ quality: "auto", fetch_format: "auto" }],
-                });
-                doc.feature_image_url = r.secure_url;
-                doc.feature_image_public_id = r.public_id;
-            }
-            await doc.save();
+        // notify admins of update
+        try {
+            await notifyAdmins({
+                type: "article:updated",
+                content: `Bài viết "${doc.title}" đã được cập nhật và cần duyệt lại`,
+                meta: { articleId: doc._id, articleTitle: doc.title, guideName: user.name, guideEmail: user.email }
+            });
+        } catch (e) {
+            console.warn("notifyAdmins for article update failed:", e);
         }
 
-        const populated = await populateDoc(doc._id);
-        res.json({ message: "Cập nhật bài viết thành công", data: populated });
+        return res.json({ message: "Cập nhật thành công. Bài sẽ được duyệt lại.", data: doc });
     } catch (err) {
-        if (err.status) return res.status(err.status).json({ message: err.message });
-        if (err?.code === 11000) return res.status(409).json({ message: "Slug bài viết đã tồn tại." });
-        console.error("updateArticleUnified error:", err);
-        return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+        console.error("updateMyArticle error:", err);
+        return res.status(500).json({ message: "Server error", error: err.message });
     }
 };
 
-/* DELETE bài viết */
+/** DELETE article (author or admin) */
 export const deleteArticle = async (req, res) => {
     try {
-        const id = toObjectId(req.params.id);
-        if (!id) return res.status(400).json({ message: "ID không hợp lệ." });
-        const doc = await Article.findById(id).lean();
-        if (!doc) return res.status(404).json({ message: "Không tìm thấy bài viết." });
+        const user = req.user;
+        const { id } = req.params;
+        if (!user) return res.status(401).json({ message: "Unauthorized" });
+        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
 
-        if (doc.feature_image_public_id) {
-            await deleteFromCloudinary(doc.feature_image_public_id, "image");
+        const doc = await Article.findById(id);
+        if (!doc) return res.status(404).json({ message: "Article not found" });
+
+        // allow author or admin to delete
+        const isAuthor = doc.authorId && String(doc.authorId) === String(user._id);
+        const isAdmin = user.role === "admin" || user?.role_id?.name === "admin";
+        if (!isAuthor && !isAdmin) return res.status(403).json({ message: "Không có quyền xóa bài" });
+
+        await doc.remove();
+
+        // optional: notify author/admin (if deleted by admin)
+        try {
+            if (isAdmin && doc.authorId) {
+                await notifyUser({
+                    userId: doc.authorId,
+                    type: "article:deleted",
+                    content: `Bài viết "${doc.title}" đã bị xóa bởi quản trị viên.`,
+                    url: "/guide/articles",
+                    meta: { articleId: doc._id }
+                });
+            }
+        } catch (e) {
+            console.warn("notifyUser after delete failed:", e);
         }
-        await Article.deleteOne({ _id: id });
-        res.json({ message: "Xóa bài viết thành công" });
+
+        return res.json({ message: "Đã xóa bài viết" });
     } catch (err) {
         console.error("deleteArticle error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+        return res.status(500).json({ message: "Server error", error: err.message });
     }
 };
 
-/* ẢNH ĐẠI DIỆN: cập nhật bằng file */
-export const setFeatureImage = async (req, res) => {
-    try {
-        const id = toObjectId(req.params.id);
-        if (!id) return res.status(400).json({ message: "ID không hợp lệ." });
-        const doc = await Article.findById(id);
-        if (!doc) return res.status(404).json({ message: "Không tìm thấy bài viết." });
-        if (!req.file) return res.status(400).json({ message: "Thiếu file 'feature_image'." });
-
-        if (doc.feature_image_public_id) {
-            await deleteFromCloudinary(doc.feature_image_public_id, "image");
-        }
-        const r = await uploadBufferToCloudinary(req.file.buffer, `articles/${doc._id}/feature`, {
-            transformation: [{ quality: "auto", fetch_format: "auto" }],
-        });
-        doc.feature_image_url = r.secure_url;
-        doc.feature_image_public_id = r.public_id;
-        await doc.save();
-
-        res.json({ message: "Cập nhật ảnh đại diện thành công", feature_image_url: doc.feature_image_url });
-    } catch (err) {
-        console.error("setFeatureImage error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
-    }
-};
-
-/* ẢNH ĐẠI DIỆN: cập nhật bằng URL */
-export const setFeatureImageByUrl = async (req, res) => {
-    try {
-        const id = toObjectId(req.params.id);
-        if (!id) return res.status(400).json({ message: "ID không hợp lệ." });
-        const doc = await Article.findById(id);
-        if (!doc) return res.status(404).json({ message: "Không tìm thấy bài viết." });
-
-        const url = (req.body?.url || "").trim();
-        if (!url) return res.status(400).json({ message: "Thiếu url." });
-
-        if (doc.feature_image_public_id) {
-            await deleteFromCloudinary(doc.feature_image_public_id, "image");
-        }
-        const r = await uploadFromUrlToCloudinary(url, `articles/${doc._id}/feature`, {
-            transformation: [{ quality: "auto", fetch_format: "auto" }],
-        });
-        doc.feature_image_url = r.secure_url;
-        doc.feature_image_public_id = r.public_id;
-        await doc.save();
-
-        res.json({ message: "Cập nhật ảnh đại diện thành công", feature_image_url: doc.feature_image_url });
-    } catch (err) {
-        console.error("setFeatureImageByUrl error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
-    }
-};
-
-/* XÓA ẢNH ĐẠI DIỆN */
+/**
+ * DELETE feature image or image url from article
+ * - If query param ?url=<imageUrl> provided => remove that image from doc.images array
+ * - Otherwise remove cover_image (set to null)
+ * Permissions: author OR admin can remove images
+ */
 export const deleteFeatureImage = async (req, res) => {
     try {
-        const id = toObjectId(req.params.id);
-        if (!id) return res.status(400).json({ message: "ID không hợp lệ." });
-        const doc = await Article.findById(id);
-        if (!doc) return res.status(404).json({ message: "Không tìm thấy bài viết." });
+        const user = req.user;
+        const { id } = req.params;
+        const imageUrl = req.query.url; // optional
 
-        if (doc.feature_image_public_id) {
-            await deleteFromCloudinary(doc.feature_image_public_id, "image");
+        if (!user) return res.status(401).json({ message: "Unauthorized" });
+        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
+
+        const doc = await Article.findById(id);
+        if (!doc) return res.status(404).json({ message: "Article not found" });
+
+        const isAuthor = doc.authorId && String(doc.authorId) === String(user._id);
+        const isAdmin = user.role === "admin" || user?.role_id?.name === "admin";
+        if (!isAuthor && !isAdmin) return res.status(403).json({ message: "Không có quyền xóa ảnh" });
+
+        // If url provided => remove from images array
+        if (imageUrl) {
+            const prevLen = (doc.images || []).length;
+            doc.images = (doc.images || []).filter((u) => u !== imageUrl);
+            if (doc.cover_image === imageUrl) {
+                doc.cover_image = null;
+            }
+            if ((doc.images || []).length === prevLen) {
+                return res.status(404).json({ message: "Ảnh không tồn tại trong bài viết" });
+            }
+
+            await doc.save();
+
+            // optional: delete from storage if uploader exposes a delete function
+            try {
+                const uploader = await import("../services/uploader.js").catch(() => null);
+                if (uploader && typeof uploader.deleteFileByUrl === "function") {
+                    await uploader.deleteFileByUrl(imageUrl).catch(() => { });
+                }
+            } catch (e) { }
+
+            return res.json({ message: "Đã xóa ảnh khỏi bài viết.", data: doc });
         }
-        doc.feature_image_url = null;
-        doc.feature_image_public_id = null;
+
+        // Otherwise remove cover_image
+        if (!doc.cover_image) {
+            return res.status(400).json({ message: "Bài viết không có ảnh bìa để xóa." });
+        }
+
+        const removedUrl = doc.cover_image;
+        doc.cover_image = null;
+
+        // Also remove from images array if present
+        doc.images = (doc.images || []).filter((u) => u !== removedUrl);
+
         await doc.save();
 
-        res.json({ message: "Đã xoá ảnh đại diện." });
+        try {
+            const uploader = await import("../services/uploader.js").catch(() => null);
+            if (uploader && typeof uploader.deleteFileByUrl === "function") {
+                await uploader.deleteFileByUrl(removedUrl).catch(() => { });
+            }
+        } catch (e) { }
+
+        return res.json({ message: "Đã xóa ảnh bìa.", data: doc });
     } catch (err) {
         console.error("deleteFeatureImage error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+        return res.status(500).json({ message: "Server error", error: err.message });
     }
 };
 
-export const listFeaturedArticlesPublic = async (req, res) => {
+/** Admin: list articles with filter (pending/approved/rejected) */
+export const adminListArticles = async (req, res) => {
     try {
-        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 3, 1), 50);
-        const items = await Article.find({ status: "published", featured: true })
-            .select("title slug feature_image_url featured publishedAt createdAt authorId categoryId")
-            .populate("authorId", "name avatar_url")
-            .populate("categoryId", "name slug")
-            .sort({ publishedAt: -1, createdAt: -1 })
-            .limit(limit)
+        const { status, page = 1, limit = 20 } = req.query;
+        const filter = {};
+        if (status) {
+            if (status === "pending") filter["approval.status"] = "pending";
+            else if (status === "approved") filter["approval.status"] = "approved";
+            else if (status === "rejected") filter["approval.status"] = "rejected";
+        }
+
+        const pg = Math.max(parseInt(page, 10) || 1, 1);
+        const docs = await Article.find(filter)
+            .sort({ createdAt: -1 })
+            .skip((pg - 1) * limit)
+            .limit(Number(limit))
+            .populate("authorId", "name email")
             .lean();
 
-        return res.json({ items, limit });
+        return res.json({ items: docs, page: pg });
     } catch (err) {
-        console.error("listFeaturedArticlesPublic error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+        console.error("adminListArticles error:", err);
+        return res.status(500).json({ message: "Server error", error: err.message });
     }
+};
+
+/** Admin: approve article */
+export const adminApproveArticle = async (req, res) => {
+    try {
+        const admin = req.user;
+        const { id } = req.params;
+        const { notes } = req.body || {};
+        if (!admin) return res.status(401).json({ message: "Unauthorized" });
+        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
+
+        const doc = await Article.findById(id);
+        if (!doc) return res.status(404).json({ message: "Article not found" });
+        if (!doc.authorId) return res.status(400).json({ message: "Bài viết phải có tác giả trước khi duyệt" });
+
+        doc.approval = { status: "approved", reviewed_by: admin._id, reviewed_at: new Date(), notes: notes || null };
+        doc.status = "active";
+        doc.publishedAt = new Date();
+        await doc.save();
+
+        // notify author
+        try {
+            await notifyUser({
+                userId: doc.authorId,
+                type: "article:approved",
+                content: `Bài viết "${doc.title}" đã được duyệt.`,
+                url: `/articles/${doc._id}`,
+                meta: { articleId: doc._id, articleTitle: doc.title }
+            });
+        } catch (e) {
+            console.warn("notifyUser article approved failed:", e);
+        }
+
+        return res.json({ message: "Đã duyệt bài", data: doc });
+    } catch (err) {
+        console.error("adminApproveArticle error:", err);
+        return res.status(500).json({ message: "Server error", error: err.message });
+    }
+};
+
+/** Admin: reject article */
+export const adminRejectArticle = async (req, res) => {
+    try {
+        const admin = req.user;
+        const { id } = req.params;
+        const { notes } = req.body || {};
+        if (!admin) return res.status(401).json({ message: "Unauthorized" });
+        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
+
+        const doc = await Article.findById(id);
+        if (!doc) return res.status(404).json({ message: "Article not found" });
+
+        doc.approval = { status: "rejected", reviewed_by: admin._id, reviewed_at: new Date(), notes: notes || null };
+        doc.status = "inactive";
+        await doc.save();
+
+        // notify author
+        try {
+            if (doc.authorId) {
+                await notifyUser({
+                    userId: doc.authorId,
+                    type: "article:rejected",
+                    content: `Bài viết "${doc.title}" đã bị từ chối.`,
+                    url: `/guide/articles/${doc._id}`,
+                    meta: { articleId: doc._id, reason: notes || "" }
+                });
+            }
+        } catch (e) {
+            console.warn("notifyUser article rejected failed:", e);
+        }
+
+        return res.json({ message: "Đã từ chối bài", data: doc });
+    } catch (err) {
+        console.error("adminRejectArticle error:", err);
+        return res.status(500).json({ message: "Server error", error: err.message });
+    }
+};
+
+export default {
+    listArticlesPublic,
+    getArticlePublic,
+    createArticle,
+    listMyArticles,
+    updateMyArticle,
+    deleteArticle,
+    deleteFeatureImage,
+    adminListArticles,
+    adminApproveArticle,
+    adminRejectArticle
 };

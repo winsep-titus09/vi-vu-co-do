@@ -1,7 +1,16 @@
-/* Modified: added admin handling for 'payout:requested' -> adminPayoutRequest
-   and user handling for 'payout:rejected' -> payoutRejected
-   (Kept original logic; only added blocks where appropriate)
-*/
+/**
+ * server/services/notify.js
+ *
+ * Notification service: create Notification documents (in-app), emit via socket.io if available,
+ * and send optional email templates (via email.service.sendTemplateEmail) for admin and user audiences.
+ *
+ * This file is the project's notify implementation with added handling for:
+ * - admin email when a guide creates a payout request ("payout:requested" -> templateKey "adminPayoutRequest")
+ * - user email when a payout is rejected ("payout:rejected" -> templateKey "payoutRejected")
+ *
+ * Keep this file in sync with templates under server/templates/email/.
+ */
+
 import Notification from "../models/Notification.js";
 import User from "../models/User.js";
 import { sendTemplateEmail } from "./email.service.js";
@@ -9,9 +18,11 @@ import { sendTemplateEmail } from "./email.service.js";
 let ioRef = null;
 export const setIO = (io) => { ioRef = io; };
 
-/* flattenForTemplate, buildTemplateData, sendAdminEmail functions unchanged (omitted here for brevity) */
-/* ... keep existing helper functions exactly as in current file ... */
-
+/**
+ * Flatten object (one-level dotted keys)
+ * e.g. { a: { b: 1 }, c: 2 } -> { "a.b":1, a_b:1, a: {b:1}, c:2 }
+ * We flatten nested meta to top-level keys as well as keep nested object for backward compat.
+ */
 function flattenForTemplate(obj = {}, prefix = "", out = {}) {
     for (const key of Object.keys(obj || {})) {
         const val = obj[key];
@@ -20,17 +31,21 @@ function flattenForTemplate(obj = {}, prefix = "", out = {}) {
             flattenForTemplate(val, newKey, out);
         } else {
             out[newKey] = val;
+            // also expose simple underscore version for templates that used underscores
             out[newKey.replace(/\./g, "_")] = val;
         }
     }
     return out;
 }
 
+// Helper: build email data from provided meta + explicit fields
 function buildTemplateData(extra = {}, meta = {}) {
     const flatMeta = flattenForTemplate(meta);
+    // merge extra (explicit) with flatten meta; extra overrides meta keys
     return { ...flatMeta, ...extra };
 }
 
+// send admin email list (ADMIN_EMAILS)
 async function sendAdminEmail({ subject, templateKey, data }) {
     const list = (process.env.ADMIN_EMAILS || "")
         .split(",")
@@ -40,7 +55,7 @@ async function sendAdminEmail({ subject, templateKey, data }) {
     await Promise.all(
         list.map(email =>
             sendTemplateEmail({ to: email, subject, templateKey, data })
-                .catch(err => console.error("Admin email error:", err.message))
+                .catch(err => console.error("Admin email error:", err && err.message ? err.message : err))
         )
     );
 }
@@ -48,11 +63,17 @@ async function sendAdminEmail({ subject, templateKey, data }) {
 /**
  * maybeSendEmail: map event -> email template + data
  * audience: "admin" or "user"
+ *
+ * - For audience === 'admin': we send emails to ADMIN_EMAILS (if configured) mapped by type.
+ * - For audience === 'user': we lookup user by recipientId and send template emails if user.email exists.
+ *
+ * The function is best-effort: failures to send email are logged but do not throw.
  */
 async function maybeSendEmail({ audience, recipientId, type, content, url, meta = {} }) {
     try {
+        // ADMIN audience
         if (audience === "admin") {
-            // existing admin handlers...
+            // Guide application new
             if (type === "guide_application:new") {
                 const data = buildTemplateData({
                     applicantName: meta?.applicantName || "",
@@ -63,6 +84,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 await sendAdminEmail({ subject: "Yêu cầu làm HDV mới", templateKey: "adminNewGuideApplication", data });
             }
 
+            // Booking paid (admin)
             if (type === "booking:paid") {
                 const data = buildTemplateData({
                     tourName: meta?.tourName || "",
@@ -73,7 +95,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 await sendAdminEmail({ subject: "Booking thanh toán thành công", templateKey: "adminPaymentSuccess", data });
             }
 
-            // refund events...
+            // Refund requested/pending (admin)
             if (type === "refund:requested" || type === "refund:pending") {
                 const data = buildTemplateData({
                     bookingId: meta?.bookingId || "",
@@ -109,7 +131,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 await sendAdminEmail({ subject: "Yêu cầu hoàn tiền đã bị từ chối", templateKey: "adminRefundRejected", data });
             }
 
-            // payout admin notifications (existing)
+            // Payout notifications for admins (paid)
             if (type === "payout:paid_admin" || type === "payout:paid") {
                 const data = buildTemplateData({
                     payoutId: meta?.payoutId || "",
@@ -135,15 +157,18 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 await sendAdminEmail({ subject: "Yêu cầu rút tiền mới", templateKey: "adminPayoutRequest", data });
             }
 
+            // Other admin cases remain possible — add mapping as needed.
+
             return;
         }
 
-        // USER/GUIDE events
+        // USER / GUIDE audience
         if (!recipientId) return;
         const user = await User.findById(recipientId);
         if (!user?.email) return;
         const to = user.email;
 
+        // Build baseMeta with helpful defaults + flattened meta
         const baseMeta = buildTemplateData({
             bookingId: meta?.bookingId || "",
             bookingCode: meta?.bookingCode || "",
@@ -160,6 +185,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
         }, meta);
 
         switch (type) {
+            // Guide application emails
             case "guide_application:approved":
                 await sendTemplateEmail({
                     to,
@@ -177,6 +203,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 });
                 break;
 
+            // Booking-related emails to users/guides
             case "booking:request":
                 await sendTemplateEmail({
                     to,
@@ -185,7 +212,6 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     data: baseMeta
                 });
                 break;
-
             case "booking:approved":
                 await sendTemplateEmail({
                     to,
@@ -194,7 +220,6 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     data: baseMeta
                 });
                 break;
-
             case "booking:rejected":
                 await sendTemplateEmail({
                     to,
@@ -203,7 +228,6 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     data: baseMeta
                 });
                 break;
-
             case "booking:paid":
                 await sendTemplateEmail({
                     to,
@@ -212,7 +236,6 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     data: baseMeta
                 });
                 break;
-
             case "booking:refund_requested":
             case "booking:refund_requested:confirm":
                 await sendTemplateEmail({
@@ -222,7 +245,6 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     data: baseMeta
                 });
                 break;
-
             case "booking:refunded":
                 await sendTemplateEmail({
                     to,
@@ -231,7 +253,6 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     data: baseMeta
                 });
                 break;
-
             case "booking:refund_rejected":
                 await sendTemplateEmail({
                     to,
@@ -241,7 +262,7 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 });
                 break;
 
-            // payout emails for guides
+            // Payout emails for guides
             case "payout:created":
                 await sendTemplateEmail({
                     to,
@@ -270,15 +291,45 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 });
                 break;
 
+            // Article notifications (guide)
+            case "article:approved":
+                await sendTemplateEmail({
+                    to,
+                    subject: "Bài viết của bạn đã được duyệt",
+                    templateKey: "articleApproved",
+                    data: baseMeta
+                });
+                break;
+            case "article:rejected":
+                await sendTemplateEmail({
+                    to,
+                    subject: "Bài viết của bạn đã bị từ chối",
+                    templateKey: "articleRejected",
+                    data: baseMeta
+                });
+                break;
+            case "article:deleted":
+                await sendTemplateEmail({
+                    to,
+                    subject: "Bài viết của bạn đã bị xóa",
+                    templateKey: "articleDeleted",
+                    data: baseMeta
+                });
+                break;
+
             default:
+                // no mapping for other types — safe to ignore
                 break;
         }
     } catch (err) {
-        console.error("maybeSendEmail error:", err.message);
+        console.error("maybeSendEmail error:", err && err.message ? err.message : err);
     }
 }
 
-// Notify functions used by controllers (unchanged)
+/**
+ * notifyAdmins: create admin Notification doc, emit via socket.io to admins,
+ * and attempt to send admin emails via maybeSendEmail (audience admin).
+ */
 export const notifyAdmins = async ({ type, content, url, meta = {} }) => {
     const doc = await Notification.create({
         audience: "admin",
@@ -295,11 +346,15 @@ export const notifyAdmins = async ({ type, content, url, meta = {} }) => {
         });
     }
 
-    // call maybeSendEmail with audience admin
+    // call maybeSendEmail with audience admin (best-effort)
     await maybeSendEmail({ audience: "admin", recipientId: null, type, content, url, meta }).catch(() => { });
     return doc;
 };
 
+/**
+ * notifyUser: create user Notification doc, emit via socket.io to user,
+ * and attempt to send user email via maybeSendEmail (audience user).
+ */
 export const notifyUser = async ({ userId, type, content, url, meta = {} }) => {
     if (!userId) throw new Error("Thiếu userId để gửi thông báo.");
     const doc = await Notification.create({
@@ -318,7 +373,7 @@ export const notifyUser = async ({ userId, type, content, url, meta = {} }) => {
         });
     }
 
-    // call maybeSendEmail for user with meta
+    // call maybeSendEmail for user with meta (best-effort)
     await maybeSendEmail({ audience: "user", recipientId: userId, type, content, url, meta }).catch(() => { });
     return doc;
 };

@@ -6,7 +6,7 @@ import { authorize } from "../middleware/auth.js";
 import { applyGuide, getMyGuideApplication } from "../controllers/guideApplication.controller.js";
 import { getMyGuideProfile, updateMyGuideProfile, uploadGuideVideo, getPublicGuideProfile, listFeaturedGuides, listTopRatedGuides } from "../controllers/guideProfile.controller.js";
 import { getGuideBookings } from "../controllers/bookings.controller.js";
-import { guideDashboard } from "../controllers/guides.dashboard.controller.js";
+import { guideDashboard, getGuideMonthlyEarnings } from "../controllers/guides.dashboard.controller.js";
 
 const router = express.Router();
 
@@ -24,5 +24,6 @@ router.get("/top-rated", listTopRatedGuides);
 router.get("/profile/:guideId", getPublicGuideProfile);
 
 router.get("/me/dashboard", auth, guideDashboard);
+router.get("/me/earnings/monthly", auth, authorize("guide"), getGuideMonthlyEarnings);
 
 export default router;

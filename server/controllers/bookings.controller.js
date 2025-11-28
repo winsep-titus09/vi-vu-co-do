@@ -595,15 +595,94 @@ export const getMyBookings = async (req, res) => {
         const userId = req.user?._id;
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-        const { status } = req.query;
+        // query params
+        const { status, page = 1, limit = 50, grouped = "false" } = req.query;
+        const pg = Math.max(Number(page) || 1, 1);
+        const lm = Math.min(Math.max(Number(limit) || 50, 1), 500);
+
+        // base condition: bookings belonging to current user
         const cond = { customer_id: userId };
         if (status) cond.status = status;
 
-        const list = await Booking.find(cond).sort({ createdAt: -1 });
-        res.json({ bookings: list });
+        // prepare population for tour -> also populate nested locations.locationId
+        const tourPopulate = {
+            path: "tour_id",
+            select: "name slug cover_image_url locations",
+            populate: {
+                path: "locations.locationId",
+                select: "name slug address province city",
+            },
+        };
+        const guidePopulate = { path: "intended_guide_id", select: "name avatar_url" };
+
+        // if grouped -> return grouped buckets (cap to reasonable amount)
+        if (String(grouped).toLowerCase() === "true") {
+            const items = await Booking.find(cond)
+                .populate(tourPopulate)
+                .populate(guidePopulate)
+                .sort({ start_date: 1, createdAt: -1 })
+                .limit(1000)
+                .lean();
+
+            const now = new Date();
+            const groups = { upcoming: [], canceled: [], completed: [], others: [] };
+
+            for (const b of items) {
+                const s = (b.status || "").toString();
+
+                if (s === "completed") {
+                    groups.completed.push(b);
+                    continue;
+                }
+                if (["canceled", "rejected"].includes(s)) {
+                    groups.canceled.push(b);
+                    continue;
+                }
+
+                // Decide upcoming: has start_date in the future and not canceled/rejected/completed
+                let isUpcoming = false;
+                try {
+                    const start = toDateOrNull(b.start_date);
+                    if (start && start > now) isUpcoming = true;
+                } catch (e) {
+                    isUpcoming = false;
+                }
+
+                if (isUpcoming) {
+                    groups.upcoming.push(b);
+                } else {
+                    groups.others.push(b);
+                }
+            }
+
+            return res.json({
+                ok: true,
+                grouped: true,
+                total: items.length,
+                groups,
+            });
+        }
+
+        // Normal (paginated) listing
+        const total = await Booking.countDocuments(cond);
+        const items = await Booking.find(cond)
+            .populate(tourPopulate)
+            .populate(guidePopulate)
+            .sort({ createdAt: -1 })
+            .skip((pg - 1) * lm)
+            .limit(lm)
+            .lean();
+
+        return res.json({
+            ok: true,
+            total,
+            page: pg,
+            limit: lm,
+            bookings: items,
+        });
     } catch (e) {
-        console.error(e);
-        res.status(500).json({ message: "Lỗi lấy danh sách booking" });
+        console.error("getMyBookings error:", e);
+        res.status(500).json({ message: "Lỗi lấy danh sách booking", error: e.message });
     }
 };
 

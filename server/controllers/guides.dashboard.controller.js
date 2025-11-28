@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Tour from "../models/Tour.js";
 import Booking from "../models/Booking.js";
+import Transaction from "../models/Transaction.js";
 
 /**
  * GET /api/guides/me/dashboard
@@ -56,5 +57,74 @@ export async function guideDashboard(req, res) {
     } catch (err) {
         console.error("guideDashboard error:", err);
         return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+    }
+}
+
+export async function getGuideMonthlyEarnings(req, res) {
+    try {
+        const guideId = req.user && req.user._id;
+        if (!guideId) return res.status(401).json({ message: "Unauthorized" });
+
+        // ensure valid ObjectId
+        if (!mongoose.isValidObjectId(guideId)) {
+            return res.status(400).json({ message: "Invalid guide id" });
+        }
+        const guideObjId = new mongoose.Types.ObjectId(String(guideId));
+
+        const year = parseInt(req.query.year, 10) || new Date().getFullYear();
+        const mode = (req.query.mode || "paid").toLowerCase();
+
+        if (mode !== "paid") {
+            return res.status(400).json({ message: "mode chỉ hỗ trợ 'paid' hiện tại" });
+        }
+
+        // time window (UTC)
+        const start = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
+        const end = new Date(Date.UTC(year + 1, 0, 1, 0, 0, 0));
+
+        const match = {
+            payeeUserId: guideObjId,
+            status: { $in: ["confirmed", "completed", "paid"] },
+            $or: [
+                { processedAt: { $gte: start, $lt: end } },
+                { createdAt: { $gte: start, $lt: end } }
+            ]
+        };
+
+        const pipeline = [
+            { $match: match },
+            { $addFields: { net_amount_num: { $toDouble: { $ifNull: ["$net_amount", "$amount", 0] } } } },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: { $toDate: { $ifNull: ["$processedAt", "$createdAt"] } } },
+                        month: { $month: { $toDate: { $ifNull: ["$processedAt", "$createdAt"] } } }
+                    },
+                    total: { $sum: "$net_amount_num" },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } }
+        ];
+
+        const agg = await Transaction.aggregate(pipeline);
+
+        // Build months 1..12
+        const months = Array.from({ length: 12 }, (_, i) => {
+            const m = agg.find(a => a._id && a._id.month === i + 1);
+            return {
+                year,
+                month: i + 1,
+                total: m ? Number(m.total) : 0,
+                count: m ? m.count : 0
+            };
+        });
+
+        const totalYear = months.reduce((s, m) => s + m.total, 0);
+
+        return res.json({ year, months, totalYear });
+    } catch (err) {
+        console.error("getGuideMonthlyEarnings error:", err);
+        return res.status(500).json({ message: "Server error", error: err.message });
     }
 }

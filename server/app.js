@@ -37,7 +37,6 @@ import adminPayoutRoutes from "./routes/admin/payouts.routes.js";
 import adminDashboardRoutes from "./routes/admin/dashboard.routes.js";
 
 // Blog admin
-import adminArticleRoutes from "./routes/admin/articles.routes.js";
 import adminArticleCategoryRoutes from "./routes/admin/articleCategories.routes.js";
 
 const app = express();
@@ -83,7 +82,6 @@ app.use("/api/admin/payouts", adminPayoutRoutes);
 app.use("/api/admin/dashboard", adminDashboardRoutes);
 
 // blog admin
-app.use("/api/admin/articles", adminArticleRoutes);
 app.use("/api/admin/article-categories", adminArticleCategoryRoutes);
 
 app.get("/health", (_, res) => res.json({ ok: true }));

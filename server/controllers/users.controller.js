@@ -3,21 +3,85 @@ import bcrypt from "bcrypt";
 import { updateProfileSchema } from "../utils/validator.js";
 import { uploadBufferToCloudinary, deleteFromCloudinary } from "../services/uploader.js";
 import BlacklistedToken from "../models/BlacklistedToken.js";
+import Booking from "../models/Booking.js";
+import Review from "../models/Review.js";
 import { v2 as cloudinary } from "cloudinary";
 
 // controllers/users.controller.js
 export const getProfile = async (req, res) => {
     try {
         const user = req.user; // từ middleware auth
-        res.json({
+        if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+        const userId = user._id;
+
+        // Thực hiện đồng thời các truy vấn để hiệu năng tốt hơn
+        const now = new Date();
+
+        const [
+            totalBookings,
+            completedBookings,
+            upcomingBookings,
+            // reviewsCount via aggregation (lookup booking -> match customer_id)
+            reviewsAgg,
+            pendingReviewsAgg
+        ] = await Promise.all([
+            Booking.countDocuments({ customer_id: userId }),
+            Booking.countDocuments({ customer_id: userId, status: "completed" }),
+            Booking.countDocuments({
+                customer_id: userId,
+                start_date: { $gt: now },
+                status: { $nin: ["canceled", "rejected", "completed"] },
+            }),
+            // reviewsCount: join reviews -> bookings -> filter customer_id
+            Review.aggregate([
+                {
+                    $lookup: {
+                        from: "bookings",
+                        localField: "bookingId",
+                        foreignField: "_id",
+                        as: "booking",
+                    },
+                },
+                { $unwind: "$booking" },
+                { $match: { "booking.customer_id": userId } },
+                { $count: "count" },
+            ]),
+            // pendingReviewsCount: bookings completed but no review
+            Booking.aggregate([
+                { $match: { customer_id: userId, status: "completed" } },
+                {
+                    $lookup: {
+                        from: "reviews",
+                        localField: "_id",
+                        foreignField: "bookingId",
+                        as: "review",
+                    },
+                },
+                { $match: { "review.0": { $exists: false } } },
+                { $count: "count" },
+            ]),
+        ]);
+
+        const reviewsCount = (reviewsAgg && reviewsAgg[0] && reviewsAgg[0].count) ? reviewsAgg[0].count : 0;
+        const pendingReviewsCount = (pendingReviewsAgg && pendingReviewsAgg[0] && pendingReviewsAgg[0].count) ? pendingReviewsAgg[0].count : 0;
+
+        return res.json({
             id: user._id,
             name: user.name,
             email: user.email,
-            phone_number: user.phone_number,
+            phone: user.phone_number,
             avatar_url: user.avatar_url,
             role: user.role_id?.name,
             status: user.status,
             createdAt: user.createdAt,
+            stats: {
+                totalBookings: Number(totalBookings || 0),
+                completedBookings: Number(completedBookings || 0),
+                upcomingBookings: Number(upcomingBookings || 0),
+                reviewsCount: Number(reviewsCount || 0),
+                pendingReviewsCount: Number(pendingReviewsCount || 0)
+            }
         });
     } catch (err) {
         console.error(err);
