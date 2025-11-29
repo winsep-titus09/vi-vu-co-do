@@ -1,7 +1,7 @@
 // src/pages/Tours/Detail/index.jsx
 
 import React, { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { DayPicker } from "react-day-picker";
@@ -25,7 +25,9 @@ import {
 import IconArrowRight from "../../../icons/IconArrowRight";
 import { IconChevronDown } from "../../../icons/IconChevronDown";
 
-// --- CONSTANTS & MOCK DATA ---
+// ============================================================================
+// CONSTANTS & MOCK DATA
+// ============================================================================
 const BASE_PRICE = 42;
 const CHILD_PRICE = 21;
 
@@ -37,7 +39,7 @@ const guideOptions = [
   { value: "male", label: "HDV Nam" },
 ];
 
-// [New] Mock Data cho Amenities
+// Mock data: Tour amenities
 const tourAmenities = [
   {
     icon: <IconCheck className="w-5 h-5 text-primary" />,
@@ -66,14 +68,16 @@ const tourAmenities = [
 ];
 
 export default function TourDetailPage() {
-  // --- FORM STATE ---
+  const navigate = useNavigate();
+
+  // Form state
   const [selectedDate, setSelectedDate] = useState();
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [selectedGuide, setSelectedGuide] = useState(guideOptions[0]);
   const [note, setNote] = useState("");
 
-  // --- UI STATE ---
+  // UI state
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
@@ -122,8 +126,7 @@ export default function TourDetailPage() {
       guidePreference: selectedGuide.value,
       note: note.trim(),
     };
-    console.log("📦 Booking Data:", bookingData);
-    alert(`Đã nhận yêu cầu đặt tour!\nTổng tiền: $${totalPrice}`);
+    navigate("/booking/review", { state: bookingData });
   };
 
   return (

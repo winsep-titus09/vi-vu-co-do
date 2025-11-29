@@ -9,41 +9,7 @@ import {
 } from "../../../icons/IconBox";
 import { IconUser } from "../../../icons/IconUser";
 import { IconX } from "../../../icons/IconX";
-
-// Inline Icons cho phần này
-const IconWallet = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-    <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
-  </svg>
-);
-
-const IconChart = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <line x1="12" x2="12" y1="20" y2="10" />
-    <line x1="18" x2="18" y1="20" y2="4" />
-    <line x1="6" x2="6" y1="20" y2="16" />
-  </svg>
-);
+import { IconWallet, IconChart } from "../../../icons/IconCommon";
 
 // --- MOCK DATA ---
 const guideInfo = {
@@ -220,16 +186,12 @@ export default function GuideDashboard() {
                   <div className="flex flex-col sm:flex-row gap-5 justify-between items-start sm:items-center">
                     {/* Info Block */}
                     <div className="flex gap-4 flex-1 min-w-0 w-full">
-                      {" "}
-                      {/* [FIX] w-full để flex hoạt động đúng trên mobile */}
                       <img
                         src={req.tourist.avatar}
                         className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border border-border-light shrink-0"
                         alt="Avatar"
                       />
                       <div className="min-w-0 flex-1">
-                        {" "}
-                        {/* [FIX] min-w-0 để text con truncate được */}
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <h3 className="font-bold text-text-primary text-lg truncate max-w-full">
                             {req.tourist.name}
@@ -238,7 +200,6 @@ export default function GuideDashboard() {
                             {req.time}
                           </span>
                         </div>
-                        {/* [FIX] break-words và whitespace-normal để tên tour dài tự xuống dòng */}
                         <p className="text-sm text-text-primary font-medium mb-2 break-words whitespace-normal">
                           Đặt tour:{" "}
                           <span className="text-primary font-bold">

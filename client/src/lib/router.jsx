@@ -3,14 +3,18 @@
 import React, { Suspense, lazy } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
-// --- Layouts ---
+// ============================================================================
+// LAYOUTS
+// ============================================================================
 import MainLayout from "../layouts/MainLayout"; // Layout cho khách vãng lai (Public)
 // Layout riêng cho từng đối tượng (Lazy load)
 const TouristLayout = lazy(() => import("../layouts/TouristLayout"));
 const GuideLayout = lazy(() => import("../layouts/GuideLayout"));
 const AdminLayout = lazy(() => import("../layouts/AdminLayout"));
 
-// --- Pages: Public (Khách vãng lai) ---
+// ============================================================================
+// PAGES: PUBLIC
+// ============================================================================
 import HomePage from "../pages/Home/index"; // Load trang chủ ngay lập tức (Eager load)
 
 // Lazy load các trang con để tối ưu hiệu suất
@@ -23,17 +27,24 @@ const GuideProfilePage = lazy(() => import("../pages/Guides/Profile/index"));
 const BlogPage = lazy(() => import("../pages/Blog/index"));
 const PostDetailPage = lazy(() => import("../pages/Blog/PostDetail"));
 
-// --- Pages: Auth ---
-const SignInPage = lazy(() => import("../pages/Auth/SignIn"));
-const SignUpPage = lazy(() => import("../pages/Auth/SignUp"));
-// const SignOutPage = lazy(() => import("../pages/Auth/SignOut"));
+// ============================================================================
+// PAGES: AUTH
+// ============================================================================
+const AuthPage = lazy(() => import("../pages/Auth/AuthPage"));
+const SignOutPage = lazy(() => import("../pages/Auth/SignOut"));
 
-// --- Pages: Booking ---
+// ============================================================================
+// PAGES: BOOKING
+// ============================================================================
+const BookingStepReview = lazy(() => import("../pages/Booking/StepReview"));
 const BookingStepPayment = lazy(() => import("../pages/Booking/StepPayment"));
+const BookingStepReceipt = lazy(() => import("../pages/Booking/StepReceipt"));
 
-// --- Pages: Dashboard (3 Roles) ---
+// ============================================================================
+// PAGES: DASHBOARD (3 ROLES)
+// ============================================================================
 
-// 1. Tourist Dashboard Pages
+// Tourist Dashboard Pages
 const TouristDashboard = lazy(() => import("../pages/Dashboard/Tourist/index"));
 const TouristHistory = lazy(() => import("../pages/Dashboard/Tourist/History"));
 const TouristProfile = lazy(() => import("../pages/Dashboard/Tourist/Profile"));
@@ -45,6 +56,9 @@ const TouristNotifications = lazy(() =>
 );
 const TouristTransactionHistory = lazy(() =>
   import("../pages/Dashboard/Tourist/TransactionHistory")
+);
+const TouristInvoices = lazy(() =>
+  import("../pages/Dashboard/Tourist/Invoices")
 );
 
 // 2. Guide Dashboard Pages
@@ -84,12 +98,26 @@ const AdminModels3D = lazy(() => import("../pages/Dashboard/Admin/Models3D"));
 const AdminNotifications = lazy(() =>
   import("../pages/Dashboard/Admin/Notifications")
 );
+const AdminUsers = lazy(() => import("../pages/Dashboard/Admin/Users"));
+const AdminTours = lazy(() => import("../pages/Dashboard/Admin/Tours"));
+const AdminPlaces = lazy(() => import("../pages/Dashboard/Admin/Places"));
+const AdminFinance = lazy(() => import("../pages/Dashboard/Admin/Finance"));
+const AdminSettings = lazy(() => import("../pages/Dashboard/Admin/Settings"));
+const AdminPosts = lazy(() => import("../pages/Dashboard/Admin/Posts"));
+const AdminCreatePost = lazy(() =>
+  import("../pages/Dashboard/Admin/CreatePost")
+);
+const AdminReviews = lazy(() => import("../pages/Dashboard/Admin/Reviews"));
 
-// --- Pages: Error ---
+// ============================================================================
+// PAGES: ERROR
+// ============================================================================
 const NotFoundPage = lazy(() => import("../pages/Error/NotFound"));
 const ServerErrorPage = lazy(() => import("../pages/Error/ServerError"));
 
-// --- Fallback Component (Loading Spinner) ---
+// ============================================================================
+// FALLBACK COMPONENT
+// ============================================================================
 import Spinner from "../components/Loaders/Spinner";
 const PageFallback = () => (
   <div className="flex min-h-screen items-center justify-center bg-bg-main">
@@ -97,7 +125,9 @@ const PageFallback = () => (
   </div>
 );
 
-// --- Router Configuration ---
+// ============================================================================
+// ROUTER CONFIGURATION
+// ============================================================================
 const router = createBrowserRouter([
   // 1. PUBLIC ROUTES (Sử dụng MainLayout - Có Navbar & Footer chuẩn)
   {
@@ -184,7 +214,7 @@ const router = createBrowserRouter([
         path: "auth/signin",
         element: (
           <Suspense fallback={<PageFallback />}>
-            <SignInPage />
+            <AuthPage />
           </Suspense>
         ),
       },
@@ -192,17 +222,41 @@ const router = createBrowserRouter([
         path: "auth/signup",
         element: (
           <Suspense fallback={<PageFallback />}>
-            <SignUpPage />
+            <AuthPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "auth/signout",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <SignOutPage />
           </Suspense>
         ),
       },
 
       // Booking
       {
+        path: "booking/review",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <BookingStepReview />
+          </Suspense>
+        ),
+      },
+      {
         path: "booking/payment",
         element: (
           <Suspense fallback={<PageFallback />}>
             <BookingStepPayment />
+          </Suspense>
+        ),
+      },
+      {
+        path: "booking/receipt/:bookingId",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <BookingStepReceipt />
           </Suspense>
         ),
       },
@@ -274,6 +328,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <TouristTransactionHistory />
+          </Suspense>
+        ),
+      },
+      {
+        path: "invoices",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <TouristInvoices />
           </Suspense>
         ),
       },
@@ -449,7 +511,70 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
-      // Các route quản lý users, tours...
+      {
+        path: "users",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminUsers />
+          </Suspense>
+        ),
+      },
+      {
+        path: "tours",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminTours />
+          </Suspense>
+        ),
+      },
+      {
+        path: "places",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminPlaces />
+          </Suspense>
+        ),
+      },
+      {
+        path: "finance",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminFinance />
+          </Suspense>
+        ),
+      },
+      {
+        path: "settings",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminSettings />
+          </Suspense>
+        ),
+      },
+      {
+        path: "posts",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminPosts />
+          </Suspense>
+        ),
+      },
+      {
+        path: "create-post",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminCreatePost />
+          </Suspense>
+        ),
+      },
+      {
+        path: "reviews",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminReviews />
+          </Suspense>
+        ),
+      },
     ],
   },
 ]);

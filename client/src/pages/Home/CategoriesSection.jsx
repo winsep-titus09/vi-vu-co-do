@@ -8,7 +8,10 @@ import IconMusic from "../../icons/IconMusic.jsx";
 import IconCraft from "../../icons/IconCraft.jsx";
 import IconLotus from "../../icons/IconLotus.jsx";
 
-// Dữ liệu Categories
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Tour categories
 const categories = [
   {
     id: "01",

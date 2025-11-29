@@ -14,7 +14,10 @@ import IconInfo from "../../icons/IconInfo";
 import { IconX } from "../../icons/IconX";
 import { IconSun } from "../../icons/IconSun";
 
-// --- MOCK DATA: CHI TIẾT ĐỊA ĐIỂM ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Place details
 const placeDetail = {
   id: 1,
   name: "Đại Nội Huế (Hoàng Thành)",
@@ -64,7 +67,7 @@ const reviews = [
   },
 ];
 
-// --- [UPDATED] MOCK DATA: 3 ĐIỂM LỘ TRÌNH ---
+// Mock data: Visiting route (3 key points)
 const visitingRoute = [
   {
     time: "15 phút",
@@ -92,7 +95,7 @@ const visitingRoute = [
   },
 ];
 
-// --- MOCK DATA: TOUR LIÊN QUAN ---
+// Mock data: Related tours
 const relatedTours = [
   {
     id: 1,
@@ -196,7 +199,7 @@ export default function PlaceDetail() {
               </article>
             </div>
 
-            {/* [UPDATED] VISITING ROUTE (3 ITEMS) */}
+            {/* Visiting route with 3 key points */}
             <div className="bg-white p-6 md:p-8 rounded-3xl border border-border-light shadow-sm">
               <h3 className="text-2xl font-heading font-bold text-text-primary mb-8 flex items-center gap-3">
                 <span className="flex items-center justify-center w-10 h-10 rounded-full bg-secondary text-white">

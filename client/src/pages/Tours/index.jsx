@@ -84,7 +84,7 @@ const toursData = [
   },
 ];
 
-// Các tùy chọn sắp xếp
+// Sort options
 const sortOptions = [
   "Phổ biến nhất",
   "Giá thấp đến cao",

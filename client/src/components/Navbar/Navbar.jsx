@@ -1,29 +1,28 @@
 // src/components/Navbar/Navbar.jsx
 
 import React, { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
-
-// Imports các icon
+import { NavLink, useLocation, Link } from "react-router-dom";
 import { IconSearch } from "../../icons/IconSearch";
 import { IconUser } from "../../icons/IconUser";
 import { IconMenu } from "../../icons/IconMenu";
 import { IconX } from "../../icons/IconX";
 import { IconChevronDown } from "../../icons/IconChevronDown";
-
-// Import components
+import { IconSettings, IconHistory, IconLogout } from "../../icons/IconCommon";
 import Drawer from "../Modals/Drawer";
-// (Đã xóa import ButtonSvgMask vì không còn dùng nút Đặt chuyến đi)
 
-/**
- * Thanh điều hướng chính.
- * Style: Heritage Trails.
- * Updates: Tăng padding, Thêm menu Tours, Font to hơn, User Icon, Bỏ CTA.
- */
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openMobileSubmenu, setOpenMobileSubmenu] = useState(null);
 
-  // Hooks để kiểm tra link active
+  // Mock logged-in state
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const user = {
+    name: "Hoàng Nam",
+    avatar:
+      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg",
+    role: "tourist", // 'tourist' | 'guide' | 'admin'
+  };
+
   const location = useLocation();
   const isBlogActive = location.pathname.startsWith("/blog");
   const isPlacesActive = location.pathname.startsWith("/places");
@@ -37,17 +36,21 @@ export default function Navbar() {
     setOpenMobileSubmenu(openMobileSubmenu === menuName ? null : menuName);
   };
 
-  // --- CẬP NHẬT STYLE: Soft Pill (Nền nhẹ + Chữ đậm) ---
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    alert("Đã đăng xuất!");
+  };
 
-  // 1. Class chung cho Link thường
+  // ============================================================================
+  // STYLES
+  // ============================================================================
   const navLinkClasses = ({ isActive }) =>
     `text-base px-3 py-2 rounded-btn transition-all duration-200 ${
       isActive
-        ? "bg-primary/10 text-primary font-semibold shadow-sm" // Active: Nền tím nhạt, chữ đậm
-        : "text-text-primary hover:bg-gray-100 hover:text-primary font-medium" // Inactive: Hover xám nhẹ
+        ? "bg-primary/10 text-primary font-semibold shadow-sm"
+        : "text-text-primary hover:bg-gray-100 hover:text-primary font-medium"
     }`;
 
-  // 2. Class chung cho Dropdown Button
   const dropdownBtnClasses = (isActive) =>
     `text-base px-3 py-2 rounded-btn flex items-center gap-1 transition-all duration-200 ${
       isActive
@@ -57,8 +60,6 @@ export default function Navbar() {
 
   return (
     <>
-      {/* === HEADER === */}
-      {/* CẬP NHẬT: Tăng padding py-3 -> py-5 (hoặc py-4 = 16px) */}
       <header className="border-b border-border-light bg-bg-main/95 backdrop-blur-sm sticky top-0 z-40 transition-all">
         <div className="container-main flex items-center justify-between gap-4 py-5">
           {/* 1. Logo Area */}
@@ -75,8 +76,6 @@ export default function Navbar() {
             <NavLink to="/" className={navLinkClasses}>
               Trang chủ
             </NavLink>
-
-            {/* CẬP NHẬT: Thêm menu "Chuyến tham quan" */}
             <NavLink to="/tours" className={navLinkClasses}>
               Chuyến tham quan
             </NavLink>
@@ -87,8 +86,7 @@ export default function Navbar() {
                 type="button"
                 className={dropdownBtnClasses(isBlogActive)}
               >
-                Cẩm nang
-                <IconChevronDown className="h-4 w-4 opacity-70" />
+                Cẩm nang <IconChevronDown className="h-4 w-4 opacity-70" />
               </button>
               <div className="absolute top-full left-0 w-48 pt-4 opacity-0 pointer-events-none scale-95 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:scale-100 transition-all duration-200 ease-out">
                 <div className="bg-white rounded-card shadow-card border border-border-light py-2 overflow-hidden">
@@ -114,8 +112,7 @@ export default function Navbar() {
                 type="button"
                 className={dropdownBtnClasses(isPlacesActive)}
               >
-                Địa điểm
-                <IconChevronDown className="h-4 w-4 opacity-70" />
+                Địa điểm <IconChevronDown className="h-4 w-4 opacity-70" />
               </button>
               <div className="absolute top-full left-0 w-48 pt-4 opacity-0 pointer-events-none scale-95 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:scale-100 transition-all duration-200 ease-out">
                 <div className="bg-white rounded-card shadow-card border border-border-light py-2 overflow-hidden">
@@ -161,16 +158,101 @@ export default function Navbar() {
             >
               <IconSearch className="h-6 w-6" />
             </button>
-            <div className="h-5 w-px bg-border-light"></div> {/* Divider */}
-            {/* CẬP NHẬT: Chuyển "Đăng nhập" thành Icon User */}
-            <NavLink
-              to="/auth/signin"
-              className="btn-icon btn-ghost text-text-primary hover:bg-primary-light hover:text-primary transition-colors"
-              aria-label="Đăng nhập"
-            >
-              <IconUser className="h-6 w-6" />
-            </NavLink>
-            {/* CẬP NHẬT: Đã xóa nút "Đặt Chuyến đi" */}
+            <div className="h-5 w-px bg-border-light"></div>
+
+            {/* LOGGED IN USER MENU */}
+            {isLoggedIn ? (
+              <div className="relative group z-50">
+                <button className="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border border-transparent hover:bg-gray-100 transition-all group-hover:border-border-light">
+                  <span className="text-sm font-bold text-text-primary">
+                    {user.name}
+                  </span>
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-border-light">
+                    <img
+                      src={user.avatar}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </button>
+
+                {/* User Dropdown Content */}
+                <div className="absolute top-full right-0 w-56 pt-3 opacity-0 pointer-events-none scale-95 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:scale-100 transition-all duration-200 ease-out">
+                  <div className="bg-white rounded-xl shadow-xl border border-border-light py-2 overflow-hidden">
+                    <div className="px-4 py-2 border-b border-border-light mb-1">
+                      <p className="text-xs text-text-secondary">Xin chào,</p>
+                      <p className="font-bold text-text-primary truncate">
+                        {user.name}
+                      </p>
+                    </div>
+
+                    {/* Conditional Dashboard Link */}
+                    {user.role === "tourist" && (
+                      <Link
+                        to="/dashboard/tourist"
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-primary hover:bg-primary-light hover:text-primary font-medium"
+                      >
+                        <div className="w-4 h-4">
+                          <IconSettings className="w-full h-full" />
+                        </div>{" "}
+                        Dashboard
+                      </Link>
+                    )}
+                    {user.role === "guide" && (
+                      <Link
+                        to="/dashboard/guide"
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-primary hover:bg-primary-light hover:text-primary font-medium"
+                      >
+                        <div className="w-4 h-4">
+                          <IconSettings className="w-full h-full" />
+                        </div>{" "}
+                        Kênh HDV
+                      </Link>
+                    )}
+
+                    <Link
+                      to="/dashboard/tourist/profile"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-primary hover:bg-primary-light hover:text-primary font-medium"
+                    >
+                      <div className="w-4 h-4">
+                        <IconSettings className="w-full h-full" />
+                      </div>{" "}
+                      Hồ sơ của tôi
+                    </Link>
+                    <Link
+                      to="/dashboard/tourist/history"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-text-primary hover:bg-primary-light hover:text-primary font-medium"
+                    >
+                      <div className="w-4 h-4">
+                        <IconHistory className="w-full h-full" />
+                      </div>{" "}
+                      Lịch sử đặt chỗ
+                    </Link>
+
+                    <div className="my-1 border-t border-border-light"></div>
+
+                    <button
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 font-bold"
+                    >
+                      <div className="w-4 h-4">
+                        <IconLogout className="w-full h-full" />
+                      </div>{" "}
+                      Đăng xuất
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Guest: Show Login Icon
+              <NavLink
+                to="/auth/signin"
+                className="btn-icon btn-ghost text-text-primary hover:bg-primary-light hover:text-primary transition-colors"
+                aria-label="Đăng nhập"
+              >
+                <IconUser className="h-6 w-6" />
+              </NavLink>
+            )}
           </div>
 
           {/* 4. Mobile Menu Toggle */}
@@ -189,7 +271,28 @@ export default function Navbar() {
       <Drawer isOpen={isMobileMenuOpen} onClose={toggleMenu}>
         <div className="flex flex-col h-full bg-bg-main">
           {/* Header Drawer */}
-          <div className="flex items-center justify-center p-5 border-b border-border-light">
+          <div className="flex items-center justify-between p-5 border-b border-border-light">
+            {isLoggedIn ? (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-border-light">
+                  <img
+                    src={user.avatar}
+                    alt="Avatar"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-text-primary">
+                    {user.name}
+                  </p>
+                  <p className="text-xs text-text-secondary">Thành viên</p>
+                </div>
+              </div>
+            ) : (
+              <span className="font-heading font-bold text-lg text-primary">
+                Menu
+              </span>
+            )}
             <button
               type="button"
               className="btn-icon btn-ghost text-text-primary"
@@ -215,8 +318,6 @@ export default function Navbar() {
             >
               Trang chủ
             </NavLink>
-
-            {/* CẬP NHẬT: Thêm Link Mobile "Chuyến tham quan" */}
             <NavLink
               to="/tours"
               onClick={toggleMenu}
@@ -231,7 +332,7 @@ export default function Navbar() {
               Chuyến tham quan
             </NavLink>
 
-            {/* Accordion Cẩm nang */}
+            {/* Mobile Accordions - Blog */}
             <div>
               <button
                 type="button"
@@ -240,7 +341,7 @@ export default function Navbar() {
                   isBlogActive ? "text-primary" : "text-text-primary"
                 }`}
               >
-                Cẩm nang
+                Cẩm nang{" "}
                 <IconChevronDown
                   className={`h-4 w-4 transition-transform ${
                     openMobileSubmenu === "blog" ? "rotate-180" : ""
@@ -267,7 +368,7 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Accordion Địa điểm */}
+            {/* Mobile Accordions - Places */}
             <div>
               <button
                 type="button"
@@ -276,7 +377,7 @@ export default function Navbar() {
                   isPlacesActive ? "text-primary" : "text-text-primary"
                 }`}
               >
-                Địa điểm
+                Địa điểm{" "}
                 <IconChevronDown
                   className={`h-4 w-4 transition-transform ${
                     openMobileSubmenu === "places" ? "rotate-180" : ""
@@ -333,13 +434,35 @@ export default function Navbar() {
 
             <div className="my-2 border-t border-border-light" />
 
-            <NavLink
-              to="/auth/signin"
-              onClick={toggleMenu}
-              className="block p-3 text-base font-medium text-text-primary"
-            >
-              Đăng nhập
-            </NavLink>
+            {/* Mobile Auth Links */}
+            {isLoggedIn ? (
+              <>
+                <Link
+                  to="/dashboard/tourist"
+                  onClick={toggleMenu}
+                  className="flex items-center gap-3 p-3 text-base font-medium text-text-primary hover:bg-gray-50 rounded-lg"
+                >
+                  <IconSettings className="w-5 h-5" /> Quản lý tài khoản
+                </Link>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    toggleMenu();
+                  }}
+                  className="flex w-full items-center gap-3 p-3 text-base font-bold text-red-500 hover:bg-red-50 rounded-lg text-left"
+                >
+                  <IconLogout className="w-5 h-5" /> Đăng xuất
+                </button>
+              </>
+            ) : (
+              <NavLink
+                to="/auth/signin"
+                onClick={toggleMenu}
+                className="block p-3 text-base font-medium text-text-primary bg-primary/5 rounded-lg text-center mt-2"
+              >
+                Đăng nhập / Đăng ký
+              </NavLink>
+            )}
           </nav>
         </div>
       </Drawer>
