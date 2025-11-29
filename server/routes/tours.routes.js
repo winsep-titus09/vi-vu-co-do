@@ -1,6 +1,6 @@
+// Thêm endpoint calendar cho tour
 import express from "express";
-import mongoose from "mongoose";
-import { auth, authorize } from "../middleware/auth.js";
+import { auth } from "../middleware/auth.js";
 import {
     listTours,
     getTour,
@@ -9,30 +9,27 @@ import {
     deleteTour,
     listAvailableGuides,
     listFeaturedTours,
-    listTopRatedTours
+    listTopRatedTours,
 } from "../controllers/tours.controller.js";
-import { checkTourDate, checkMultipleTourDates } from "../controllers/tourAvailability.controller.js";
+import { getTourCalendar } from "../controllers/guideDates.controller.js";
 
 const router = express.Router();
 
-// PUBLIC routes
+// Public
 router.get("/", listTours);
-router.get("/available-guides", auth, authorize("admin", "guide", "tourist"), listAvailableGuides);
-
-// IMPORTANT: register specific list routes BEFORE the catch-all "/:token"
 router.get("/featured", listFeaturedTours);
 router.get("/top-rated", listTopRatedTours);
+router.get("/available-guides", auth, listAvailableGuides);
 
-// CHECK DATE endpoints (đặt TRƯỚC catch-all ":token")
-router.get("/:id/check-date", checkTourDate);
-router.post("/:id/check-dates", checkMultipleTourDates);
+// Tour calendar (lấy dữ liệu ngày có booking, ngày guide bận)
+router.get("/:tourId/calendar", getTourCalendar);
 
-// id hoặc slug (catch-all)
+// Single tour
 router.get("/:token", getTour);
 
-// create/update/delete (protected)
-router.post("/", auth, authorize("admin", "guide"), createTour);
-router.patch("/:id", auth, authorize("admin", "guide"), updateTour);
-router.delete("/:id", auth, authorize("admin"), deleteTour);
+// Admin/Guide
+router.post("/", auth, createTour);
+router.patch("/:id", auth, updateTour);
+router.delete("/:id", auth, deleteTour);
 
 export default router;

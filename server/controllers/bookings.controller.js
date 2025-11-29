@@ -13,6 +13,7 @@ import {
     toDateOrNull,
     addHours,
     getDurationHoursFromTour,
+    isGuideMarkedBusy
 } from "../helpers/bookings.helper.js";
 
 const ObjectId = mongoose.Types.ObjectId;
@@ -74,7 +75,7 @@ export const createBooking = async (req, res) => {
 
         if (start_date && !start) {
             return res.status(400).json({
-                message: "start_date không hợp lệ. Dùng 'YYYY-MM-DD' hoặc ISO 8601.",
+                message: "start_date không hợp lệ.  Dùng 'YYYY-MM-DD' hoặc ISO 8601.",
                 received: start_date,
             });
         }
@@ -96,6 +97,37 @@ export const createBooking = async (req, res) => {
 
         const tour = await Tour.findById(tour_id).lean();
         if (!tour) return res.status(404).json({ message: "Tour không tồn tại" });
+
+        // ========== KIỂM TRA NGÀY BLACKOUT CỦA TOUR ==========
+        if (start && Array.isArray(tour.blackout_dates) && tour.blackout_dates.length > 0) {
+            const startNormalized = new Date(start);
+            startNormalized.setHours(0, 0, 0, 0);
+
+            const isBlackout = tour.blackout_dates.some(bd => {
+                const blackoutDate = new Date(bd);
+                blackoutDate.setHours(0, 0, 0, 0);
+                return blackoutDate.getTime() === startNormalized.getTime();
+            });
+
+            if (isBlackout) {
+                return res.status(409).json({
+                    message: "Tour không khả dụng vào ngày này (ngày blackout).",
+                    code: "BLACKOUT_DATE",
+                });
+            }
+        }
+
+        // ========== KIỂM TRA NGÀY ĐÓNG CỬA THEO THỨ ==========
+        if (start && Array.isArray(tour.closed_weekdays) && tour.closed_weekdays.length > 0) {
+            const dayOfWeek = start.getDay(); // 0 = Sunday, 6 = Saturday
+            if (tour.closed_weekdays.includes(dayOfWeek)) {
+                const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+                return res.status(409).json({
+                    message: `Tour không hoạt động vào ${dayNames[dayOfWeek]}. `,
+                    code: "CLOSED_WEEKDAY",
+                });
+            }
+        }
 
         // Build participants array (support simplified adults/children)
         let participantsInput = null;
@@ -160,7 +192,8 @@ export const createBooking = async (req, res) => {
 
         if (requested > remaining) {
             return res.status(409).json({
-                message: `Không đủ chỗ. Còn ${remaining} slot, nhưng yêu cầu ${requested}.`,
+                message: `Không đủ chỗ.  Còn ${remaining} slot, nhưng yêu cầu ${requested}. `,
+                code: "INSUFFICIENT_SLOTS",
                 meta: { remaining, requested },
             });
         }
@@ -182,14 +215,55 @@ export const createBooking = async (req, res) => {
         let guide_approval_due_at = null;
         let payment_due_at = null;
 
-        if (intendedGuide) {
-            const busy = await isGuideBusy(intendedGuide, start, computedEnd, null, tour._id);
-            if (busy) {
+        // ========== KIỂM TRA GUIDE AVAILABILITY ==========
+        if (intendedGuide && start) {
+            // 1. Kiểm tra guide có đánh dấu bận ngày này không (GuideBusyDate)
+            const markedBusy = await isGuideMarkedBusy(intendedGuide, start);
+            if (markedBusy) {
+                // Thử tìm guide khác khả dụng trong tour
+                const alternativeGuide = await findAlternativeGuide(tour, start, computedEnd);
+
+                if (alternativeGuide) {
+                    return res.status(409).json({
+                        message: "HDV chính đã đánh dấu bận vào ngày này.  Vui lòng chọn ngày khác hoặc HDV khác.",
+                        code: "GUIDE_MARKED_BUSY",
+                        suggestion: {
+                            alternativeGuideId: alternativeGuide._id,
+                            alternativeGuideName: alternativeGuide.name,
+                        },
+                    });
+                }
+
                 return res.status(409).json({
-                    message: "HDV đã bận thời gian này với tour khác. Vui lòng chọn thời gian khác hoặc HDV khác.",
+                    message: "HDV đã đánh dấu bận vào ngày này. Vui lòng chọn ngày khác.",
+                    code: "GUIDE_MARKED_BUSY",
                 });
             }
 
+            // 2.  Kiểm tra guide có booking trùng với tour khác không
+            const busy = await isGuideBusy(intendedGuide, start, computedEnd, null, tour._id);
+            if (busy) {
+                // Thử tìm guide khác khả dụng trong tour
+                const alternativeGuide = await findAlternativeGuide(tour, start, computedEnd);
+
+                if (alternativeGuide) {
+                    return res.status(409).json({
+                        message: "HDV đã bận thời gian này với tour khác.  Vui lòng chọn thời gian khác hoặc HDV khác.",
+                        code: "GUIDE_HAS_BOOKING",
+                        suggestion: {
+                            alternativeGuideId: alternativeGuide._id,
+                            alternativeGuideName: alternativeGuide.name,
+                        },
+                    });
+                }
+
+                return res.status(409).json({
+                    message: "HDV đã bận thời gian này với tour khác.  Vui lòng chọn thời gian khác hoặc HDV khác.",
+                    code: "GUIDE_HAS_BOOKING",
+                });
+            }
+
+            // 3.  Kiểm tra guide đã lock ngày này cho tour này chưa (auto-approve)
             const locked = await hasGuideLockedThisTourDate(intendedGuide, tour._id, start, computedEnd);
             if (locked) {
                 status = "awaiting_payment";
@@ -199,6 +273,18 @@ export const createBooking = async (req, res) => {
                     decided_by: intendedGuide,
                 };
                 payment_due_at = new Date(Date.now() + paymentMins * 60 * 1000);
+            }
+        }
+
+        // ========== KIỂM TRA TẤT CẢ GUIDE CỦA TOUR ĐỀU BẬN ==========
+        if (!intendedGuide && start) {
+            // Nếu không chỉ định guide, kiểm tra xem có guide nào khả dụng không
+            const availableGuide = await findAlternativeGuide(tour, start, computedEnd);
+            if (!availableGuide) {
+                return res.status(409).json({
+                    message: "Tất cả HDV của tour đều bận vào ngày này. Vui lòng chọn ngày khác.",
+                    code: "ALL_GUIDES_BUSY",
+                });
             }
         }
 
@@ -231,12 +317,12 @@ export const createBooking = async (req, res) => {
             await notifyUser({
                 userId,
                 type: "booking:approved",
-                content: `Yêu cầu đặt tour ${tourName} đã được hệ thống xác nhận. Vui lòng thanh toán.`,
+                content: `Yêu cầu đặt tour ${tourName} đã được hệ thống xác nhận.  Vui lòng thanh toán. `,
                 url: `/booking/${booking._id}`,
                 meta: {
                     bookingId: booking._id,
                     bookingCode,
-                    tourId: booking._id ? booking._id : booking.tour_id,
+                    tourId: booking.tour_id,
                     tourName,
                     dueDate: payment_due_at ? new Date(payment_due_at).toISOString() : undefined,
                     bookingUrl,
@@ -247,12 +333,12 @@ export const createBooking = async (req, res) => {
                 await notifyUser({
                     userId: intendedGuide,
                     type: "booking:request",
-                    content: `Có yêu cầu đặt tour ${tourName} cần bạn xác nhận.`,
+                    content: `Có yêu cầu đặt tour ${tourName} cần bạn xác nhận. `,
                     url: `/guide/bookings/${booking._id}`,
                     meta: {
                         bookingId: booking._id,
                         bookingCode,
-                        tourId: booking._id ? booking._id : booking.tour_id,
+                        tourId: booking.tour_id,
                         tourName,
                         guideBookingUrl,
                     },
@@ -261,12 +347,12 @@ export const createBooking = async (req, res) => {
             await notifyUser({
                 userId,
                 type: "booking:created",
-                content: `Đã gửi yêu cầu đặt tour ${tourName}. Vui lòng chờ HDV duyệt.`,
+                content: `Đã gửi yêu cầu đặt tour ${tourName}. Vui lòng chờ HDV duyệt. `,
                 url: `/booking/${booking._id}`,
                 meta: {
                     bookingId: booking._id,
                     bookingCode,
-                    tourId: booking._id ? booking._id : booking.tour_id,
+                    tourId: booking.tour_id,
                     tourName,
                     bookingUrl,
                 },
@@ -275,9 +361,52 @@ export const createBooking = async (req, res) => {
 
         res.status(201).json({ booking });
     } catch (e) {
-        console.error(e);
+        console.error("createBooking error:", e);
         res.status(500).json({ message: "Lỗi tạo booking", error: e.message });
     }
+};
+
+/**
+ * Helper: Tìm guide khả dụng thay thế trong danh sách guides của tour
+ * @param {Object} tour - Tour document
+ * @param {Date} startDate - Ngày bắt đầu
+ * @param {Date} endDate - Ngày kết thúc
+ * @returns {Promise<Object|null>} - User object hoặc null
+ */
+async function findAlternativeGuide(tour, startDate, endDate) {
+    if (!tour || !startDate) return null;
+
+    // Lấy tất cả guide IDs của tour
+    const guideIds = [];
+    if (tour.guide_id) guideIds.push(String(tour.guide_id));
+    if (Array.isArray(tour.guides)) {
+        tour.guides.forEach((g) => {
+            if (g.guideId) guideIds.push(String(g.guideId));
+        });
+    }
+
+    // Loại bỏ duplicate
+    const uniqueGuideIds = [...new Set(guideIds)];
+
+    if (uniqueGuideIds.length === 0) return null;
+
+    for (const gId of uniqueGuideIds) {
+        // Kiểm tra đánh dấu bận
+        const markedBusy = await isGuideMarkedBusy(gId, startDate);
+        if (markedBusy) continue;
+
+        // Kiểm tra booking trùng
+        const busy = await isGuideBusy(gId, startDate, endDate, null, tour._id);
+        if (busy) continue;
+
+        // Guide này khả dụng, lấy thông tin
+        const guideUser = await User.findById(gId).select("name avatar_url").lean();
+        if (guideUser) {
+            return guideUser;
+        }
+    }
+
+    return null;
 };
 
 /**

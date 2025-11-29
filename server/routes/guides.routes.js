@@ -7,6 +7,14 @@ import { applyGuide, getMyGuideApplication } from "../controllers/guideApplicati
 import { getMyGuideProfile, updateMyGuideProfile, uploadGuideVideo, getPublicGuideProfile, listFeaturedGuides, listTopRatedGuides } from "../controllers/guideProfile.controller.js";
 import { getGuideBookings } from "../controllers/bookings.controller.js";
 import { guideDashboard, getGuideMonthlyEarnings } from "../controllers/guides.dashboard.controller.js";
+import {
+    getMyBusyDates,
+    addBusyDates,
+    removeBusyDates,
+    getGuideBusyDates,
+    getAvailableGuides,
+    getGuideCalendar,
+} from "../controllers/guideDates.controller.js";
 
 const router = express.Router();
 
@@ -18,6 +26,23 @@ router.put("/profile/me", auth, authorize("guide"), uploadGuideVideo, updateMyGu
 
 // Guide-specific endpoints
 router.get("/bookings", auth, authorize("guide"), getGuideBookings);
+
+// ========== BUSY DATES ==========
+// HDV quản lý ngày bận của mình
+router.get("/busy-dates", auth, authorize("guide"), getMyBusyDates);
+router.post("/busy-dates", auth, authorize("guide"), addBusyDates);
+router.delete("/busy-dates", auth, authorize("guide"), removeBusyDates);
+
+// Lấy calendar của HDV
+router.get("/calendar", auth, authorize("guide"), getGuideCalendar);
+
+// Lấy danh sách HDV khả dụng (public hoặc auth)
+router.get("/available", getAvailableGuides);
+
+// Lấy ngày bận của 1 HDV cụ thể (public)
+router.get("/:guideId/busy-dates", getGuideBusyDates);
+
+// ========== END BUSY DATES ==========
 
 router.get("/featured", listFeaturedGuides);
 router.get("/top-rated", listTopRatedGuides);
