@@ -11,7 +11,10 @@ import { IconSearch } from "../../../icons/IconSearch";
 import ReviewModal from "../../../components/Modals/ReviewModal";
 import TicketModal from "../../../components/Modals/TicketModal";
 
-// --- MOCK DATA: BOOKING HISTORY ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Booking history
 const bookings = [
   {
     id: "BK-2025-001",
@@ -22,9 +25,9 @@ const bookings = [
     time: "08:00 AM",
     duration: "4 giờ",
     guide: "Minh Hương",
-    price: "1.800.000đ", // 2 người
+    price: "1.800.000đ",
     guests: 2,
-    status: "confirmed", // confirmed, completed, cancelled, pending
+    status: "confirmed",
   },
   {
     id: "BK-2025-002",
@@ -38,7 +41,7 @@ const bookings = [
     price: "500.000đ",
     guests: 1,
     status: "completed",
-    isRated: false, // Chưa đánh giá
+    isRated: false,
   },
   {
     id: "BK-2024-099",
@@ -52,7 +55,7 @@ const bookings = [
     price: "1.200.000đ",
     guests: 2,
     status: "completed",
-    isRated: true, // Đã đánh giá
+    isRated: true,
   },
   {
     id: "BK-2024-080",
@@ -69,7 +72,9 @@ const bookings = [
   },
 ];
 
-// --- CONFIG: TABS TRẠNG THÁI ---
+// ============================================================================
+// TAB CONFIGURATION
+// ============================================================================
 const tabs = [
   { id: "all", label: "Tất cả" },
   { id: "confirmed", label: "Sắp tới" },

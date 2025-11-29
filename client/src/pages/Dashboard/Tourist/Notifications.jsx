@@ -2,97 +2,18 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { IconCheck, IconClock } from "../../../icons/IconBox";
 import { IconUser } from "../../../icons/IconUser";
+import {
+  IconBell,
+  IconWallet,
+  IconInfo,
+  IconTrash,
+  IconTicket,
+} from "../../../icons/IconCommon";
 
-// Inline IconBell
-const IconBell = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-  </svg>
-);
-
-// Inline IconWallet
-const IconWallet = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
-    <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
-  </svg>
-);
-
-// Inline IconInfo
-const IconInfo = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 16v-4" />
-    <path d="M12 8h.01" />
-  </svg>
-);
-
-// Inline IconTrash
-const IconTrash = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M3 6h18" />
-    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-  </svg>
-);
-
-// Inline Icon Ticket (Nếu chưa có trong IconBox)
-const IconTicket = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
-    <path d="M13 5v2" />
-    <path d="M13 17v2" />
-    <path d="M13 11v2" />
-  </svg>
-);
-
-// --- MOCK DATA: THÔNG BÁO CỦA DU KHÁCH ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Tourist notifications
 const notificationsData = [
   {
     id: 1,
@@ -200,7 +121,6 @@ export default function TouristNotifications() {
   };
 
   return (
-    // [FIX] Thêm 'w-full' và 'min-h-screen' (hoặc min-h-[800px]) để giữ khung layout không bị co lại khi ít nội dung
     <div className="space-y-8 w-full">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

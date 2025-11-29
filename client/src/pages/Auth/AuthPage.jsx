@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 
-// --- INLINE ICONS ---
+// ============================================================================
+// INLINE ICONS
+// ============================================================================
 const IconMail = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -174,7 +176,7 @@ export default function AuthPage() {
   const [role, setRole] = useState("tourist");
   const [isLoading, setIsLoading] = useState(false);
 
-  // [NEW] Logic Quên mật khẩu
+  // Forgot password logic
   const [viewState, setViewState] = useState("login"); // 'login' | 'forgot' | 'sent'
 
   // Reset view state khi chuyển tab Đăng ký/Đăng nhập

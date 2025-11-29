@@ -3,152 +3,21 @@ import { IconCheck } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
 import { IconUser } from "../../../icons/IconUser";
+import {
+  IconLock,
+  IconUnlock,
+  IconEye,
+  IconShield,
+  IconVideo,
+  IconFileText,
+  IconInbox,
+  IconChevronLeft,
+  IconChevronRight,
+} from "../../../icons/IconCommon";
 
-// --- INLINE ICONS ---
-const IconLock = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />{" "}
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />{" "}
-  </svg>
-);
-const IconUnlock = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />{" "}
-    <path d="M7 11V7a5 5 0 0 1 9.9-1" />{" "}
-  </svg>
-);
-const IconEye = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />{" "}
-    <circle cx="12" cy="12" r="3" />{" "}
-  </svg>
-);
-const IconShieldCheck = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />{" "}
-    <path d="m9 12 2 2 4-4" />{" "}
-  </svg>
-);
-const IconVideo = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="m22 8-6 4 6 4V8Z" />{" "}
-    <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />{" "}
-  </svg>
-);
-const IconFileText = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />{" "}
-    <polyline points="14 2 14 8 20 8" /> <line x1="16" x2="8" y1="13" y2="13" />{" "}
-    <line x1="16" x2="8" y1="17" y2="17" />{" "}
-    <line x1="10" x2="8" y1="9" y2="9" />{" "}
-  </svg>
-);
-const IconInbox = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />{" "}
-    <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />{" "}
-  </svg>
-);
-const IconChevronLeft = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
-const IconChevronRight = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <polyline points="9 18 15 12 9 6" />
-  </svg>
-);
-
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const usersData = [
   {
     id: 1,
@@ -216,7 +85,7 @@ const pendingGuides = [
 export default function AdminUsers() {
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
-  const [lightboxImg, setLightboxImg] = useState(null); // [NEW] Lightbox State
+  const [lightboxImg, setLightboxImg] = useState(null); // Lightbox state
 
   // Logic Lọc User
   const filteredUsers = usersData.filter((user) => {
@@ -310,8 +179,8 @@ export default function AdminUsers() {
       {/* --- VIEW 1: USER LIST TABLE --- */}
       {activeTab !== "pending" && (
         <div className="bg-white rounded-3xl border border-border-light overflow-hidden shadow-sm animate-fade-in">
-          {/* [NEW] 1. Empty State Check */}
-          {filteredUsers.length > 0 ? (
+          {/* Empty state check */}
+          {filteredUsers.length === 0 ? (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -405,7 +274,7 @@ export default function AdminUsers() {
                 </table>
               </div>
 
-              {/* [NEW] 2. Pagination UI */}
+              {/* Pagination */}
               <div className="p-4 border-t border-border-light flex justify-between items-center text-xs text-text-secondary bg-white">
                 <span>
                   Hiển thị <strong>1-10</strong> trên tổng số{" "}
@@ -505,7 +374,7 @@ export default function AdminUsers() {
                       <p className="text-xs font-bold text-text-secondary uppercase flex items-center gap-1">
                         <IconFileText className="w-3 h-3" /> Ảnh thẻ HDV / CCCD
                       </p>
-                      {/* [NEW] 3. Lightbox Trigger */}
+                      {/* Lightbox trigger */}
                       <div
                         className="h-32 rounded-xl overflow-hidden border border-border-light bg-gray-100 relative group cursor-zoom-in"
                         onClick={() => setLightboxImg(guide.certImage)}

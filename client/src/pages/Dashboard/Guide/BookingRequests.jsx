@@ -56,7 +56,9 @@ const IconFilter = ({ className }) => (
   </svg>
 );
 
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const allRequests = [
   {
     id: "BK-901",
@@ -328,8 +330,6 @@ export default function BookingRequests() {
                     <p className="text-xl font-bold text-primary mb-4">
                       {req.totalPrice}
                     </p>
-
-                    {/* [UPDATED] Đã xóa nút "Xem chi tiết" */}
 
                     {req.status === "pending" && (
                       <div className="flex flex-col gap-2">

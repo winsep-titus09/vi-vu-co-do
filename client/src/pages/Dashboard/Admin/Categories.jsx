@@ -3,7 +3,9 @@ import { IconCheck } from "../../../icons/IconBox";
 import { IconX } from "../../../icons/IconX";
 import { IconSearch } from "../../../icons/IconSearch";
 
-// --- INLINE ICONS ---
+// ============================================================================
+// INLINE ICONS
+// ============================================================================
 const IconEdit = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -96,7 +98,7 @@ export default function AdminCategories() {
   const [newCat, setNewCat] = useState("");
   const [search, setSearch] = useState("");
 
-  // [NEW] Edit States
+  // Edit states
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState("");
 
@@ -176,7 +178,7 @@ export default function AdminCategories() {
           </p>
         </div>
 
-        {/* [NEW] Search Bar */}
+        {/* Search bar */}
         <div className="relative w-full md:w-64">
           <input
             type="text"
@@ -226,7 +228,7 @@ export default function AdminCategories() {
                   </div>
 
                   {editingId === cat.id ? (
-                    // [NEW] Edit Mode
+                    // Edit mode
                     <div className="flex-1 flex gap-2">
                       <input
                         type="text"
@@ -297,7 +299,7 @@ export default function AdminCategories() {
               </div>
             ))
           ) : (
-            // [NEW] Empty State
+            // Empty state
             <div className="p-12 text-center text-text-secondary">
               <IconFolder className="w-12 h-12 mx-auto mb-3 text-gray-300" />
               <p className="font-bold">Không tìm thấy danh mục</p>

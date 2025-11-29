@@ -16,7 +16,9 @@ import IconBookOpen from "../../../icons/IconBookOpen";
 import IconCraft from "../../../icons/IconCraft";
 import IconLotus from "../../../icons/IconLotus";
 
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const guideDetail = {
   id: 1,
   name: "Minh Hương",

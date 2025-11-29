@@ -15,88 +15,13 @@ import {
 import { IconCheck, IconMapPin, IconCalendar } from "../../../icons/IconBox";
 import { IconUser } from "../../../icons/IconUser";
 import { IconX } from "../../../icons/IconX";
-
-// --- INLINE ICONS ---
-const IconWallet = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-    <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
-  </svg>
-);
-
-const IconArrowUpRight = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M7 17L17 7" />
-    <path d="M7 7h10v10" />
-  </svg>
-);
-
-const IconEye = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-
-const IconFlag = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-    <line x1="4" x2="4" y1="22" y2="15" />
-  </svg>
-);
-
-const IconShieldCheck = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-    <path d="m9 12 2 2 4-4" />
-  </svg>
-);
+import {
+  IconWallet,
+  IconArrowUpRight,
+  IconEye,
+  IconFlag,
+  IconShield,
+} from "../../../icons/IconCommon";
 
 const IconSettings = ({ className }) => (
   <svg
@@ -148,7 +73,9 @@ const IconAlert = ({ className }) => (
   </svg>
 );
 
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const stats = {
   totalUsers: 1240,
   newUsers: 45,
@@ -172,10 +99,10 @@ const revenueData = [
 
 const userDistribution = [
   { name: "Du khách", value: 1150, color: "#5b3d7c" },
-  { name: "Hướng dẫn viên", value: 90, color: "#d4af37" },
+  { name: "Ước dẫn viên", value: 90, color: "#d4af37" },
 ];
 
-// [NEW] Dữ liệu Booking mới nhất
+// Mock data: Recent bookings
 const recentBookings = [
   {
     id: "#BK-902",
@@ -211,7 +138,7 @@ const recentBookings = [
   },
 ];
 
-// [NEW] Dữ liệu Hành động nhanh
+// Mock data: Pending tasks
 const pendingTasks = [
   { id: 1, title: "Duyệt hồ sơ HDV: Phạm Lan", type: "user", urgency: "high" },
   {
@@ -502,7 +429,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* 3. [NEW] ACTIONABLE SECTION (2 Columns) */}
+      {/* Actionable section: Latest bookings and tasks */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left: Latest Bookings Table (2/3) */}
         <div className="lg:col-span-2 bg-white rounded-3xl border border-border-light shadow-sm overflow-hidden flex flex-col">

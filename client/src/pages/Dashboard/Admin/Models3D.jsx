@@ -3,7 +3,9 @@ import { Icon3D, IconMapPin, IconCheck } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
 
-// --- INLINE ICONS ---
+// ============================================================================
+// INLINE ICONS
+// ============================================================================
 const IconPlus = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -67,22 +69,7 @@ const IconUploadCloud = ({ className }) => (
     <path d="M12 12v9" /> <path d="m16 16-4-4-4 4" />{" "}
   </svg>
 );
-const IconChevronDown = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <polyline points="6 9 12 15 18 9" />{" "}
-  </svg>
-);
-const IconInbox = ({ className }) => (
+const IconUpload = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
@@ -99,7 +86,9 @@ const IconInbox = ({ className }) => (
   </svg>
 );
 
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const initialModels = [
   {
     id: 1,
@@ -146,10 +135,10 @@ export default function AdminModels3D() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [viewingModel, setViewingModel] = useState(null);
 
-  // [NEW] Search State
+  // Search state
   const [search, setSearch] = useState("");
 
-  // [NEW] Upload Form States
+  // Upload form states
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadPlace, setUploadPlace] = useState("Chọn địa điểm");
@@ -284,7 +273,7 @@ export default function AdminModels3D() {
             <h3 className="text-xl font-bold mb-6">Upload Mô hình 3D</h3>
 
             <div className="space-y-5">
-              {/* [NEW] Functional File Input */}
+              {/* File input */}
               <input
                 type="file"
                 ref={fileInputRef}
@@ -336,7 +325,7 @@ export default function AdminModels3D() {
                 />
               </div>
 
-              {/* [NEW] Custom Place Dropdown */}
+              {/* Custom place dropdown */}
               <div className="space-y-2 relative">
                 <label className="text-xs font-bold text-text-secondary uppercase">
                   Gắn thẻ địa điểm

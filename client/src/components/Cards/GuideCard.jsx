@@ -14,14 +14,14 @@ export default function GuideCard({ guide }) {
       to={`/guides/${guide.id}`}
       className="group relative block h-full overflow-hidden rounded-2xl cursor-pointer"
     >
-      {/* 1. Ảnh Chân Dung (Tỷ lệ 3:4) */}
+      {/* Image: Portrait (3:4 ratio) */}
       <div className="relative aspect-[3/4] w-full">
         <img
           src={guide.image}
           alt={guide.name}
           className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
-        {/* Gradient mờ ở đáy để làm nổi bật text */}
+        {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-80"></div>
 
         {/* Badge: Ngôn ngữ (Góc trên phải) */}
@@ -37,33 +37,31 @@ export default function GuideCard({ guide }) {
         </div>
       </div>
 
-      {/* 2. Thông tin nổi (Floating Card) */}
-      {/* CẬP NHẬT: Vị trí absolute bottom-4 */}
+      {/* Floating info card */}
       <div className="absolute bottom-4 left-4 right-4 z-20">
         <div className="bg-white/95 backdrop-blur-md rounded-xl p-4 shadow-lg border border-white/50 transition-all duration-300 group-hover:-translate-y-1">
-          {/* Header: Tên + Verify */}
+          {/* Header: Name + Verification badge */}
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-lg font-heading font-bold text-text-primary flex items-center gap-1">
-              {guide.name}
-              <IconVerify className="w-4 h-4 text-blue-500" />
+            <h3 className="text-lg font-heading font-bold text-text-primary flex items-center gap-1 min-w-0 pr-2">
+              <span className="truncate">{guide.name}</span>
+              <IconVerify className="w-4 h-4 text-blue-500 shrink-0" />
             </h3>
-            <div className="flex items-center gap-1 text-xs font-bold text-[#BC4C00]">
+
+            <div className="flex items-center gap-1 text-xs font-bold text-[#BC4C00] shrink-0">
               <IconStarSolid className="w-3.5 h-3.5 fill-[#BC4C00]" />
               {guide.rating}
             </div>
           </div>
 
-          {/* Chuyên môn (Luôn hiển thị) */}
-          <p className="text-xs font-medium text-primary uppercase tracking-wide">
+          {/* Specialty (always visible) */}
+          <p className="text-xs font-medium text-primary uppercase tracking-wide truncate">
             {guide.specialty}
           </p>
 
-          {/* === CẬP NHẬT: Bio Section (Chỉ hiện khi Hover) === */}
-          {/* Sử dụng kỹ thuật grid-rows để animate height từ 0 -> auto */}
+          {/* Bio section (visible on hover) */}
           <div className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] transition-[grid-template-rows] duration-500 ease-out">
             <div className="overflow-hidden">
               <div className="pt-3 mt-2 border-t border-border-light opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
-                {/* Bio hiển thị đầy đủ (không dùng line-clamp) */}
                 <p className="text-xs text-text-secondary leading-relaxed">
                   {guide.bio}
                 </p>

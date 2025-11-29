@@ -4,7 +4,10 @@ import React from "react";
 import ButtonSvgMask from "../../components/Forms/ButtonSvgMask";
 import { IconMapPin } from "../../icons/IconBox.jsx";
 
-// Dữ liệu thống kê (Mock data phù hợp với Vi Vu Cố Đô)
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Statistics
 const stats = [
   {
     id: 1,

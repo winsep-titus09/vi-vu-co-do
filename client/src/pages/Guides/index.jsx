@@ -6,7 +6,10 @@ import { IconChevronDown } from "../../icons/IconChevronDown";
 import IconChevronLeft from "../../icons/IconChevronLeft";
 import IconChevronRight from "../../icons/IconChevronRight";
 
-// --- MOCK DATA (16 GUIDES) ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Tour guides (16 total)
 const originalGuides = [
   {
     id: 1,
@@ -157,7 +160,7 @@ export default function GuidesPage() {
 
   return (
     <div className="min-h-screen bg-bg-main pb-20 pt-6 relative overflow-hidden">
-      {/* [NEW] Background Map Pattern cho vùng Header */}
+      {/* Background map pattern for header area */}
       <div className="absolute top-0 right-0 w-full md:w-2/3 h-[600px] z-0 pointer-events-none">
         <img
           src="/images/placeholders/map-bg.png"
@@ -211,7 +214,7 @@ export default function GuidesPage() {
                   />
                 </div>
 
-                {/* [UPDATED] Dropdown Menu: Đã thêm lại max-h và overflow */}
+                {/* Dropdown menu */}
                 {isFilterOpen && (
                   <div className="absolute top-full right-0 w-full mt-2 bg-white rounded-2xl shadow-xl border border-border-light py-2 z-50 animate-fade-in-up max-h-60 overflow-y-auto">
                     {filters.map((f) => (

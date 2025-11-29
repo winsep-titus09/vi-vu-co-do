@@ -3,85 +3,17 @@ import { Link } from "react-router-dom";
 import { IconCheck, IconClock, IconMapPin } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
+import {
+  IconFilter,
+  IconEye,
+  IconChevronLeft,
+  IconChevronRight,
+  IconInbox,
+} from "../../../icons/IconCommon";
 
-// --- INLINE ICONS ---
-const IconFilter = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />{" "}
-  </svg>
-);
-const IconEye = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />{" "}
-    <circle cx="12" cy="12" r="3" />{" "}
-  </svg>
-);
-const IconChevronLeft = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
-const IconChevronRight = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <polyline points="9 18 15 12 9 6" />
-  </svg>
-);
-const IconInbox = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />{" "}
-    <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />{" "}
-  </svg>
-);
-
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const allTours = [
   {
     id: 1,
@@ -273,7 +205,7 @@ export default function AdminTours() {
                             >
                               {tour.name}
                             </p>
-                            {/* [NEW] Thêm Location */}
+                            {/* Location display */}
                             <p className="text-xs text-text-secondary flex items-center gap-1 mt-0.5">
                               <IconMapPin className="w-3 h-3" /> {tour.location}
                             </p>
@@ -333,7 +265,7 @@ export default function AdminTours() {
               </table>
             </div>
 
-            {/* [NEW] Pagination */}
+            {/* Pagination */}
             <div className="p-4 border-t border-border-light flex justify-between items-center text-xs text-text-secondary">
               <span>
                 Hiển thị <strong>1-{filteredTours.length}</strong> trên tổng số{" "}

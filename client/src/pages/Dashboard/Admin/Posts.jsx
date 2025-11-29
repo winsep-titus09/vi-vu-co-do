@@ -3,104 +3,18 @@ import { Link } from "react-router-dom";
 import { IconCheck, IconClock, IconMapPin } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
+import {
+  IconFilter,
+  IconEdit,
+  IconTrash,
+  IconEye,
+  IconPlus,
+  IconInbox,
+} from "../../../icons/IconCommon";
 
-// --- INLINE ICONS ---
-const IconFilter = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />{" "}
-  </svg>
-);
-const IconEdit = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />{" "}
-    <path d="m15 5 4 4" />{" "}
-  </svg>
-);
-const IconTrash = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M3 6h18" /> <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />{" "}
-    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />{" "}
-  </svg>
-);
-const IconEye = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />{" "}
-    <circle cx="12" cy="12" r="3" />{" "}
-  </svg>
-);
-const IconPlus = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M5 12h14" /> <path d="M12 5v14" />{" "}
-  </svg>
-);
-const IconInbox = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />{" "}
-    <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />{" "}
-  </svg>
-);
-
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const posts = [
   {
     id: 1,
@@ -142,7 +56,7 @@ const posts = [
 
 export default function AdminPosts() {
   const [filter, setFilter] = useState("all");
-  const [search, setSearch] = useState(""); // [NEW] Search State
+  const [search, setSearch] = useState(""); // Search state
 
   const filteredPosts = posts.filter((p) => {
     const matchSearch =
@@ -236,7 +150,7 @@ export default function AdminPosts() {
           ))}
         </div>
 
-        {/* [NEW] Search Bar */}
+        {/* Search bar */}
         <div className="relative w-full md:w-72">
           <input
             type="text"
@@ -346,7 +260,7 @@ export default function AdminPosts() {
             </table>
           </div>
         ) : (
-          // [NEW] Empty State
+          // Empty state
           <div className="flex flex-col items-center justify-center py-20 text-text-secondary">
             <div className="w-16 h-16 bg-bg-main rounded-full flex items-center justify-center mb-4 text-gray-400">
               <IconInbox className="w-8 h-8" />
