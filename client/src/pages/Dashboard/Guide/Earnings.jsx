@@ -10,75 +10,16 @@ import {
   Cell,
 } from "recharts";
 import { IconCheck, IconClock } from "../../../icons/IconBox";
+import {
+  IconArrowUpRight,
+  IconBank,
+  IconDownload,
+  IconFilter,
+} from "../../../icons/IconCommon";
 
-// Inline Icons
-const IconArrowUpRight = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <line x1="7" y1="17" x2="17" y2="7" />
-    <polyline points="7 7 17 7 17 17" />
-  </svg>
-);
-
-const IconBank = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M3 21h18" />
-    <path d="M5 21v-7" />
-    <path d="M19 21v-7" />
-    <path d="M10 9 3 21" />
-    <path d="M14 9l7 12" />
-    <rect x="3" y="4" width="18" height="5" rx="1" />
-  </svg>
-);
-const IconDownload = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="7 10 12 15 17 10" />
-    <line x1="12" y1="15" x2="12" y2="3" />
-  </svg>
-);
-const IconFilter = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-  </svg>
-);
-
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const transactions = [
   {
     id: "TRX-001",
@@ -118,7 +59,7 @@ const transactions = [
   },
 ];
 
-// [UPDATED] Dữ liệu chuẩn cho Recharts (Đơn vị: Triệu đồng)
+// Mock data: Chart data for Recharts (unit: million VND)
 const chartData = [
   { name: "Th12", value: 4.5 },
   { name: "Th1", value: 6.0 },
@@ -228,7 +169,7 @@ export default function GuideEarnings() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* 2. [UPDATED] REVENUE CHART (RECHARTS) */}
+        {/* Revenue chart */}
         <div className="lg:col-span-2 bg-white p-6 md:p-8 rounded-3xl border border-border-light shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-text-primary">

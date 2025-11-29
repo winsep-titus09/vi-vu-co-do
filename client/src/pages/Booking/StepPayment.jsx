@@ -1,9 +1,13 @@
+// src/pages/Booking/StepPayment.jsx
+
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { IconCheck } from "../../icons/IconBox";
 import IconChevronLeft from "../../icons/IconChevronLeft";
 
-// --- INLINE ICONS ---
+// ============================================================================
+// INLINE ICONS
+// ============================================================================
 const IconLock = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -66,7 +70,9 @@ const IconTicket = ({ className }) => (
   </svg>
 );
 
-// --- PAYMENT LOGOS ---
+// ============================================================================
+// PAYMENT LOGOS
+// ============================================================================
 const LogoMomo = ({ className }) => (
   <svg viewBox="0 0 48 48" className={className} fill="none">
     <rect width="48" height="48" rx="8" fill="#A50064" />
@@ -84,7 +90,10 @@ const LogoVNPay = ({ className }) => (
   </svg>
 );
 
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Booking summary
 const bookingSummary = {
   tourName: "Bí mật Hoàng cung Huế & Trải nghiệm trà chiều",
   image:
@@ -112,7 +121,6 @@ const paymentMethods = [
     id: "card",
     name: "Thẻ Quốc tế",
     desc: "Visa, MasterCard, JCB",
-    // [IMPROVEMENT] Icon thẻ chuyên nghiệp hơn
     icon: ({ className }) => (
       <div
         className={`bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200 ${className}`}
@@ -130,8 +138,8 @@ export default function BookingStepPayment() {
   const navigate = useNavigate();
   const [selectedMethod, setSelectedMethod] = useState("momo");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [promoCode, setPromoCode] = useState(""); // [NEW] Promo Code State
-  const [agreedToTerms, setAgreedToTerms] = useState(false); // [NEW] Terms State
+  const [promoCode, setPromoCode] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const handlePayment = () => {
     if (!agreedToTerms) return;
@@ -146,7 +154,7 @@ export default function BookingStepPayment() {
   return (
     <div className="min-h-screen bg-bg-main py-8 md:py-12">
       <div className="container-main max-w-6xl">
-        {/* [NEW] 1. PROGRESS STEPPER */}
+        {/* Progress stepper */}
         <div className="flex justify-center mb-8 md:mb-12">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-text-secondary opacity-60">
@@ -190,7 +198,7 @@ export default function BookingStepPayment() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-          {/* --- LEFT COLUMN --- */}
+          {/* Left column: Payment methods */}
           <div className="lg:col-span-7 space-y-6">
             {/* Payment Method Selection */}
             <div className="bg-white p-6 rounded-3xl border border-border-light shadow-sm">
@@ -265,7 +273,7 @@ export default function BookingStepPayment() {
               </div>
             </div>
 
-            {/* [NEW] 4. Cancellation Policy (Trust Signal) */}
+            {/* Cancellation policy */}
             <div className="bg-green-50 p-4 rounded-2xl border border-green-100 flex gap-3">
               <IconShield className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
               <div>
@@ -280,7 +288,7 @@ export default function BookingStepPayment() {
             </div>
           </div>
 
-          {/* --- RIGHT COLUMN --- */}
+          {/* Right column: Order summary */}
           <div className="lg:col-span-5">
             <div className="bg-white p-6 rounded-3xl border border-border-light shadow-lg sticky top-24">
               <h3 className="text-lg font-bold text-text-primary mb-4">
@@ -307,7 +315,7 @@ export default function BookingStepPayment() {
                 </div>
               </div>
 
-              {/* [NEW] 2. Promo Code Input */}
+              {/* Promo code input */}
               <div className="mb-6 pb-6 border-b border-border-light">
                 <label className="text-xs font-bold text-text-secondary mb-2 block uppercase">
                   Mã ưu đãi
@@ -358,7 +366,7 @@ export default function BookingStepPayment() {
                 </div>
               </div>
 
-              {/* [NEW] 3. Terms Checkbox */}
+              {/* Terms & conditions checkbox */}
               <div className="mb-4">
                 <label className="flex items-start gap-3 cursor-pointer group">
                   <div className="relative flex items-center">
@@ -388,7 +396,7 @@ export default function BookingStepPayment() {
               {/* Action Button */}
               <button
                 onClick={handlePayment}
-                disabled={isProcessing || !agreedToTerms} // Disable logic
+                disabled={isProcessing || !agreedToTerms}
                 className={`
                     w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all
                     ${

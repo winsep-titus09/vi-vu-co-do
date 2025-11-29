@@ -4,7 +4,9 @@ import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
 import DestinationForm from "../../../components/Forms/DestinationForm";
 
-// --- INLINE ICONS ---
+// ============================================================================
+// INLINE ICONS
+// ============================================================================
 const IconPlus = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -69,7 +71,9 @@ const IconInbox = ({ className }) => (
   </svg>
 );
 
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const initialPlaces = [
   {
     id: 1,
@@ -105,9 +109,9 @@ const CATEGORIES = ["Tất cả", "Di sản", "Thiên nhiên", "Tâm linh", "Ẩ
 export default function AdminPlaces() {
   const [places, setPlaces] = useState(initialPlaces);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingPlace, setEditingPlace] = useState(null);
+  const [viewingPlace, setViewingPlace] = useState(null);
 
-  // [NEW] Search & Filter State
+  // Search and filter state
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("Tất cả");
 
@@ -184,7 +188,7 @@ export default function AdminPlaces() {
         </button>
       </div>
 
-      {/* [NEW] Filter Toolbar */}
+      {/* Filter toolbar */}
       <div className="bg-white p-4 rounded-2xl border border-border-light flex flex-col md:flex-row gap-4 shadow-sm">
         {/* Category Filter */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
@@ -276,7 +280,7 @@ export default function AdminPlaces() {
           ))}
         </div>
       ) : (
-        // [NEW] Empty State
+        // Empty state
         <div className="flex flex-col items-center justify-center py-20 text-text-secondary">
           <div className="w-20 h-20 bg-bg-main rounded-full flex items-center justify-center mb-4 text-gray-400">
             <IconInbox className="w-10 h-10" />

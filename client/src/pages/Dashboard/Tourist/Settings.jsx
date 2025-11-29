@@ -1,55 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { IconChevronDown } from "../../../icons/IconChevronDown";
-
-// Icons Inline
-const IconBell = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-  </svg>
-);
-// [NEW] Icon Display thay cho IconGlobe
-const IconDisplay = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <rect width="20" height="14" x="2" y="3" rx="2" />
-    <line x1="8" x2="16" y1="21" y2="21" />
-    <line x1="12" x2="12" y1="17" y2="21" />
-  </svg>
-);
-const IconTrash = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M3 6h18" />
-    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-  </svg>
-);
+import { IconBell, IconDisplay, IconTrash } from "../../../icons/IconCommon";
 
 // Options cho 3D Quality
 const QUALITY_OPTIONS = [
@@ -194,7 +145,7 @@ export default function SettingsPage() {
 
         {/* 2. Preferences & Danger Zone */}
         <div className="space-y-8">
-          {/* [UPDATED] DISPLAY & 3D SETTINGS */}
+          {/* Display & 3D settings */}
           <div className="bg-white p-6 rounded-3xl border border-border-light shadow-sm overflow-visible">
             <h3 className="text-lg font-bold text-text-primary flex items-center gap-2 mb-6">
               <IconDisplay className="w-5 h-5 text-primary" /> Trải nghiệm &

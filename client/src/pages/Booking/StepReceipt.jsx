@@ -2,7 +2,9 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { IconCalendar, IconMapPin } from "../../icons/IconBox";
 
-// --- INLINE ICONS ---
+// ============================================================================
+// INLINE ICONS
+// ============================================================================
 const IconCheckCircle = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -50,7 +52,9 @@ const IconHome = ({ className }) => (
   </svg>
 );
 
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const successData = {
   id: "BK-2025-001",
   tourName: "Bí mật Hoàng cung Huế & Trải nghiệm trà chiều",

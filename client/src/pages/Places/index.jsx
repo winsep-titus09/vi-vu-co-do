@@ -68,7 +68,7 @@ const highlightPlaces = [
   },
 ];
 
-// [NEW] MOCK DATA: Features Section
+// Mock data: Features section
 const features = [
   {
     icon: <IconMapPin className="w-12 h-12 mb-6 stroke-[1.5]" />,

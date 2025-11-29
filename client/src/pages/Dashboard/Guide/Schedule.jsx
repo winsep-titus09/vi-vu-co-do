@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom"; // [NEW] Import Link
+import { Link } from "react-router-dom";
 import {
   IconCalendar,
   IconClock,
@@ -20,7 +20,10 @@ import {
 } from "date-fns";
 import { vi } from "date-fns/locale";
 
-// --- MOCK DATA: LỊCH TRÌNH (Cập nhật thêm loại 'blocked') ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Schedule (includes 'blocked' type)
 const scheduleData = [
   {
     id: 1,
@@ -58,7 +61,7 @@ const scheduleData = [
     status: "confirmed",
     tourist: "Lê Bình",
   },
-  // [NEW] Lịch bận cá nhân
+  // Personal blocked schedule
   {
     id: 4,
     date: new Date(2025, 4, 25),
@@ -189,7 +192,7 @@ export default function GuideSchedule() {
                 >
                   <span className="text-sm">{format(day, "d")}</span>
 
-                  {/* [UPDATED] Dot Indicator Logic */}
+                  {/* Dot indicator */}
                   {status === "has-tour" && (
                     <span
                       className={`w-1.5 h-1.5 rounded-full mt-1 ${
@@ -209,7 +212,7 @@ export default function GuideSchedule() {
             })}
           </div>
 
-          {/* [NEW] Legend */}
+          {/* Legend */}
           <div className="flex gap-4 mt-6 pt-4 border-t border-border-light justify-center text-xs text-text-secondary">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500"></span> Có
@@ -237,8 +240,7 @@ export default function GuideSchedule() {
             <div className="space-y-4">
               {eventsOnDate.map((item) =>
                 item.type === "tour" ? (
-                  // --- TOUR CARD ---
-                  // Link to Detail để xem chi tiết booking
+                  // Tour card with booking link
                   <Link
                     to={`/dashboard/guide/requests/${item.bookingId}`}
                     key={item.id}
@@ -277,7 +279,7 @@ export default function GuideSchedule() {
                     <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
                   </Link>
                 ) : (
-                  // --- BLOCKED CARD ---
+                  // Blocked date card
                   <div
                     key={item.id}
                     className="bg-red-50 p-5 rounded-2xl border border-red-100 flex gap-4 relative overflow-hidden opacity-80"

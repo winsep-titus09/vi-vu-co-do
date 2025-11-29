@@ -18,7 +18,10 @@ import BlogCard from "../../components/Cards/BlogCard";
 
 // Import thêm các icon mạng xã hội nếu có (hoặc dùng tạm text)
 
-// --- MOCK DATA CHI TIẾT BÀI VIẾT ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Blog post details
 const postData = {
   id: 1,
   title:

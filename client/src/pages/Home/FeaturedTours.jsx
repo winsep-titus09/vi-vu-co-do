@@ -6,7 +6,10 @@ import TourCard from "../../components/Cards/TourCard";
 import ButtonSvgMask from "../../components/Forms/ButtonSvgMask";
 import IconArrowRight from "../../icons/IconArrowRight.jsx";
 
-// --- Dữ liệu Mock (Giữ nguyên) ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Featured tours
 const allTours = [
   {
     id: 1,

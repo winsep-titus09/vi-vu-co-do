@@ -23,12 +23,12 @@ const themes = [
 ];
 
 export default function FilterBar() {
-  // --- State cho Dropdown CHỦ ĐỀ ---
+  // Theme dropdown state
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState("");
   const themeRef = useRef(null);
 
-  // --- State cho Dropdown NGÀY (Mới) ---
+  // Date dropdown state
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(undefined);
   const dateRef = useRef(null);

@@ -5,7 +5,10 @@ import { Link } from "react-router-dom";
 import BlogCard from "../../components/Cards/BlogCard";
 import { IconMapPin } from "../../icons/IconBox.jsx"; // Dùng icon Map Pin làm điểm nhấn header
 
-// Mock Data: Bài viết (Cập nhật nội dung du lịch)
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+// Mock data: Featured blog posts
 const posts = [
   {
     id: 1,

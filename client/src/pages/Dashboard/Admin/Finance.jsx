@@ -2,122 +2,19 @@ import React, { useState } from "react";
 import { IconCheck, IconClock } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
+import { IconChevronDown } from "../../../icons/IconChevronDown";
+import {
+  IconFilter,
+  IconWallet,
+  IconArrowRight,
+  IconDownload,
+  IconRefresh,
+  IconTrendingUp,
+} from "../../../icons/IconCommon";
 
-// --- INLINE ICONS ---
-const IconFilter = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />{" "}
-  </svg>
-);
-const IconWallet = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />{" "}
-    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />{" "}
-    <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />{" "}
-  </svg>
-);
-const IconArrowRight = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M5 12h14" /> <path d="m12 5 7 7-7 7" />{" "}
-  </svg>
-);
-const IconDownload = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />{" "}
-    <polyline points="7 10 12 15 17 10" />{" "}
-    <line x1="12" x2="12" y1="15" y2="3" />{" "}
-  </svg>
-);
-const IconRefresh = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-    <path d="M21 3v5h-5" />
-    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-    <path d="M8 16H3v5" />
-  </svg>
-);
-const IconTrendingUp = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-    <polyline points="17 6 23 6 23 12" />
-  </svg>
-);
-// [NEW] Icon Chevron Down
-const IconChevronDown = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <polyline points="6 9 12 15 18 9" />{" "}
-  </svg>
-);
-
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const transactionsIn = [
   {
     id: "TRX-1001",
@@ -200,8 +97,8 @@ export default function AdminFinance() {
   const [activeTab, setActiveTab] = useState("transactions");
   const [search, setSearch] = useState("");
 
-  // [NEW] Dropdown States
-  const [dateFilter, setDateFilter] = useState("Tháng này");
+  // Dropdown states
+  const [dateFilter, setDateFilter] = useState("Á ống này");
   const [isDateOpen, setIsDateOpen] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState("all"); // Filter cho Transactions
@@ -279,7 +176,7 @@ export default function AdminFinance() {
           </p>
         </div>
         <div className="flex gap-2 relative z-20">
-          {/* [NEW] DATE DROPDOWN */}
+          {/* Date dropdown */}
           <div className="relative">
             <button
               onClick={() => setIsDateOpen(!isDateOpen)}
@@ -423,7 +320,7 @@ export default function AdminFinance() {
               <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
             </div>
 
-            {/* [NEW] STATUS FILTER DROPDOWN */}
+            {/* Status filter dropdown */}
             <div className="relative">
               <button
                 onClick={() => setIsStatusOpen(!isStatusOpen)}

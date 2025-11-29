@@ -3,14 +3,18 @@
 import React, { Suspense, lazy } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
-// --- Layouts ---
+// ============================================================================
+// LAYOUTS
+// ============================================================================
 import MainLayout from "../layouts/MainLayout"; // Layout cho khách vãng lai (Public)
 // Layout riêng cho từng đối tượng (Lazy load)
 const TouristLayout = lazy(() => import("../layouts/TouristLayout"));
 const GuideLayout = lazy(() => import("../layouts/GuideLayout"));
 const AdminLayout = lazy(() => import("../layouts/AdminLayout"));
 
-// --- Pages: Public (Khách vãng lai) ---
+// ============================================================================
+// PAGES: PUBLIC
+// ============================================================================
 import HomePage from "../pages/Home/index"; // Load trang chủ ngay lập tức (Eager load)
 
 // Lazy load các trang con để tối ưu hiệu suất
@@ -23,17 +27,24 @@ const GuideProfilePage = lazy(() => import("../pages/Guides/Profile/index"));
 const BlogPage = lazy(() => import("../pages/Blog/index"));
 const PostDetailPage = lazy(() => import("../pages/Blog/PostDetail"));
 
-// --- Pages: Auth ---
+// ============================================================================
+// PAGES: AUTH
+// ============================================================================
 const AuthPage = lazy(() => import("../pages/Auth/AuthPage"));
 const SignOutPage = lazy(() => import("../pages/Auth/SignOut"));
 
-// --- Pages: Booking ---
+// ============================================================================
+// PAGES: BOOKING
+// ============================================================================
+const BookingStepReview = lazy(() => import("../pages/Booking/StepReview"));
 const BookingStepPayment = lazy(() => import("../pages/Booking/StepPayment"));
 const BookingStepReceipt = lazy(() => import("../pages/Booking/StepReceipt"));
 
-// --- Pages: Dashboard (3 Roles) ---
+// ============================================================================
+// PAGES: DASHBOARD (3 ROLES)
+// ============================================================================
 
-// 1. Tourist Dashboard Pages
+// Tourist Dashboard Pages
 const TouristDashboard = lazy(() => import("../pages/Dashboard/Tourist/index"));
 const TouristHistory = lazy(() => import("../pages/Dashboard/Tourist/History"));
 const TouristProfile = lazy(() => import("../pages/Dashboard/Tourist/Profile"));
@@ -45,6 +56,9 @@ const TouristNotifications = lazy(() =>
 );
 const TouristTransactionHistory = lazy(() =>
   import("../pages/Dashboard/Tourist/TransactionHistory")
+);
+const TouristInvoices = lazy(() =>
+  import("../pages/Dashboard/Tourist/Invoices")
 );
 
 // 2. Guide Dashboard Pages
@@ -93,12 +107,17 @@ const AdminPosts = lazy(() => import("../pages/Dashboard/Admin/Posts"));
 const AdminCreatePost = lazy(() =>
   import("../pages/Dashboard/Admin/CreatePost")
 );
+const AdminReviews = lazy(() => import("../pages/Dashboard/Admin/Reviews"));
 
-// --- Pages: Error ---
+// ============================================================================
+// PAGES: ERROR
+// ============================================================================
 const NotFoundPage = lazy(() => import("../pages/Error/NotFound"));
 const ServerErrorPage = lazy(() => import("../pages/Error/ServerError"));
 
-// --- Fallback Component (Loading Spinner) ---
+// ============================================================================
+// FALLBACK COMPONENT
+// ============================================================================
 import Spinner from "../components/Loaders/Spinner";
 const PageFallback = () => (
   <div className="flex min-h-screen items-center justify-center bg-bg-main">
@@ -106,7 +125,9 @@ const PageFallback = () => (
   </div>
 );
 
-// --- Router Configuration ---
+// ============================================================================
+// ROUTER CONFIGURATION
+// ============================================================================
 const router = createBrowserRouter([
   // 1. PUBLIC ROUTES (Sử dụng MainLayout - Có Navbar & Footer chuẩn)
   {
@@ -216,6 +237,14 @@ const router = createBrowserRouter([
 
       // Booking
       {
+        path: "booking/review",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <BookingStepReview />
+          </Suspense>
+        ),
+      },
+      {
         path: "booking/payment",
         element: (
           <Suspense fallback={<PageFallback />}>
@@ -299,6 +328,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <TouristTransactionHistory />
+          </Suspense>
+        ),
+      },
+      {
+        path: "invoices",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <TouristInvoices />
           </Suspense>
         ),
       },
@@ -527,6 +564,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <AdminCreatePost />
+          </Suspense>
+        ),
+      },
+      {
+        path: "reviews",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminReviews />
           </Suspense>
         ),
       },

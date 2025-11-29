@@ -8,9 +8,11 @@ import BlogCard from "../../components/Cards/BlogCard";
 // Import Icons
 import { IconSearch } from "../../icons/IconSearch.jsx";
 import { IconChevronDown } from "../../icons/IconChevronDown.jsx";
-import IconInstagram from "../../icons/IconInstagram.jsx"; // [NEW] Import Icon Instagram
+import IconInstagram from "../../icons/IconInstagram.jsx";
 
-// --- MOCK DATA ---
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 const categories = [
   { id: "all", label: "Tất cả chủ đề" },
   { id: "food", label: "Ẩm thực Huế" },
@@ -248,7 +250,7 @@ export default function BlogPage() {
 
       {/* 4. INFINITE GALLERY MARQUEE (Updated Background) */}
       <div className="w-full border-t border-border-light py-16 overflow-hidden relative bg-bg-main/30">
-        {/* [NEW] Background Map Image */}
+        {/* Background map pattern */}
         <div className="absolute inset-0 z-0 pointer-events-none mix-blend-multiply">
           <img
             src="/images/placeholders/map-bg.png"
@@ -259,7 +261,7 @@ export default function BlogPage() {
 
         <div className="container-main mb-8 flex justify-between items-end relative z-10">
           <div>
-            {/* [NEW] Icon Instagram */}
+            {/* Instagram icon */}
             <div className="flex items-center gap-2 mb-2 text-secondary">
               <IconInstagram className="w-5 h-5" />
               <p className="text-xs font-bold uppercase tracking-[0.2em]">
