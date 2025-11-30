@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
+import { useMyBookings } from "../../../features/booking/hooks";
+import Spinner from "../../../components/Loaders/Spinner";
 import { IconCheck } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
@@ -9,43 +11,49 @@ import {
   IconWallet,
 } from "../../../icons/IconCommon";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Payment and refund transactions
-const transactions = [
-  {
-    id: "TRX-2025-001",
-    tourName: "Bí mật Hoàng cung Huế",
-    amount: -1800000, // Số âm thể hiện tiền ra
-    date: "20/05/2025 10:30",
-    method: "VNPay QR",
-    status: "success",
-    type: "payment",
-  },
-  {
-    id: "TRX-2025-003",
-    tourName: "Hoàn tiền: Sông Hương Ca Huế",
-    amount: +300000, // Số dương thể hiện tiền vào (Hoàn tiền)
-    date: "15/05/2025 14:20",
-    method: "Về tài khoản gốc",
-    status: "success",
-    type: "refund",
-  },
-  {
-    id: "TRX-2025-004",
-    tourName: "Food Tour Huế",
-    amount: -500000,
-    date: "10/05/2025 19:00",
-    method: "MoMo",
-    status: "failed",
-    type: "payment",
-  },
-];
-
 export default function TouristInvoices() {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+
+  // Fetch bookings from API
+  const { bookings, isLoading } = useMyBookings();
+
+  // Transform bookings to transactions
+  const transactions = useMemo(() => {
+    if (!bookings) return [];
+
+    return bookings
+      .filter(
+        (b) =>
+          b.status === "confirmed" ||
+          b.status === "completed" ||
+          b.status === "canceled"
+      )
+      .map((b) => {
+        const isRefund =
+          b.status === "canceled" && b.payment_status === "refunded";
+        return {
+          id: b._id?.slice(-8).toUpperCase() || "N/A",
+          tourName: isRefund
+            ? `Hoàn tiền: ${b.tour_id?.name || "Tour"}`
+            : b.tour_id?.name || "Tour",
+          amount: isRefund
+            ? Math.abs(b.total_price || 0)
+            : -(b.total_price || 0),
+          date:
+            new Date(b.start_date).toLocaleDateString("vi-VN") +
+            " " +
+            (b.start_time || ""),
+          method: b.payment_method || "Chưa thanh toán",
+          status:
+            b.payment_status === "paid" || b.payment_status === "refunded"
+              ? "success"
+              : "failed",
+          type: isRefund ? "refund" : "payment",
+        };
+      })
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [bookings]);
 
   // Logic lọc
   const filteredData = transactions.filter((item) => {
@@ -94,6 +102,14 @@ export default function TouristInvoices() {
       </span>
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-20">

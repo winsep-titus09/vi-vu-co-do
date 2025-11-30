@@ -11,6 +11,7 @@ import guideRoutes from "./routes/guides.routes.js";
 import userNotifyRoutes from "./routes/notifications.routes.js";
 import locationCategoryPublicRoutes from "./routes/locationCategories.routes.js";
 import locationPublicRoutes from "./routes/locations.routes.js";
+import models3dRoutes from "./routes/models3d.routes.js";
 import tourRoutes from "./routes/tours.routes.js";
 import tourCategoryRoutes from "./routes/tourCategories.routes.js";
 import tourRequestRoutes from "./routes/tour-requests.routes.js";
@@ -40,7 +41,18 @@ import adminDashboardRoutes from "./routes/admin/dashboard.routes.js";
 import adminArticleCategoryRoutes from "./routes/admin/articleCategories.routes.js";
 
 const app = express();
-app.use(cors());
+
+// ============================================================================
+// CORS CONFIGURATION
+// ============================================================================
+const corsOptions = {
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
 app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -56,6 +68,7 @@ app.use("/api/guides", guideRoutes);
 app.use("/api/notifications", userNotifyRoutes);
 app.use("/api/location-categories", locationCategoryPublicRoutes);
 app.use("/api/locations", locationPublicRoutes);
+app.use("/api/models3d", models3dRoutes);
 app.use("/api/tours", tourRoutes);
 app.use("/api/tour-categories", tourCategoryRoutes);
 app.use("/api/tour-requests", tourRequestRoutes);

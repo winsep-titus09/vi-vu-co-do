@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
+import { placesApi } from "../../features/places/api";
+import { toursApi } from "../../features/tours/api";
+import { reviewsApi } from "../../features/reviews/api";
+import { IconLoader } from "../../icons/IconCommon";
 import {
   IconMapPin,
   IconClock,
@@ -14,106 +18,182 @@ import IconInfo from "../../icons/IconInfo";
 import { IconX } from "../../icons/IconX";
 import { IconSun } from "../../icons/IconSun";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Place details
-const placeDetail = {
-  id: 1,
-  name: "Đại Nội Huế (Hoàng Thành)",
-  category: "Di sản",
-  address: "Đường 23/8, P. Thuận Hòa, TP. Huế",
-  description: `Hoàng thành Huế là vòng thành thứ hai bên trong Kinh thành Huế, có chức năng bảo vệ các cung điện quan trọng nhất của triều đình, các miếu thờ tổ tiên nhà Nguyễn và bảo vệ Tử Cấm Thành.`,
-  content: `
-    <h3>Lịch sử hình thành</h3>
-    <p>Hoàng thành được vua Gia Long khởi công xây dựng vào năm 1804 và hoàn thiện vào năm 1833 dưới thời vua Minh Mạng. Hệ thống thành quách ở đây là sự kết hợp hài hòa giữa tinh hoa kiến trúc phương Đông và kỹ thuật quân sự phương Tây.</p>
-    <blockquote>"Đại Nội Huế không chỉ là di sản vật thể, mà còn là chứng nhân lịch sử của triều đại phong kiến cuối cùng tại Việt Nam."</blockquote>
-  `,
-  images: [
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/ngomon_3d_placeholder.jpg",
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
-  ],
-  info: {
-    openTime: "07:00 - 17:30",
-    ticket: "200.000đ",
-    bestTime: "Sáng sớm / Hoàng hôn",
-  },
-  weather: { temp: 28, condition: "Nắng đẹp", humidity: "65%" },
-  has3D: true,
-  rating: 4.8,
-  reviewsCount: 1280,
+// Helper to convert MongoDB Decimal128 to number
+const toNumber = (val) => {
+  if (val?.$numberDecimal) return parseFloat(val.$numberDecimal);
+  return parseFloat(val) || 0;
 };
 
-// --- MOCK DATA: REVIEWS ---
-const reviews = [
-  {
-    id: 1,
-    user: "Minh Anh",
-    date: "2 ngày trước",
-    rating: 5,
-    content:
-      "Không gian cổ kính tuyệt vời. Nên thuê HDV để hiểu rõ lịch sử hơn.",
-    avatar: "M",
-  },
-  {
-    id: 2,
-    user: "John Doe",
-    date: "1 tuần trước",
-    rating: 4,
-    content:
-      "Beautiful architecture but quite hot in the afternoon. Bring water!",
-    avatar: "J",
-  },
-];
-
-// Mock data: Visiting route (3 key points)
-const visitingRoute = [
-  {
-    time: "15 phút",
-    name: "Cổng Ngọ Môn",
-    desc: "Cổng chính phía Nam, nơi diễn ra các lễ lạc quan trọng nhất của triều đình (Lễ Truyền Lô, Lễ Ban Sóc...).",
-    tip: "Góc chụp ảnh đẹp nhất: Chụp từ quảng trường hướng lên lầu Ngũ Phụng lúc hoàng hôn.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/ngomon_3d_placeholder.jpg",
-  },
-  {
-    time: "30 phút",
-    name: "Điện Thái Hòa",
-    desc: "Nơi vua thiết triều và đón tiếp sứ thần. Biểu tượng quyền lực tối cao của nhà Nguyễn.",
-    tip: "Lưu ý: Không được phép quay phim, chụp ảnh bên trong nội điện để bảo tồn di tích.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  },
-  {
-    time: "45 phút",
-    name: "Thế Miếu & Cửu Đỉnh",
-    desc: "Khu vực thờ cúng các vị vua triều Nguyễn và nơi đặt 9 chiếc đỉnh đồng khổng lồ đúc từ năm 1835.",
-    tip: "Hãy tìm vết đạn trên Hiển Lâm Các - dấu tích của chiến tranh còn sót lại.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
-  },
-];
-
-// Mock data: Related tours
-const relatedTours = [
-  {
-    id: 1,
-    title: "Bí mật Hoàng cung Huế",
-    price: 45,
-    duration: "4 giờ",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  },
-];
+// Helper function to format ticket price
+const formatTicketPrice = (price, currency = "VND") => {
+  const amount = toNumber(price);
+  if (amount === 0) return "Miễn phí";
+  if (currency === "VND") {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(amount);
+  }
+  return `${amount} ${currency}`;
+};
 
 export default function PlaceDetail() {
-  useParams();
+  const { id } = useParams();
+  const navigate = useNavigate();
+
+  // State management
+  const [location, setLocation] = useState(null);
+  const [relatedTours, setRelatedTours] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toursLoading, setToursLoading] = useState(false);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [error, setError] = useState("");
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
+
+  // Fetch location details
+  useEffect(() => {
+    const fetchLocation = async () => {
+      try {
+        setIsLoading(true);
+        const response = await placesApi.getLocation(id);
+        setLocation(response);
+      } catch (err) {
+        console.error("Fetch location error:", err);
+        setError(err.message || "Không thể tải thông tin địa điểm");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchLocation();
+    }
+  }, [id]);
+
+  // Fetch related tours - filtered by location
+  useEffect(() => {
+    const fetchRelatedTours = async () => {
+      if (!location?._id) return;
+      try {
+        setToursLoading(true);
+        const response = await toursApi.listTours({
+          location_id: location._id,
+          limit: 3,
+        });
+        setRelatedTours(response?.items || []);
+      } catch (err) {
+        console.error("Fetch tours error:", err);
+      } finally {
+        setToursLoading(false);
+      }
+    };
+
+    fetchRelatedTours();
+  }, [location?._id]);
+
+  // Fetch location reviews
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!location?._id) return;
+      try {
+        setReviewsLoading(true);
+        const response = await reviewsApi.listLocationReviews(location._id, {
+          limit: 6,
+          sort: "-createdAt",
+        });
+        setReviews(response?.items || []);
+      } catch (err) {
+        console.error("Fetch reviews error:", err);
+        // Don't show error, just leave reviews empty
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, [location?._id]);
 
   useEffect(() => {
     document.body.style.overflow = is3DModalOpen ? "hidden" : "auto";
   }, [is3DModalOpen]);
+
+  // Prepare dynamic data
+  const placeDetail = location
+    ? {
+        id: location._id,
+        name: location.name,
+        category: location.category_id?.name || "Địa điểm",
+        address: location.address || "Huế",
+        description: location.description || "",
+        images:
+          location.images?.length > 0
+            ? location.images
+            : [
+                "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
+              ],
+        info: {
+          openTime: location.opening_hours || "Liên hệ",
+          ticket: formatTicketPrice(
+            location.ticket_price,
+            location.ticket_price_currency
+          ),
+          bestTime: location.best_visit_time || "Cả ngày",
+        },
+        weather: { temp: 28, condition: "Nắng đẹp", humidity: "65%" }, // Mock - optional
+        has3D: location.threeDModels?.length > 0,
+        threeDModels: location.threeDModels || [],
+        rating: toNumber(location.average_rating) || 0,
+        reviewsCount: location.review_count || 0,
+      }
+    : null;
+
+  const visitingRoute =
+    location?.highlights?.map((h, idx) => ({
+      id: idx + 1,
+      title: h.name,
+      description: h.description || "",
+      duration: h.duration || "",
+      tip: h.tip || "",
+      image: h.image_url || "",
+    })) || [];
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-bg-main flex items-center justify-center">
+        <IconLoader className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !location) {
+    return (
+      <div className="min-h-screen bg-bg-main pb-20 pt-6">
+        <div className="container-main">
+          <Breadcrumbs
+            items={[
+              { label: "Điểm đến", href: "/places" },
+              { label: "Không tìm thấy" },
+            ]}
+          />
+          <div className="mt-20 text-center">
+            <h1 className="text-2xl font-bold text-text-primary mb-4">
+              Không tìm thấy địa điểm
+            </h1>
+            <p className="text-text-secondary mb-6">
+              {error || "Địa điểm bạn tìm kiếm không tồn tại hoặc đã bị xóa."}
+            </p>
+            <button
+              onClick={() => navigate("/places")}
+              className="inline-block px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-colors"
+            >
+              Quay lại danh sách
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg-main pb-24 pt-6 md:pb-20">
@@ -162,11 +242,19 @@ export default function PlaceDetail() {
               />
             </div>
             <div
-              onClick={() => setIs3DModalOpen(true)}
-              className="flex-1 bg-primary relative rounded-2xl flex flex-col items-center justify-center cursor-pointer overflow-hidden group/btn shadow-inner"
+              onClick={() => placeDetail.has3D && setIs3DModalOpen(true)}
+              className={`flex-1 bg-primary relative rounded-2xl flex flex-col items-center justify-center overflow-hidden group/btn shadow-inner ${
+                placeDetail.has3D
+                  ? "cursor-pointer"
+                  : "cursor-not-allowed opacity-60"
+              }`}
             >
               <img
-                src={placeDetail.images[2]}
+                src={
+                  placeDetail.threeDModels?.[0]?.thumbnail_url ||
+                  placeDetail.images[1] ||
+                  placeDetail.images[0]
+                }
                 className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay"
                 alt="3D"
               />
@@ -175,7 +263,7 @@ export default function PlaceDetail() {
                   <Icon3D className="w-7 h-7 animate-pulse" />
                 </div>
                 <span className="font-bold font-heading text-lg">
-                  Tham quan 3D
+                  {placeDetail.has3D ? "Tham quan 3D" : "Chưa có 3D"}
                 </span>
               </div>
             </div>
@@ -188,65 +276,72 @@ export default function PlaceDetail() {
           <div className="lg:col-span-8 space-y-10">
             {/* Intro & Article */}
             <div className="space-y-6">
-              <p className="text-lg md:text-xl text-text-primary font-medium leading-relaxed border-l-4 border-secondary pl-6 py-1">
-                {placeDetail.description}
-              </p>
-              <hr className="border-border-light" />
-              <article className="prose prose-lg prose-slate max-w-none prose-headings:font-heading prose-headings:text-primary prose-img:rounded-2xl">
-                <div
-                  dangerouslySetInnerHTML={{ __html: placeDetail.content }}
-                />
-              </article>
+              {placeDetail.description && (
+                <>
+                  <p className="text-lg md:text-xl text-text-primary font-medium leading-relaxed border-l-4 border-secondary pl-6 py-1">
+                    {placeDetail.description}
+                  </p>
+                  <hr className="border-border-light" />
+                </>
+              )}
+              {!placeDetail.description && (
+                <p className="text-text-secondary italic text-center py-8">
+                  Thông tin chi tiết đang được cập nhật.
+                </p>
+              )}
             </div>
 
             {/* Visiting route with 3 key points */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl border border-border-light shadow-sm">
-              <h3 className="text-2xl font-heading font-bold text-text-primary mb-8 flex items-center gap-3">
-                <span className="flex items-center justify-center w-10 h-10 rounded-full bg-secondary text-white">
-                  <IconMapPin className="w-5 h-5" />
-                </span>{" "}
-                Lộ trình gợi ý
-              </h3>
-              <div className="relative pl-4 md:pl-6 border-l-2 border-dashed border-border-light space-y-10">
-                {visitingRoute.map((point, idx) => (
-                  <div key={idx} className="relative pl-6 md:pl-8 group">
-                    <div className="absolute -left-[9px] md:-left-[11px] top-0 w-4 h-4 md:w-5 md:h-5 rounded-full bg-white border-4 border-secondary group-hover:scale-125 transition-transform"></div>
-                    <div className="flex flex-col md:flex-row gap-5">
-                      <div className="flex-1 order-2 md:order-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="text-xl font-bold text-text-primary">
-                            {point.name}
-                          </h4>
-                          <span className="text-xs font-bold text-text-secondary bg-bg-main px-2 py-0.5 rounded border border-border-light">
-                            ~{point.time}
-                          </span>
-                        </div>
-                        <p className="text-text-secondary text-sm mb-3 leading-relaxed">
-                          {point.desc}
-                        </p>
-                        <div className="bg-primary/5 border border-primary/10 p-3 rounded-xl flex gap-3 items-start">
-                          <IconStar className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs font-bold text-primary uppercase tracking-wide mb-0.5">
-                              Mẹo nhỏ
-                            </p>
-                            <p className="text-xs text-text-secondary italic">
-                              "{point.tip}"
-                            </p>
+            {/* Visiting route with 3 key points */}
+            {visitingRoute.length > 0 && (
+              <div className="bg-white p-6 md:p-8 rounded-3xl border border-border-light shadow-sm">
+                <h3 className="text-2xl font-heading font-bold text-text-primary mb-8 flex items-center gap-3">
+                  <span className="flex items-center justify-center w-10 h-10 rounded-full bg-secondary text-white">
+                    <IconMapPin className="w-5 h-5" />
+                  </span>{" "}
+                  Lộ trình gợi ý
+                </h3>
+                <div className="relative pl-4 md:pl-6 border-l-2 border-dashed border-border-light space-y-10">
+                  {visitingRoute.map((point, idx) => (
+                    <div key={idx} className="relative pl-6 md:pl-8 group">
+                      <div className="absolute -left-[9px] md:-left-[11px] top-0 w-4 h-4 md:w-5 md:h-5 rounded-full bg-white border-4 border-secondary group-hover:scale-125 transition-transform"></div>
+                      <div className="flex flex-col md:flex-row gap-5">
+                        <div className="flex-1 order-2 md:order-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="text-xl font-bold text-text-primary">
+                              {point.name}
+                            </h4>
+                            <span className="text-xs font-bold text-text-secondary bg-bg-main px-2 py-0.5 rounded border border-border-light">
+                              ~{point.time}
+                            </span>
+                          </div>
+                          <p className="text-text-secondary text-sm mb-3 leading-relaxed">
+                            {point.desc}
+                          </p>
+                          <div className="bg-primary/5 border border-primary/10 p-3 rounded-xl flex gap-3 items-start">
+                            <IconStar className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs font-bold text-primary uppercase tracking-wide mb-0.5">
+                                Mẹo nhỏ
+                              </p>
+                              <p className="text-xs text-text-secondary italic">
+                                "{point.tip}"
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="w-full md:w-32 h-32 rounded-xl overflow-hidden shrink-0 order-1 md:order-2 shadow-sm group-hover:shadow-md transition-shadow">
-                        <img
-                          src={point.image}
-                          className="w-full h-full object-cover"
-                        />
+                        <div className="w-full md:w-32 h-32 rounded-xl overflow-hidden shrink-0 order-1 md:order-2 shadow-sm group-hover:shadow-md transition-shadow">
+                          <img
+                            src={point.image}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* REVIEWS SECTION */}
             <div className="pt-8 border-t border-border-light">
@@ -294,41 +389,79 @@ export default function PlaceDetail() {
                 </div>
               </div>
 
-              <div className="space-y-6">
-                {reviews.map((review) => (
-                  <div
-                    key={review.id}
-                    className="flex gap-4 pb-6 border-b border-border-light last:border-0"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center shrink-0">
-                      {review.avatar}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-bold text-text-primary">
-                          {review.user}
-                        </h4>
-                        <span className="text-xs text-text-secondary">
-                          • {review.date}
-                        </span>
+              {reviewsLoading ? (
+                <div className="flex justify-center py-8">
+                  <IconLoader className="w-8 h-8 text-primary animate-spin" />
+                </div>
+              ) : reviews.length > 0 ? (
+                <div className="space-y-6">
+                  {reviews.map((review) => (
+                    <div
+                      key={review._id}
+                      className="flex gap-4 pb-6 border-b border-border-light last:border-0"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center shrink-0">
+                        {review.reviewer?.avatar_url ? (
+                          <img
+                            src={review.reviewer.avatar_url}
+                            alt={review.reviewer.name}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          review.reviewer?.name?.charAt(0)?.toUpperCase() || "U"
+                        )}
                       </div>
-                      <div className="flex text-[#BC4C00] w-16 mb-2">
-                        <IconStar className="w-3 h-3 fill-current" />
-                        <IconStar className="w-3 h-3 fill-current" />
-                        <IconStar className="w-3 h-3 fill-current" />
-                        <IconStar className="w-3 h-3 fill-current" />
-                        <IconStar className="w-3 h-3 fill-current" />
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-bold text-text-primary">
+                            {review.reviewer?.name || "Khách tham quan"}
+                          </h4>
+                          <span className="text-xs text-text-secondary">
+                            •{" "}
+                            {new Date(review.createdAt).toLocaleDateString(
+                              "vi-VN"
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex text-[#BC4C00] gap-0.5 mb-2">
+                          {[...Array(5)].map((_, i) => (
+                            <IconStar
+                              key={i}
+                              className={`w-3 h-3 ${
+                                i < review.rating
+                                  ? "fill-current"
+                                  : "fill-gray-200"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        {review.comment && (
+                          <p className="text-sm text-text-secondary leading-relaxed">
+                            {review.comment}
+                          </p>
+                        )}
+                        {review.visit_date && (
+                          <p className="text-xs text-text-tertiary mt-2">
+                            Thời gian tham quan:{" "}
+                            {new Date(review.visit_date).toLocaleDateString(
+                              "vi-VN"
+                            )}
+                          </p>
+                        )}
                       </div>
-                      <p className="text-sm text-text-secondary leading-relaxed">
-                        {review.content}
-                      </p>
                     </div>
-                  </div>
-                ))}
-                <button className="w-full py-3 text-sm font-bold text-primary border border-border-light rounded-xl hover:bg-bg-main">
-                  Xem thêm 120+ đánh giá
-                </button>
-              </div>
+                  ))}
+                  {placeDetail.reviewsCount > 6 && (
+                    <button className="w-full py-3 text-sm font-bold text-primary border border-border-light rounded-xl hover:bg-bg-main">
+                      Xem thêm đánh giá
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-text-secondary italic text-center py-8">
+                  Chưa có đánh giá nào. Hãy là người đầu tiên!
+                </p>
+              )}
             </div>
           </div>
 
@@ -476,33 +609,51 @@ export default function PlaceDetail() {
                   <p className="text-sm text-white/70 mb-6">
                     Khám phá địa điểm này trọn vẹn nhất cùng hướng dẫn viên.
                   </p>
-                  <div className="space-y-4">
-                    {relatedTours.map((tour) => (
-                      <Link
-                        to={`/tours/${tour.id}`}
-                        key={tour.id}
-                        className="flex gap-3 bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-colors cursor-pointer items-center"
-                      >
-                        <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0">
-                          <img
-                            src={tour.image}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-bold truncate">
-                            {tour.title}
-                          </h4>
-                          <div className="flex items-center gap-2 text-xs text-secondary mt-1">
-                            <span className="font-bold text-white">
-                              ${tour.price}
-                            </span>
-                            <span>• {tour.duration}</span>
+                  {toursLoading ? (
+                    <div className="text-center py-8">
+                      <IconLoader className="w-6 h-6 text-white/60 animate-spin mx-auto" />
+                    </div>
+                  ) : relatedTours.length > 0 ? (
+                    <div className="space-y-4">
+                      {relatedTours.map((tour) => (
+                        <Link
+                          key={tour._id}
+                          to={`/tours/${tour._id}`}
+                          className="flex gap-4 group p-3 rounded-2xl hover:bg-white/10 transition-colors border border-white/10 hover:border-white/20"
+                        >
+                          <div className="w-24 h-24 rounded-xl overflow-hidden shrink-0 bg-white/5">
+                            <img
+                              src={
+                                tour.cover_image_url ||
+                                tour.image_url ||
+                                tour.images?.[0] ||
+                                "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg"
+                              }
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                              alt={tour.name}
+                            />
                           </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
+                          <div className="flex-1 flex flex-col justify-center">
+                            <h4 className="text-white font-bold text-base mb-1 group-hover:text-secondary transition-colors">
+                              {tour.name}
+                            </h4>
+                            <div className="flex items-center gap-3 text-xs text-white/60">
+                              <span>${toNumber(tour.price)}</span>
+                              <span>•</span>
+                              <span>
+                                {tour.duration}{" "}
+                                {tour.duration_unit === "days" ? "ngày" : "giờ"}
+                              </span>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-white/60 text-sm text-center py-8">
+                      Chưa có tour liên quan.
+                    </p>
+                  )}
                   <Link
                     to="/tours"
                     className="mt-6 flex items-center justify-center gap-2 text-sm font-bold text-secondary hover:text-white transition-colors"

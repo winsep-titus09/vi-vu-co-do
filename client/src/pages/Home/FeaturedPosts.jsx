@@ -1,50 +1,34 @@
 // src/pages/Home/FeaturedPosts.jsx
 
-import React from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import BlogCard from "../../components/Cards/BlogCard";
+import Spinner from "../../components/Loaders/Spinner";
+import { useArticles } from "../../features/posts/hooks";
 import { IconMapPin } from "../../icons/IconBox.jsx"; // Dùng icon Map Pin làm điểm nhấn header
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Featured blog posts
-const posts = [
-  {
-    id: 1,
-    slug: "huong-dan-du-lich-quoc-te",
-    title: "Hướng Dẫn Du Lịch Quốc Tế: Những điều cần biết khi đến Huế",
-    date: "27 Tháng 4 2023",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg", // Ảnh placeholder
-  },
-  {
-    id: 2,
-    slug: "meo-cho-ky-nghi-gia-dinh",
-    title: "Mẹo Về Điểm Đến Cho Kỳ Nghỉ Gia Đình Tại Cố Đô",
-    date: "02 Tháng 5 2023",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  },
-  {
-    id: 3,
-    slug: "goi-du-lich-gia-re",
-    title: "Gói Du Lịch Trải Nghiệm Văn Hóa Giá Rẻ Mùa Hè Này",
-    date: "15 Tháng 6 2023",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  },
-  {
-    id: 4,
-    slug: "diem-den-tiep-theo",
-    title: "Điểm Đến Cho Chuyến Du Ngoạn Tiếp Theo: Phá Tam Giang",
-    date: "20 Tháng 8 2023",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  },
-];
-
 export default function FeaturedPosts() {
+  const { articles, isLoading } = useArticles({ limit: 4, status: "approved" });
+
+  // Map articles to BlogCard format
+  const mappedArticles = useMemo(() => {
+    return (articles || []).map((article) => ({
+      id: article._id,
+      title: article.title,
+      slug: article.slug || article._id,
+      date: new Date(
+        article.publishedAt || article.createdAt
+      ).toLocaleDateString("vi-VN"),
+      image:
+        article.cover_image ||
+        article.images?.[0] ||
+        "/images/placeholders/hero_slide_1.jpg",
+      category: article.categoryId?.name || "Bài viết",
+      categoryId: article.categoryId?._id,
+      author: article.authorId?.name || "Vi Vu Cố Đô",
+    }));
+  }, [articles]);
+
   return (
     // Sử dụng nền map-bg như mẫu
     <section className="relative py-20 lg:py-28 bg-[#fcfaf5] overflow-hidden">
@@ -73,11 +57,17 @@ export default function FeaturedPosts() {
         </div>
 
         {/* Grid Posts (4 cột theo mẫu) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {posts.map((post) => (
-            <BlogCard key={post.id} post={post} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Spinner size="lg" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {mappedArticles.map((post) => (
+              <BlogCard key={post.id} post={post} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

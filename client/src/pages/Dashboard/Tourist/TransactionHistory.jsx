@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useMyBookings } from "../../../features/booking/hooks";
+import Spinner from "../../../components/Loaders/Spinner";
 import { IconCheck, IconClock } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
@@ -13,47 +15,58 @@ import {
 
 const IconInvoice = IconFileText;
 
-// --- MOCK DATA ---
-const transactions = [
-  {
-    id: "TRX-8892",
-    date: "20/05/2025",
-    desc: "Thanh toán tour 'Bí mật Hoàng cung Huế'",
-    amount: "- 1.800.000đ",
-    method: "Ví MoMo",
-    status: "success",
-    type: "payment",
-  },
-  {
-    id: "TRX-8801",
-    date: "15/04/2025",
-    desc: "Thanh toán tour 'Food Tour'",
-    amount: "- 500.000đ",
-    method: "Thẻ Visa •••• 4582",
-    status: "success",
-    type: "payment",
-  },
-  {
-    id: "TRX-REF-09",
-    date: "02/01/2025",
-    desc: "Hoàn tiền tour 'Sông Hương ca Huế'",
-    amount: "+ 300.000đ",
-    method: "Ví MoMo",
-    status: "refunded",
-    type: "refund",
-  },
-  {
-    id: "TRX-FAIL-01",
-    date: "01/01/2025",
-    desc: "Thanh toán thất bại",
-    amount: "0đ",
-    method: "Ví MoMo",
-    status: "failed",
-    type: "payment",
-  },
-];
-
 export default function TouristTransactionHistory() {
+  // Fetch bookings from API
+  const { bookings, isLoading } = useMyBookings();
+
+  // Transform bookings to transactions
+  const transactions = useMemo(() => {
+    if (!bookings) return [];
+
+    return bookings
+      .filter((b) => b.status === "confirmed" || b.status === "cancelled")
+      .map((b) => ({
+        id: b._id?.slice(-8).toUpperCase() || "N/A",
+        date: new Date(b.booking_date).toLocaleDateString("vi-VN"),
+        desc: `Thanh toán tour '${b.tourId?.title || "Tour"}'`,
+        amount:
+          b.status === "cancelled"
+            ? "+ " + (b.total_price || 0).toLocaleString() + "đ"
+            : "- " + (b.total_price || 0).toLocaleString() + "đ",
+        method: b.payment_method || "Chưa thanh toán",
+        status:
+          b.status === "cancelled"
+            ? "refunded"
+            : b.payment_status === "paid"
+            ? "success"
+            : "pending",
+        type: b.status === "cancelled" ? "refund" : "payment",
+      }))
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [bookings]);
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const totalSpent = transactions
+      .filter((t) => t.type === "payment" && t.status === "success")
+      .reduce((sum, t) => {
+        const amount = parseInt(t.amount.replace(/[^\d]/g, ""));
+        return sum + amount;
+      }, 0);
+
+    const totalRefunded = transactions
+      .filter((t) => t.type === "refund")
+      .reduce((sum, t) => {
+        const amount = parseInt(t.amount.replace(/[^\d]/g, ""));
+        return sum + amount;
+      }, 0);
+
+    return {
+      totalSpent: totalSpent.toLocaleString() + "đ",
+      totalRefunded: totalRefunded.toLocaleString() + "đ",
+      totalTransactions: transactions.length,
+    };
+  }, [transactions]);
   const getStatusBadge = (status) => {
     switch (status) {
       case "success":
@@ -79,6 +92,14 @@ export default function TouristTransactionHistory() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-20">
       {/* Header */}
@@ -102,24 +123,25 @@ export default function TouristTransactionHistory() {
           <p className="text-xs text-text-secondary font-bold uppercase tracking-wider mb-2">
             Tổng chi tiêu (2025)
           </p>
-          <p className="text-2xl font-bold text-text-primary">2.300.000đ</p>
+          <p className="text-2xl font-bold text-text-primary">
+            {stats.totalSpent}
+          </p>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-border-light shadow-sm">
           <p className="text-xs text-text-secondary font-bold uppercase tracking-wider mb-2">
             Đã hoàn tiền
           </p>
-          <p className="text-2xl font-bold text-green-600">+ 300.000đ</p>
+          <p className="text-2xl font-bold text-green-600">
+            + {stats.totalRefunded}
+          </p>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-border-light shadow-sm">
           <p className="text-xs text-text-secondary font-bold uppercase tracking-wider mb-2">
-            Phương thức chính
+            Tổng giao dịch
           </p>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-[#A50064] rounded text-white flex items-center justify-center text-[8px] font-bold">
-              Mo
-            </div>
-            <p className="text-lg font-bold text-text-primary">Ví MoMo</p>
-          </div>
+          <p className="text-2xl font-bold text-text-primary">
+            {stats.totalTransactions}
+          </p>
         </div>
       </div>
 

@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useMyBookings } from "../../../features/booking/hooks";
+import Spinner from "../../../components/Loaders/Spinner";
 import {
   IconClock,
   IconStar,
@@ -10,50 +12,6 @@ import IconArrowRight from "../../../icons/IconArrowRight";
 import { IconUser } from "../../../icons/IconUser";
 import TicketModal from "../../../components/Modals/TicketModal";
 import { IconTicket } from "../../../icons/IconCommon";
-
-// --- MOCK DATA ---
-const userInfo = {
-  name: "Hoàng Nam",
-  avatar:
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg",
-  // Đã ẩn points và type vì không có trong yêu cầu FC-TOURIST
-};
-
-const upcomingTrip = {
-  id: 101,
-  tourName: "Bí mật Hoàng cung Huế & Trải nghiệm trà chiều",
-  date: "20/05/2025",
-  time: "08:00 AM",
-  guide: "Minh Hương",
-  guests: 2,
-  status: "confirmed", // confirmed, pending, completed, cancelled
-  image:
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-};
-
-const recentBookings = [
-  {
-    id: 99,
-    name: "Food Tour: Ẩm thực đường phố",
-    date: "15/04/2025",
-    price: "$25",
-    status: "completed",
-  },
-  {
-    id: 98,
-    name: "Lăng Tự Đức & Đồi Vọng Cảnh",
-    date: "10/02/2025",
-    price: "$35",
-    status: "completed",
-  },
-  {
-    id: 97,
-    name: "Sông Hương ca Huế",
-    date: "01/01/2025",
-    price: "$15",
-    status: "cancelled",
-  },
-];
 
 // Helper function badge (FC-TOURIST-03: Hiển thị trạng thái)
 const getStatusBadge = (status) => {
@@ -87,6 +45,85 @@ const getStatusBadge = (status) => {
 
 export default function TouristDashboard() {
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+
+  // Fetch bookings from API
+  const { bookings, isLoading } = useMyBookings();
+
+  // Get user info from localStorage
+  const userInfo = useMemo(() => {
+    try {
+      const userData = localStorage.getItem("user");
+      if (userData) {
+        const user = JSON.parse(userData);
+        return {
+          name: user.name || "Khách hàng",
+          avatar:
+            user.avatar_url ||
+            user.avatar ||
+            "/images/placeholders/hero_slide_4.jpg",
+        };
+      }
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+    }
+    return {
+      name: "Khách hàng",
+      avatar: "/images/placeholders/hero_slide_4.jpg",
+    };
+  }, []);
+
+  // Process bookings data
+  const { upcomingTrip, recentBookings } = useMemo(() => {
+    if (!bookings || bookings.length === 0) {
+      return { upcomingTrip: null, recentBookings: [] };
+    }
+
+    // Find upcoming trip (confirmed or pending, future date)
+    const upcoming = bookings
+      .filter((b) => ["pending", "confirmed"].includes(b.status))
+      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))[0];
+
+    // Get recent bookings (last 3)
+    const recent = bookings
+      .filter((b) => b.status !== "draft")
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 3);
+
+    return {
+      upcomingTrip: upcoming
+        ? {
+            id: upcoming._id,
+            tourName: upcoming.tour_id?.name || "Chuyến tham quan",
+            date: new Date(upcoming.start_date).toLocaleDateString("vi-VN"),
+            time: upcoming.start_time || "08:00",
+            guide:
+              upcoming.intended_guide_id?.name ||
+              upcoming.tour_id?.guide_id?.name ||
+              "Hướng dẫn viên",
+            guests: upcoming.participants?.length || 1,
+            status: upcoming.status,
+            image:
+              upcoming.tour_id?.cover_image_url ||
+              "/images/placeholders/hero_slide_1.jpg",
+          }
+        : null,
+      recentBookings: recent.map((b) => ({
+        id: b._id,
+        name: b.tour_id?.name || "Chuyến tham quan",
+        date: new Date(b.start_date).toLocaleDateString("vi-VN"),
+        price: `${(b.total_price || 0).toLocaleString()}đ`,
+        status: b.status,
+      })),
+    };
+  }, [bookings]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

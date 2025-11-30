@@ -2,21 +2,27 @@
 import express from "express";
 import { auth } from "../middleware/auth.js";
 import {
-    listTours,
-    getTour,
-    createTour,
-    updateTour,
-    deleteTour,
-    listAvailableGuides,
-    listFeaturedTours,
-    listTopRatedTours,
+  listTours,
+  getTour,
+  createTour,
+  updateTour,
+  deleteTour,
+  listAvailableGuides,
+  listFeaturedTours,
+  listTopRatedTours,
 } from "../controllers/tours.controller.js";
 import { getTourCalendar } from "../controllers/guideDates.controller.js";
+import {
+  listCategories,
+  getCategoryBySlug,
+} from "../controllers/categories.controller.js";
 
 const router = express.Router();
 
 // Public
 router.get("/", listTours);
+router.get("/categories", listCategories);
+router.get("/categories/:slug", getCategoryBySlug);
 router.get("/featured", listFeaturedTours);
 router.get("/top-rated", listTopRatedTours);
 router.get("/available-guides", auth, listAvailableGuides);

@@ -1,7 +1,15 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import Breadcrumbs from "../../../components/Breadcrumbs/Breadcrumbs";
 import TourCard from "../../../components/Cards/TourCard";
+import Spinner from "../../../components/Loaders/Spinner";
+import EmptyState from "../../../components/Loaders/EmptyState";
+import {
+  useGuideProfile,
+  useGuideTours,
+  useGuideBusyDates,
+  useGuideReviews,
+} from "../../../features/guides/hooks";
 import {
   IconStar,
   IconPlay,
@@ -16,64 +24,157 @@ import IconBookOpen from "../../../icons/IconBookOpen";
 import IconCraft from "../../../icons/IconCraft";
 import IconLotus from "../../../icons/IconLotus";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-const guideDetail = {
-  id: 1,
-  name: "Minh Hương",
-  role: "Nhà sử học & Văn hóa",
-  avatar: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/1.jpg",
-  cover:
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  rating: 4.9,
-  reviews: 122,
-  experience: 5,
-  languages: ["Tiếng Việt", "English"],
-  cert: "Thẻ HDV Quốc tế - Số: 123456",
-  bio: "Xin chào! Tôi là Hương, người con của Thành Nội. Tôi không chỉ dẫn đường, tôi kể cho bạn nghe những câu chuyện lịch sử sống động đằng sau từng viên gạch của Cố đô.",
-  videoIntro:
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/hoanghon.jpg",
-  tours: [
-    {
-      id: 1,
-      title: "Bí mật Hoàng cung Huế",
-      location: "Đại Nội",
-      duration: "4 giờ",
-      rating: 4.8,
-      price: 45,
-      image:
-        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-    },
-    {
-      id: 5,
-      title: "Thiền trà tại Chùa Từ Hiếu",
-      location: "Dương Xuân",
-      duration: "3 giờ",
-      rating: 4.9,
-      price: 30,
-      image:
-        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuatuhieu1.jpg",
-    },
-  ],
-  // Mock Availability (Lịch trống)
-  availability: [
-    { day: "T2", date: "20", status: "busy" },
-    { day: "T3", date: "21", status: "free" },
-    { day: "T4", date: "22", status: "free" },
-    { day: "T5", date: "23", status: "busy" },
-    { day: "T6", date: "24", status: "free" },
-    { day: "T7", date: "25", status: "free" },
-    { day: "CN", date: "26", status: "busy" },
-  ],
-};
-
 export default function GuideProfile() {
   const { id } = useParams();
+  const { guide: apiGuide, isLoading, error } = useGuideProfile(id);
+
+  // Fetch guide's tours
+  const { tours: apiTours, isLoading: toursLoading } = useGuideTours(id, {
+    limit: 2,
+  });
+
+  // Fetch guide's busy dates for next 7 days
+  const today = useMemo(() => new Date(), []);
+  const nextWeek = useMemo(() => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + 7);
+    return date;
+  }, [today]);
+
+  const { busyDates } = useGuideBusyDates(
+    id,
+    today.toISOString().split("T")[0],
+    nextWeek.toISOString().split("T")[0]
+  );
+
+  // Fetch guide's reviews
+  const {
+    reviews: apiReviews,
+    stats: reviewStats,
+    isLoading: reviewsLoading,
+  } = useGuideReviews(id, { limit: 4 });
+
+  // Map API data to component format
+  const guideDetail = useMemo(() => {
+    if (!apiGuide) return null;
+
+    return {
+      id: apiGuide._id,
+      name: apiGuide.user_id?.name || "Guide",
+      role: apiGuide.introduction || "",
+      avatar:
+        apiGuide.user_id?.avatar_url ||
+        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/1.jpg",
+      cover:
+        apiGuide.user_id?.cover_image_url ||
+        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
+      rating: apiGuide.rating || 5.0,
+      reviews: apiGuide.reviewCount || 0,
+      experience: parseInt(apiGuide.experience) || 5,
+      languages: (apiGuide.languages || []).map((l) =>
+        l === "vi"
+          ? "Tiếng Việt"
+          : l === "en"
+          ? "English"
+          : l === "fr"
+          ? "Français"
+          : l.toUpperCase()
+      ),
+      cert: apiGuide.certificates?.[0]?.name || "",
+      bio: apiGuide.user_id?.bio || apiGuide.experience || "",
+      videoIntro:
+        apiGuide.bio_video_url ||
+        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/hoanghon.jpg",
+    };
+  }, [apiGuide]);
+
+  // Map tours from API
+  const tours = useMemo(() => {
+    if (!apiTours?.length) return [];
+    return apiTours.map((tour) => ({
+      id: tour._id,
+      name: tour.name,
+      price: tour.price,
+      duration: `${tour.duration} ${
+        tour.duration_unit === "hours" ? "giờ" : "ngày"
+      }`,
+      rating: tour.rating || 5.0,
+      image:
+        tour.cover_image_url ||
+        tour.gallery?.[0] ||
+        "https://via.placeholder.com/400x300",
+      category: tour.category_id?.name || "Tour",
+    }));
+  }, [apiTours]);
+
+  // Map availability calendar from busy dates
+  const availability = useMemo(() => {
+    const weekDays = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+    const calendar = [];
+
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      const dayOfWeek = date.getDay();
+      const dateStr = date.toISOString().split("T")[0];
+
+      const isBusy = busyDates.some((bd) => {
+        const busyDate = new Date(bd.date).toISOString().split("T")[0];
+        return busyDate === dateStr;
+      });
+
+      calendar.push({
+        day: weekDays[dayOfWeek],
+        date: date.getDate().toString(),
+        status: isBusy ? "busy" : "free",
+      });
+    }
+
+    return calendar;
+  }, [busyDates, today]);
+
+  // Map reviews from API
+  const reviews = useMemo(() => {
+    if (!apiReviews?.length) return [];
+    return apiReviews.slice(0, 2).map((review) => ({
+      id: review._id,
+      userName: review.user_id?.name || "",
+      userInitial: (review.user_id?.name || "D")?.[0]?.toUpperCase(),
+      date: new Date(review.createdAt).toLocaleDateString("vi-VN", {
+        month: "long",
+        year: "numeric",
+      }),
+      rating: review.rating,
+      comment: review.comment,
+    }));
+  }, [apiReviews]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-bg-main flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error || !guideDetail) {
+    return (
+      <div className="min-h-screen bg-bg-main pt-20">
+        <div className="container-main">
+          <EmptyState
+            title="Không tìm thấy hướng dẫn viên"
+            message={error || "Hướng dẫn viên không tồn tại"}
+            actionLabel="Quay lại danh sách"
+            onAction={() => (window.location.href = "/guides")}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg-main pb-24 pt-0 md:pb-20">
-      {/* 1. COVER IMAGE */}
+      {/* COVER IMAGE */}
       <div className="relative h-64 md:h-80 w-full overflow-hidden group">
         <img
           src={guideDetail.cover}
@@ -166,7 +267,7 @@ export default function GuideProfile() {
                 tuần này
               </h3>
               <div className="grid grid-cols-7 gap-2 text-center mb-4">
-                {guideDetail.availability.map((slot, idx) => (
+                {availability.map((slot, idx) => (
                   <div key={idx} className="flex flex-col items-center gap-1">
                     <span className="text-[10px] text-text-secondary font-bold uppercase">
                       {slot.day}
@@ -216,41 +317,6 @@ export default function GuideProfile() {
 
           {/* --- RIGHT CONTENT --- */}
           <div className="lg:col-span-8 space-y-10 pt-4 md:pt-24">
-            {/* 2. SECTION: USP (TẠI SAO CHỌN TÔI?) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-primary/5 border border-primary/10 p-5 rounded-2xl flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-full bg-white text-primary shadow-sm flex items-center justify-center mb-3">
-                  <IconBookOpen className="w-6 h-6" />
-                </div>
-                <h4 className="font-bold text-text-primary mb-1">
-                  Kiến thức sâu
-                </h4>
-                <p className="text-xs text-text-secondary">
-                  Am hiểu lịch sử triều Nguyễn và văn hóa cung đình.
-                </p>
-              </div>
-              <div className="bg-secondary/10 border border-secondary/20 p-5 rounded-2xl flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-full bg-white text-secondary shadow-sm flex items-center justify-center mb-3">
-                  <IconCraft className="w-6 h-6" />
-                </div>
-                <h4 className="font-bold text-text-primary mb-1">
-                  Hỗ trợ chụp ảnh
-                </h4>
-                <p className="text-xs text-text-secondary">
-                  Biết các góc chụp đẹp và hỗ trợ du khách lưu giữ khoảnh khắc.
-                </p>
-              </div>
-              <div className="bg-green-50 border border-green-100 p-5 rounded-2xl flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-full bg-white text-green-600 shadow-sm flex items-center justify-center mb-3">
-                  <IconLotus className="w-6 h-6" />
-                </div>
-                <h4 className="font-bold text-text-primary mb-1">Tận tâm</h4>
-                <p className="text-xs text-text-secondary">
-                  Luôn lắng nghe và tùy chỉnh lịch trình theo sức khỏe khách.
-                </p>
-              </div>
-            </div>
-
             {/* Bio & Video */}
             <section className="space-y-6">
               <h2 className="text-2xl font-heading font-bold text-text-primary">
@@ -280,13 +346,23 @@ export default function GuideProfile() {
             {/* Tours Managed */}
             <section>
               <h2 className="text-2xl font-heading font-bold text-text-primary mb-6">
-                Các chuyến đi tôi dẫn (2)
+                Các chuyến đi tôi dẫn ({tours.length})
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {guideDetail.tours.map((tour) => (
-                  <TourCard key={tour.id} tour={tour} />
-                ))}
-              </div>
+              {toursLoading ? (
+                <div className="flex justify-center py-8">
+                  <Spinner />
+                </div>
+              ) : tours.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {tours.map((tour) => (
+                    <TourCard key={tour.id} tour={tour} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-text-secondary text-center py-8">
+                  Chưa có chuyến đi nào
+                </p>
+              )}
             </section>
 
             {/* Reviews */}
@@ -295,46 +371,61 @@ export default function GuideProfile() {
                 <h2 className="text-2xl font-heading font-bold text-text-primary">
                   Đánh giá từ du khách
                 </h2>
-                <button className="px-4 py-2 rounded-full border border-border-light text-sm font-bold hover:bg-white hover:border-primary transition-all">
-                  Xem tất cả 122 đánh giá
-                </button>
+                {reviewStats && reviewStats.totalReviews > 2 && (
+                  <button className="px-4 py-2 rounded-full border border-border-light text-sm font-bold hover:bg-white hover:border-primary transition-all">
+                    Xem tất cả {reviewStats.totalReviews} đánh giá
+                  </button>
+                )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[1, 2].map((item) => (
-                  <div
-                    key={item}
-                    className="bg-white p-6 rounded-3xl border border-border-light shadow-sm"
-                  >
-                    <div className="flex justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-text-secondary">
-                          H
+              {reviewsLoading ? (
+                <div className="flex justify-center py-8">
+                  <Spinner />
+                </div>
+              ) : reviews.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {reviews.map((review) => (
+                    <div
+                      key={review.id}
+                      className="bg-white p-6 rounded-3xl border border-border-light shadow-sm"
+                    >
+                      <div className="flex justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-text-secondary">
+                            {review.userInitial}
+                          </div>
+                          <div>
+                            <p className="font-bold text-sm text-text-primary">
+                              {review.userName}
+                            </p>
+                            <p className="text-xs text-text-secondary">
+                              {review.date}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-bold text-sm text-text-primary">
-                            Hoàng Nam
-                          </p>
-                          <p className="text-xs text-text-secondary">
-                            Tháng 2, 2025
-                          </p>
+                        <div className="flex text-[#BC4C00] text-xs gap-0.5">
+                          {[...Array(5)].map((_, i) => (
+                            <IconStar
+                              key={i}
+                              className={`w-3 h-3 ${
+                                i < review.rating
+                                  ? "fill-current"
+                                  : "stroke-current fill-none"
+                              }`}
+                            />
+                          ))}
                         </div>
                       </div>
-                      <div className="flex text-[#BC4C00] text-xs gap-0.5">
-                        <IconStar className="w-3 h-3 fill-current" />
-                        <IconStar className="w-3 h-3 fill-current" />
-                        <IconStar className="w-3 h-3 fill-current" />
-                        <IconStar className="w-3 h-3 fill-current" />
-                        <IconStar className="w-3 h-3 fill-current" />
-                      </div>
+                      <p className="text-sm text-text-secondary italic leading-relaxed">
+                        "{review.comment}"
+                      </p>
                     </div>
-                    <p className="text-sm text-text-secondary italic leading-relaxed">
-                      "Chị Hương rất nhiệt tình và am hiểu lịch sử. Cách kể
-                      chuyện lôi cuốn, không hề nhàm chán như mình nghĩ. Rất
-                      đáng tiền!"
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-text-secondary text-center py-8">
+                  Chưa có đánh giá nào
+                </p>
+              )}
             </section>
           </div>
         </div>

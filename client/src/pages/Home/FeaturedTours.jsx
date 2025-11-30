@@ -1,114 +1,126 @@
 // src/pages/Home/FeaturedTours.jsx
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import TourCard from "../../components/Cards/TourCard";
 import ButtonSvgMask from "../../components/Forms/ButtonSvgMask";
 import IconArrowRight from "../../icons/IconArrowRight.jsx";
+import { toursApi } from "../../features/tours/api";
+import { IconLoader } from "../../icons/IconCommon";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Featured tours
-const allTours = [
-  {
-    id: 1,
-    title: "Bí mật Hoàng thành",
-    location: "Phố cổ",
-    duration: "4 giờ",
-    rating: 4.8,
-    price: 58,
-    category: "history",
-    description:
-      "Dạo qua hành lang được UNESCO công nhận, hầm chiến tranh bí mật và sân điện với nhà sử học.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  },
-  {
-    id: 2,
-    title: "Đền ven sông lúc hoàng hôn",
-    location: "Khu ven sông",
-    duration: "2.5 giờ",
-    rating: 5.0,
-    price: 35,
-    category: "culture",
-    description:
-      "Các miếu thắp nến, nghi lễ ven sông và truyền thuyết địa phương do người kể chuyện bản địa chia sẻ.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
-  },
-  {
-    id: 3,
-    title: "Làng nghề & quán trà",
-    location: "Ngõ nghệ nhân",
-    duration: "Cả ngày",
-    rating: 4.7,
-    price: 95,
-    category: "culture",
-    description:
-      "Gặp gỡ nghệ nhân, thử thủ công truyền thống và thưởng trà trong những nếp nhà cổ hàng thế kỷ.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuatuhieu1.jpg",
-  },
-  {
-    id: 4,
-    title: "Phá Tam Giang mùa nước nổi",
-    location: "Ngoại ô",
-    duration: "5 giờ",
-    rating: 4.9,
-    price: 45,
-    category: "nature",
-    description:
-      "Ngắm hoàng hôn trên đầm phá lớn nhất Đông Nam Á và trải nghiệm cuộc sống ngư dân.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/cautrangtien1.jpg",
-  },
-  {
-    id: 5,
-    title: "Ẩm thực đường phố Huế",
-    location: "Chợ Đông Ba",
-    duration: "3 giờ",
-    rating: 4.9,
-    price: 30,
-    category: "food",
-    description:
-      "Khám phá hương vị đậm đà của bún bò, bánh bèo, nậm, lọc tại những quán ăn lâu đời nhất.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
-  },
-  {
-    id: 6,
-    title: "Thiền viện trúc lâm Bạch Mã",
-    location: "Vườn quốc gia",
-    duration: "6 giờ",
-    rating: 4.8,
-    price: 60,
-    category: "nature",
-    description:
-      "Tìm về sự tĩnh lặng giữa thiên nhiên hùng vĩ và kiến trúc thiền phái Trúc Lâm đặc sắc.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_2.jpg",
-  },
-];
+// Helper to convert MongoDB Decimal128 to number
+const toNumber = (val) => {
+  if (val?.$numberDecimal) return parseFloat(val.$numberDecimal);
+  return parseFloat(val) || 0;
+};
 
-const categories = [
-  { id: "all", label: "Tất cả" },
-  { id: "history", label: "Di sản & Lịch sử" },
-  { id: "culture", label: "Văn hóa & Ẩm thực" },
-  { id: "nature", label: "Thiên nhiên" },
-];
+// Helper to normalize tour data from API to match component expectations
+const normalizeTour = (tour) => ({
+  id: tour._id || tour.id,
+  title: tour.name || tour.title,
+  location: tour.locations?.[0]?.locationId?.name || tour.location || "Huế",
+  duration: tour.duration || "N/A",
+  rating: toNumber(tour.average_rating || tour.rating || 0),
+  price: toNumber(tour.price || 0),
+  category: tour.category_id?.slug || tour.category,
+  description: tour.description || "",
+  image:
+    tour.cover_image_url ||
+    tour.image_url ||
+    tour.images?.[0] ||
+    tour.image ||
+    "",
+  ...tour,
+});
 
 export default function FeaturedTours() {
   const [activeTab, setActiveTab] = useState("all");
+  const [tours, setTours] = useState([]);
+  const [categories, setCategories] = useState([
+    { id: "all", label: "Tất cả" },
+  ]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredTours =
-    activeTab === "all"
-      ? allTours
-      : allTours.filter((tour) => {
-          if (activeTab === "culture")
-            return tour.category === "culture" || tour.category === "food";
-          return tour.category === activeTab;
-        });
+  // Fetch featured tours and categories from API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+
+        // Fetch tours and categories in parallel
+        const [toursResponse, categoriesResponse] = await Promise.all([
+          toursApi.getFeaturedTours(12),
+          toursApi.getCategories().catch(() => ({ categories: [] })),
+        ]);
+
+        // Process tours - API returns { items, limit }
+        let toursData = Array.isArray(toursResponse?.items)
+          ? toursResponse.items.map(normalizeTour)
+          : Array.isArray(toursResponse)
+          ? toursResponse.map(normalizeTour)
+          : [];
+
+        // If we have fewer than 6 featured tours, fetch all tours
+        if (toursData.length < 6) {
+          try {
+            const allToursResponse = await toursApi.listTours({ limit: 12 });
+            toursData = Array.isArray(allToursResponse?.items)
+              ? allToursResponse.items.map(normalizeTour)
+              : Array.isArray(allToursResponse?.tours)
+              ? allToursResponse.tours.map(normalizeTour)
+              : toursData;
+          } catch (err) {
+            console.error("Error fetching all tours:", err);
+          }
+        }
+
+        setTours(toursData);
+
+        // Process categories - add "all" option
+        const categoriesData = Array.isArray(categoriesResponse?.categories)
+          ? categoriesResponse.categories
+          : [];
+
+        const categoryOptions = [
+          { id: "all", label: "Tất cả" },
+          ...categoriesData
+            .sort((a, b) => (a.order || 0) - (b.order || 0))
+            .map((cat) => ({
+              id: cat._id,
+              label: cat.name,
+              slug: cat.slug,
+            })),
+        ];
+
+        setCategories(categoryOptions);
+      } catch (err) {
+        console.error("Fetch data error:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Filter tours by category
+  const filteredTours = Array.isArray(tours)
+    ? activeTab === "all"
+      ? tours
+      : tours.filter((tour) => {
+          const categoryId = tour.category_id?._id || tour.category_id;
+          const categoryIds = tour.categories?.map((c) => c._id || c) || [];
+          const categorySlug = tour.category_id?.slug || tour.category;
+
+          const matchesById =
+            categoryId === activeTab || categoryIds.includes(activeTab);
+          const matchesBySlug =
+            categorySlug &&
+            categories.find((c) => c.id === activeTab)?.slug === categorySlug;
+
+          return matchesById || matchesBySlug;
+        })
+    : [];
 
   const displayTours = filteredTours.slice(0, 6);
 
@@ -162,13 +174,22 @@ export default function FeaturedTours() {
       </div>
 
       {/* --- 3. Grid Tours --- */}
-      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 relative z-10">
-        {displayTours.map((tour) => (
-          <div key={tour.id} className="transition-all duration-500 ease-out">
-            <TourCard tour={tour} />
-          </div>
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20 relative z-10">
+          <IconLoader className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      ) : (
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 relative z-10">
+          {displayTours.map((tour) => (
+            <div
+              key={tour._id || tour.id}
+              className="transition-all duration-500 ease-out"
+            >
+              <TourCard tour={tour} />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Empty State */}
       {displayTours.length === 0 && (

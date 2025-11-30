@@ -2,13 +2,16 @@
 import express from "express";
 import { auth } from "../middleware/auth.js";
 import {
-    createTourReview,
-    createGuideReview,
-    getReviewForBooking,
-    getTourRatingStats,
-    getGuideRatingStats,
-    listTourReviewsPublic,
-    listGuideReviewsPublic,
+  createTourReview,
+  createGuideReview,
+  getReviewForBooking,
+  getTourRatingStats,
+  getGuideRatingStats,
+  listTourReviewsPublic,
+  listGuideReviewsPublic,
+  createLocationReview,
+  listLocationReviews,
+  getLocationRatingStats,
 } from "../controllers/reviews.controller.js";
 
 const router = express.Router();
@@ -29,5 +32,10 @@ router.get("/guides/:guideId/stats", getGuideRatingStats);
 // PUBLIC listing reviews theo Tour/HDV (phân trang)
 router.get("/tours/:tourId", listTourReviewsPublic);
 router.get("/guides/:guideId", listGuideReviewsPublic);
+
+// Location reviews (public + authenticated)
+router.post("/locations/:locationId", auth, createLocationReview);
+router.get("/locations/:locationId", listLocationReviews);
+router.get("/locations/:locationId/stats", getLocationRatingStats);
 
 export default router;

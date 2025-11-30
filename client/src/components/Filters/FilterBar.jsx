@@ -4,34 +4,47 @@ import React, { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { DayPicker } from "react-day-picker";
-// Đảm bảo import CSS của DayPicker (thường đã ở main.jsx, nếu chưa thì uncomment dòng dưới)
-// import 'react-day-picker/dist/style.css';
-
+import { toursApi } from "../../features/tours/api";
 import { IconSearch } from "../../icons/IconSearch";
 import { IconChevronDown } from "../../icons/IconChevronDown";
 import { IconCalendar } from "../../icons/IconCalendar";
 import IconTag from "../../icons/IconTag";
 import { IconCheck } from "../../icons/IconBox";
 
-// Danh sách chủ đề
-const themes = [
-  "Di sản & Lịch sử",
-  "Ẩm thực & Văn hóa",
-  "Thiên nhiên & Sinh thái",
-  "Nghệ thuật & Làng nghề",
-  "Tâm linh & Chữa lành",
-];
-
-export default function FilterBar() {
+export default function FilterBar({ onFilterChange }) {
   // Theme dropdown state
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState("");
+  const [categories, setCategories] = useState([]);
   const themeRef = useRef(null);
 
   // Date dropdown state
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(undefined);
   const dateRef = useRef(null);
+
+  // Other filters
+  const [keyword, setKeyword] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [smallGroup, setSmallGroup] = useState(false);
+  const [has3DPreview, setHas3DPreview] = useState(false);
+
+  // Fetch categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await toursApi.getCategories();
+        const categoriesData = Array.isArray(response?.categories)
+          ? response.categories
+          : [];
+        setCategories(categoriesData);
+      } catch (err) {
+        console.error("Fetch categories error:", err);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   // Xử lý click outside (Dùng chung logic)
   useEffect(() => {
@@ -59,6 +72,38 @@ export default function FilterBar() {
     setIsDateOpen(false);
   };
 
+  const handleSearch = () => {
+    if (onFilterChange) {
+      onFilterChange({
+        keyword,
+        category: selectedTheme,
+        date: selectedDate,
+        maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+        smallGroup,
+        has3DPreview,
+      });
+    }
+  };
+
+  const handleClearFilters = () => {
+    setKeyword("");
+    setSelectedTheme("");
+    setSelectedDate(undefined);
+    setMaxPrice("");
+    setSmallGroup(false);
+    setHas3DPreview(false);
+    if (onFilterChange) {
+      onFilterChange({});
+    }
+  };
+
+  // Auto-trigger search when Enter is pressed in keyword input
+  const handleKeywordKeyPress = (e) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
+
   // Class chung cho các ô Input/Trigger để đảm bảo đồng bộ
   const triggerClasses = (isOpen) => `
     group relative h-full flex items-center w-full rounded-2xl border bg-bg-main/30 py-2.5 text-sm cursor-pointer transition-all select-none
@@ -80,6 +125,9 @@ export default function FilterBar() {
           <input
             type="text"
             placeholder="Tìm điểm đến..."
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            onKeyPress={handleKeywordKeyPress}
             className="block w-full rounded-2xl border border-border-light bg-bg-main/30 pl-11 pr-4 py-2.5 text-sm text-text-primary outline-none focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-text-secondary/60"
           />
         </div>
@@ -105,7 +153,9 @@ export default function FilterBar() {
                 selectedTheme ? "text-text-primary" : "text-text-secondary/60"
               }`}
             >
-              {selectedTheme || "Chủ đề"}
+              {selectedTheme
+                ? categories.find((c) => c._id === selectedTheme)?.name
+                : "Chủ đề"}
             </span>
 
             <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
@@ -130,17 +180,17 @@ export default function FilterBar() {
                 >
                   Tất cả chủ đề
                 </div>
-                {themes.map((theme) => (
+                {categories.map((category) => (
                   <div
-                    key={theme}
-                    onClick={() => handleSelectTheme(theme)}
+                    key={category._id}
+                    onClick={() => handleSelectTheme(category._id)}
                     className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${
-                      selectedTheme === theme
+                      selectedTheme === category._id
                         ? "bg-primary/10 text-primary font-medium"
                         : "text-text-primary hover:bg-bg-main hover:text-primary"
                     }`}
                   >
-                    {theme}
+                    {category.name}
                   </div>
                 ))}
               </div>
@@ -198,6 +248,8 @@ export default function FilterBar() {
           <input
             type="number"
             placeholder="Giá tối đa"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(e.target.value)}
             className="block w-full rounded-2xl border border-border-light bg-bg-main/30 pl-5 pr-8 py-2.5 text-sm text-text-primary outline-none focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-text-secondary/60"
           />
           <span className="absolute inset-y-0 right-0 pr-4 flex items-center text-sm font-bold text-text-secondary pointer-events-none">
@@ -206,7 +258,10 @@ export default function FilterBar() {
         </div>
 
         {/* 5. NÚT TÌM KIẾM */}
-        <button className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 hover:-translate-y-0.5 transition-all duration-200 flex-none active:scale-95">
+        <button
+          onClick={handleSearch}
+          className="w-full md:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 hover:-translate-y-0.5 transition-all duration-200 flex-none active:scale-95"
+        >
           <IconSearch className="h-5 w-5" />
           <span className="hidden lg:inline">Tìm kiếm</span>
         </button>
@@ -214,39 +269,10 @@ export default function FilterBar() {
 
       {/* Tùy chọn phụ */}
       <div className="mt-3 flex flex-wrap items-center gap-4 px-2 pt-2 border-t border-border-light/40">
-        <label className="inline-flex items-center gap-2 cursor-pointer group select-none">
-          <div className="relative flex items-center">
-            <input
-              type="checkbox"
-              className="peer appearance-none w-4 h-4 rounded border border-gray-300 checked:bg-primary checked:border-primary transition-colors"
-            />
-            <IconCheck className="absolute w-3 h-3 text-white hidden peer-checked:block pointer-events-none left-0.5" />
-          </div>
-          <span className="text-xs font-medium text-text-secondary group-hover:text-primary transition-colors">
-            Tour nhóm nhỏ
-          </span>
-        </label>
-
-        <label className="inline-flex items-center gap-2 cursor-pointer group select-none">
-          <div className="relative flex items-center">
-            <input
-              type="checkbox"
-              className="peer appearance-none w-4 h-4 rounded border border-gray-300 checked:bg-primary checked:border-primary transition-colors"
-            />
-            <IconCheck className="absolute w-3 h-3 text-white hidden peer-checked:block pointer-events-none left-0.5" />
-          </div>
-          <span className="text-xs font-medium text-text-secondary group-hover:text-primary transition-colors">
-            Có xem trước 3D
-          </span>
-        </label>
-
         <div className="flex-1"></div>
 
         <button
-          onClick={() => {
-            setSelectedTheme("");
-            setSelectedDate(undefined);
-          }}
+          onClick={handleClearFilters}
           className="text-xs font-bold text-text-secondary hover:text-red-500 transition-colors underline decoration-transparent hover:decoration-red-500 underline-offset-2"
         >
           Xóa bộ lọc

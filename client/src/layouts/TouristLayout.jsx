@@ -1,9 +1,10 @@
 // src/layouts/TouristLayout.jsx
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Outlet, NavLink } from "react-router-dom";
 import Navbar from "../components/Navbar/Navbar";
 import Footer from "../components/Footer/Footer";
+import { useNotifications } from "../features/notifications/hooks";
 import { IconUser } from "../icons/IconUser";
 import { IconCalendar } from "../icons/IconBox";
 import { IconX } from "../icons/IconX";
@@ -46,6 +47,38 @@ const MENU = [
 
 export default function TouristLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Fetch notifications to get unread count
+  const { notifications } = useNotifications();
+
+  // Get user info from localStorage
+  const userInfo = useMemo(() => {
+    try {
+      const userData = localStorage.getItem("user");
+      if (userData) {
+        const user = JSON.parse(userData);
+        return {
+          name: user.name || "Khách hàng",
+          avatar:
+            user.avatar_url ||
+            user.avatar ||
+            "/images/placeholders/hero_slide_4.jpg",
+        };
+      }
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+    }
+    return {
+      name: "Khách hàng",
+      avatar: "/images/placeholders/hero_slide_4.jpg",
+    };
+  }, []);
+
+  // Count unread notifications
+  const unreadCount = useMemo(() => {
+    if (!notifications) return 0;
+    return notifications.filter((n) => !n.isRead && !n.is_read).length;
+  }, [notifications]);
 
   return (
     <div className="min-h-screen bg-bg-main flex flex-col">
@@ -96,14 +129,14 @@ export default function TouristLayout() {
               <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border-light">
                 <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-sm">
                   <img
-                    src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg"
+                    src={userInfo.avatar}
                     alt="Avatar"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <p className="font-heading font-bold text-text-primary truncate">
-                    Hoàng Nam
+                    {userInfo.name}
                   </p>
                 </div>
                 <NavLink
@@ -113,7 +146,11 @@ export default function TouristLayout() {
                 >
                   <IconBell className="w-5 h-5" />
                   {/* Badge cho thông báo chưa đọc */}
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
                 </NavLink>
               </div>
 

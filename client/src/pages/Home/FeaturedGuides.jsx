@@ -1,51 +1,30 @@
 // src/pages/Home/FeaturedGuides.jsx
 
-import React from "react";
+import React, { useMemo } from "react";
 import GuideCard from "../../components/Cards/GuideCard";
 import ButtonSvgMask from "../../components/Forms/ButtonSvgMask";
 import IconArrowRight from "../../icons/IconArrowRight.jsx";
-
-// Mock data: Tour guides
-const guides = [
-  {
-    id: 1,
-    name: "Minh Hương",
-    specialty: "Chuyên gia Lịch sử",
-    rating: 4.9,
-    languages: ["VN", "EN"],
-    bio: "10 năm nghiên cứu về triều Nguyễn. Tôi sẽ kể cho bạn nghe những bí mật chưa từng được viết trong sách sử.",
-    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/1.jpg",
-  },
-  {
-    id: 2,
-    name: "Đức Hiếu",
-    specialty: "Nhiếp ảnh & Đời sống",
-    rating: 5.0,
-    languages: ["VN", "FR"],
-    bio: "Đam mê ghi lại những khoảnh khắc đời thường. Cùng tôi săn những góc ảnh đẹp nhất tại Huế.",
-    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/3.jpg",
-  },
-  {
-    id: 3,
-    name: "Thanh Trúc",
-    specialty: "Ẩm thực Cung đình",
-    rating: 4.8,
-    languages: ["VN", "EN", "JP"],
-    bio: "Sinh ra trong gia đình có truyền thống nấu ăn. Tôi sẽ đưa bạn đi nếm trọn vẹn hương vị Cố đô.",
-    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/2.jpg",
-  },
-  {
-    id: 4,
-    name: "Hoàng Tùng",
-    specialty: "Khám phá Thiên nhiên",
-    rating: 4.9,
-    languages: ["VN", "EN"],
-    bio: "Yêu thích trekking và chèo SUP. Khám phá một Huế xanh mát và hùng vĩ cùng tôi.",
-    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/4.jpg",
-  },
-];
+import Spinner from "../../components/Loaders/Spinner";
+import { useFeaturedGuides } from "../../features/guides/hooks";
 
 export default function FeaturedGuides() {
+  // Fetch featured guides from API
+  const { guides: apiGuides, isLoading } = useFeaturedGuides(4);
+
+  // Map API guides to GuideCard format
+  const guides = useMemo(() => {
+    return (apiGuides || []).map((guide) => ({
+      id: guide._id || guide.user_id?._id,
+      name: guide.user_id?.name || "Guide",
+      specialty: guide.introduction || "Hướng dẫn viên",
+      rating: guide.rating || 5.0,
+      languages: guide.languages || ["VN"],
+      bio: guide.bio || "Khám phá Huế cùng tôi!",
+      image:
+        guide.user_id?.avatar_url ||
+        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/1.jpg",
+    }));
+  }, [apiGuides]);
   return (
     <section className="w-full py-16 lg:py-24 bg-bg-main relative overflow-hidden">
       {/* Background decoration */}
@@ -69,11 +48,23 @@ export default function FeaturedGuides() {
         </div>
 
         {/* Guides grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-          {guides.map((guide) => (
-            <GuideCard key={guide.id} guide={guide} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Spinner size="lg" />
+          </div>
+        ) : guides.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+            {guides.map((guide) => (
+              <GuideCard key={guide.id} guide={guide} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-text-secondary">
+              Chưa có hướng dẫn viên tiêu biểu
+            </p>
+          </div>
+        )}
 
         {/* Action button */}
         <div className="mt-12 text-center">

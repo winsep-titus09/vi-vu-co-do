@@ -20,7 +20,7 @@ const IconUploadCloud = ({ className }) => (
   </svg>
 );
 
-export default function ReviewModal({ isOpen, onClose, booking }) {
+export default function ReviewModal({ isOpen, onClose, booking, onSubmit }) {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -36,15 +36,19 @@ export default function ReviewModal({ isOpen, onClose, booking }) {
   };
 
   const handleSubmit = () => {
-    // Logic gửi API đánh giá ở đây
-    console.log({
-      bookingId: booking.id,
-      rating,
-      comment,
-      images,
-    });
-    alert("Cảm ơn bạn đã đánh giá!");
-    onClose();
+    if (onSubmit) {
+      onSubmit({ rating, comment, images });
+    } else {
+      // Fallback if no onSubmit provided
+      console.log({
+        bookingId: booking.id,
+        rating,
+        comment,
+        images,
+      });
+      alert("Cảm ơn bạn đã đánh giá!");
+      onClose();
+    }
   };
 
   return (
