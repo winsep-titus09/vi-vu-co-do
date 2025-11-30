@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useNotifications } from "../../../features/notifications/hooks";
+import Spinner from "../../../components/Loaders/Spinner";
 import { IconCheck, IconClock } from "../../../icons/IconBox";
 import { IconUser } from "../../../icons/IconUser";
 import {
@@ -10,73 +12,70 @@ import {
   IconTicket,
 } from "../../../icons/IconCommon";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Tourist notifications
-const notificationsData = [
-  {
-    id: 1,
-    type: "booking_confirmed",
-    title: "Đặt tour thành công!",
-    message:
-      "Hướng dẫn viên Minh Hương đã chấp nhận yêu cầu đặt tour 'Bí mật Hoàng cung Huế'. Vui lòng thanh toán để giữ chỗ.",
-    time: "10 phút trước",
-    isRead: false,
-    link: "/dashboard/tourist/history", // Link tới lịch sử để thanh toán
-  },
-  {
-    id: 2,
-    type: "payment_success",
-    title: "Thanh toán thành công",
-    message:
-      "Bạn đã thanh toán 500.000đ cho tour 'Food Tour: Ẩm thực đường phố'.",
-    time: "1 ngày trước",
-    isRead: false,
-    link: "/dashboard/tourist/history",
-  },
-  {
-    id: 3,
-    type: "reminder",
-    title: "Nhắc nhở lịch trình",
-    message:
-      "Ngày mai (20/05) bạn có chuyến tham quan Đại Nội lúc 08:00. Hãy chuẩn bị sẵn sàng nhé!",
-    time: "2 ngày trước",
-    isRead: true,
-    link: "/dashboard/tourist",
-  },
-  {
-    id: 4,
-    type: "system",
-    title: "Chào mừng bạn mới",
-    message:
-      "Cảm ơn bạn đã tham gia Vi Vu Cố Đô. Hãy cập nhật hồ sơ để có trải nghiệm tốt nhất.",
-    time: "1 tuần trước",
-    isRead: true,
-    link: "/dashboard/tourist/profile",
-  },
-];
-
 export default function TouristNotifications() {
-  const [notifications, setNotifications] = useState(notificationsData);
   const [filter, setFilter] = useState("all");
+
+  // Fetch notifications from API
+  const {
+    notifications: apiNotifications,
+    isLoading,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+  } = useNotifications();
+
+  const getNotificationTitle = (type) => {
+    const titles = {
+      booking_confirmed: "Xác nhận đặt tour",
+      booking_cancelled: "Hủy đặt tour",
+      payment_success: "Thanh toán",
+      reminder: "Nhắc nhở",
+      system: "Thông báo hệ thống",
+    };
+    return titles[type] || "Thông báo";
+  };
+
+  const formatTimeAgo = (date) => {
+    const now = new Date();
+    const past = new Date(date);
+    const diff = Math.floor((now - past) / 1000); // seconds
+
+    if (diff < 60) return "Vừa xong";
+    if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)} ngày trước`;
+    return `${Math.floor(diff / 604800)} tuần trước`;
+  };
+
+  // Transform notifications
+  const notifications = useMemo(() => {
+    if (!apiNotifications) return [];
+
+    return apiNotifications.map((n) => ({
+      id: n._id,
+      type: n.type || "system",
+      title: getNotificationTitle(n.type),
+      message: n.content || n.message || "",
+      time: n.timeAgo || formatTimeAgo(n.createdAt),
+      isRead: n.is_read || n.isRead || false,
+      link: n.url || n.link || n.actionUrl || null,
+    }));
+  }, [apiNotifications]);
 
   const filteredNotis = notifications.filter(
     (n) => filter === "all" || (filter === "unread" && !n.isRead)
   );
 
-  const markAsRead = (id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+  const handleMarkAsRead = (id) => {
+    markAsRead(id);
   };
 
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  const handleMarkAllRead = () => {
+    markAllAsRead();
   };
 
-  const deleteNoti = (id) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  const handleDelete = (id) => {
+    deleteNotification(id);
   };
 
   const getIcon = (type) => {
@@ -120,6 +119,14 @@ export default function TouristNotifications() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 w-full">
       {/* Header */}
@@ -159,7 +166,7 @@ export default function TouristNotifications() {
       {/* Actions Bar */}
       <div className="flex justify-end border-b border-border-light pb-2">
         <button
-          onClick={markAllRead}
+          onClick={handleMarkAllRead}
           className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
         >
           <IconCheck className="w-4 h-4" /> Đánh dấu tất cả là đã đọc
@@ -210,7 +217,7 @@ export default function TouristNotifications() {
                 {noti.link && (
                   <Link
                     to={noti.link}
-                    onClick={() => markAsRead(noti.id)}
+                    onClick={() => handleMarkAsRead(noti.id)}
                     className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1"
                   >
                     Xem chi tiết
@@ -227,7 +234,7 @@ export default function TouristNotifications() {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  deleteNoti(noti.id);
+                  handleDelete(noti.id);
                 }}
                 className="absolute bottom-4 right-4 p-2 text-text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Xóa thông báo"

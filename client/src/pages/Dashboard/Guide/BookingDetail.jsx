@@ -1,6 +1,9 @@
 import React from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import Breadcrumbs from "../../../components/Breadcrumbs/Breadcrumbs";
+import { useBookingById } from "../../../features/guides/hooks";
+import guidesApi from "../../../features/guides/api";
+import { formatCurrency } from "../../../lib/formatters";
 import {
   IconCalendar,
   IconClock,
@@ -19,45 +22,37 @@ import {
   IconInfo,
 } from "../../../icons/IconCommon";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Booking details
-const booking = {
-  id: "BK-901",
-  created_at: "22/05/2025 09:30",
-  status: "pending", // pending, confirmed, completed, cancelled
-  tour: {
-    id: 1,
-    name: "Bí mật Hoàng cung Huế & Trải nghiệm trà chiều",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-    duration: "4 giờ",
-    location: "Đại Nội, Huế",
-  },
-  tourist: {
-    name: "Nguyễn Văn A",
-    avatar:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
-    email: "nguyenvana@email.com",
-    phone: "0905 *** *** (Hiện sau khi chấp nhận)",
-    rating: 5.0,
-    reviews: 3,
-  },
-  schedule: {
-    date: "25/05/2025",
-    time: "08:00 - 12:00",
-    guests: 4,
-    adults: 2,
-    children: 2,
-  },
-  payment: {
-    total: "3.600.000đ",
-    method: "Ví MoMo",
-    paymentStatus: "pending", // pending (chờ HDV duyệt), paid, refunded
-  },
-  note: "Gia đình tôi có người lớn tuổi, mong HDV di chuyển chậm và chuẩn bị xe điện nếu có thể trong Đại Nội.",
-};
+// Inline Icons
+const IconLoader = ({ className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+  </svg>
+);
+
+const IconShieldCheck = ({ className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+);
 
 // Helper Badge
 const getStatusBadge = (status) => {
@@ -93,7 +88,112 @@ const getStatusBadge = (status) => {
 };
 
 export default function GuideBookingDetail() {
-  const { id: _id } = useParams(); // Lấy ID từ URL (nếu có)
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const {
+    booking: bookingData,
+    isLoading,
+    error,
+    refetch,
+  } = useBookingById(id);
+
+  // Handle approve
+  const handleApprove = async () => {
+    try {
+      await guidesApi.approveBooking(id);
+      alert("Đã chấp nhận yêu cầu đặt tour!");
+      refetch();
+    } catch (error) {
+      alert(error.message || "Không thể chấp nhận yêu cầu");
+    }
+  };
+
+  // Handle reject
+  const handleReject = async () => {
+    const note = prompt("Lý do từ chối (không bắt buộc):");
+    if (note === null) return;
+    try {
+      await guidesApi.rejectBooking(id, note || "");
+      alert("Đã từ chối yêu cầu đặt tour!");
+      navigate("/dashboard/guide/requests");
+    } catch (error) {
+      alert(error.message || "Không thể từ chối yêu cầu");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <IconLoader className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !bookingData) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-red-600 font-bold mb-2">
+          Không thể tải thông tin booking
+        </p>
+        <p className="text-text-secondary text-sm">{error}</p>
+      </div>
+    );
+  }
+
+  // Map API data to display format
+  const booking = {
+    id: bookingData._id,
+    created_at: new Date(bookingData.created_at).toLocaleString("vi-VN"),
+    status:
+      bookingData.status === "waiting_guide"
+        ? "pending"
+        : bookingData.status === "accepted" || bookingData.status === "paid"
+        ? "confirmed"
+        : bookingData.status === "completed"
+        ? "completed"
+        : "cancelled",
+    tour: {
+      id: bookingData.tour_id?._id,
+      name: bookingData.tour_id?.name || "Tour",
+      image:
+        bookingData.tour_id?.images?.[0] ||
+        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
+      duration: bookingData.tour_id?.duration || "4 giờ",
+      location: bookingData.tour_id?.location?.name || "Huế",
+    },
+    tourist: {
+      name: bookingData.customer_id?.name || "Khách hàng",
+      avatar:
+        bookingData.customer_id?.avatar_url ||
+        "https://i.pravatar.cc/150?img=11",
+      email: bookingData.customer_id?.email || "N/A",
+      phone: bookingData.customer_id?.phone_number || "N/A",
+      rating: 5.0,
+      reviews: 0,
+    },
+    schedule: {
+      date: new Date(bookingData.start_date).toLocaleDateString("vi-VN"),
+      time: bookingData.start_time || "08:00",
+      guests: bookingData.participants?.filter((p) => p.count_slot).length || 0,
+      adults:
+        bookingData.participants?.filter((p) => p.count_slot && p.age >= 12)
+          .length || 0,
+      children:
+        bookingData.participants?.filter((p) => p.count_slot && p.age < 12)
+          .length || 0,
+    },
+    payment: {
+      total: formatCurrency(bookingData.total_price),
+      method:
+        bookingData.payment_method === "momo"
+          ? "Ví MoMo"
+          : bookingData.payment_method === "vnpay"
+          ? "VNPay"
+          : "Tiền mặt",
+      paymentStatus: bookingData.payment_status || "pending",
+    },
+    note: bookingData.customer_note || "Không có ghi chú",
+  };
 
   return (
     <div className="space-y-8 pb-20">
@@ -123,10 +223,16 @@ export default function GuideBookingDetail() {
           {/* Quick Actions (Desktop) */}
           {booking.status === "pending" && (
             <div className="flex gap-3 hidden md:flex">
-              <button className="px-6 py-2.5 rounded-xl border border-red-100 text-red-600 bg-red-50 hover:bg-red-100 font-bold text-sm flex items-center gap-2 transition-colors">
+              <button
+                onClick={handleReject}
+                className="px-6 py-2.5 rounded-xl border border-red-100 text-red-600 bg-red-50 hover:bg-red-100 font-bold text-sm flex items-center gap-2 transition-colors"
+              >
                 <IconX className="w-4 h-4" /> Từ chối
               </button>
-              <button className="px-6 py-2.5 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 flex items-center gap-2 shadow-lg shadow-primary/20 transition-all">
+              <button
+                onClick={handleApprove}
+                className="px-6 py-2.5 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 flex items-center gap-2 shadow-lg shadow-primary/20 transition-all"
+              >
                 <IconCheck className="w-4 h-4" /> Chấp nhận ngay
               </button>
             </div>
@@ -334,14 +440,22 @@ export default function GuideBookingDetail() {
           </div>
 
           {/* Mobile Sticky Action Bar (Only visible on mobile) */}
-          <div className="fixed bottom-0 left-0 w-full bg-white border-t border-border-light p-4 z-40 md:hidden flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] safe-area-pb">
-            <button className="flex-1 py-3 rounded-xl border border-red-100 text-red-600 bg-red-50 font-bold text-sm">
-              Từ chối
-            </button>
-            <button className="flex-1 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg">
-              Chấp nhận
-            </button>
-          </div>
+          {booking.status === "pending" && (
+            <div className="fixed bottom-0 left-0 w-full bg-white border-t border-border-light p-4 z-40 md:hidden flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] safe-area-pb">
+              <button
+                onClick={handleReject}
+                className="flex-1 py-3 rounded-xl border border-red-100 text-red-600 bg-red-50 font-bold text-sm"
+              >
+                Từ chối
+              </button>
+              <button
+                onClick={handleApprove}
+                className="flex-1 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg"
+              >
+                Chấp nhận
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

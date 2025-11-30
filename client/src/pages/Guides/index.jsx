@@ -1,15 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
 import GuideCard from "../../components/Cards/GuideCard";
 import { IconSearch } from "../../icons/IconSearch";
 import { IconChevronDown } from "../../icons/IconChevronDown";
 import IconChevronLeft from "../../icons/IconChevronLeft";
 import IconChevronRight from "../../icons/IconChevronRight";
+import Spinner from "../../components/Loaders/Spinner";
+import { useFeaturedGuides } from "../../features/guides/hooks";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Tour guides (16 total)
+// Mock data for filters (kept as static)
 const originalGuides = [
   {
     id: 1,
@@ -118,12 +117,31 @@ const filters = [
 export default function GuidesPage() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [search, setSearch] = useState("");
-
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef(null);
-
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  // Fetch guides from API
+  const { guides: apiGuides, isLoading } = useFeaturedGuides(50);
+
+  // Map API guides to display format
+  const guidesData = useMemo(() => {
+    return (apiGuides || []).map((guide) => ({
+      id: guide.user_id?._id || guide.user_id, // Use user_id for profile link
+      name: guide.user_id?.name || "Guide",
+      specialty: guide.introduction || "Hướng dẫn viên",
+      rating: guide.rating || 5.0,
+      image:
+        guide.user_id?.avatar_url ||
+        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/1.jpg",
+      languages: (guide.languages || []).map((l) => l.toUpperCase()),
+      bio: guide.user_id?.bio || guide.experience || "Khám phá Huế cùng tôi!",
+      tags: guide.expertise
+        ? guide.expertise.split(",").map((t) => t.trim().toLowerCase())
+        : [],
+    }));
+  }, [apiGuides]);
 
   const filteredGuides = guidesData.filter((g) => {
     const matchSearch = g.name.toLowerCase().includes(search.toLowerCase());
@@ -257,7 +275,11 @@ export default function GuidesPage() {
         </div>
 
         {/* 3. Guides Grid */}
-        {currentItems.length > 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <Spinner size="lg" />
+          </div>
+        ) : currentItems.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {currentItems.map((guide) => (
               <div key={guide.id} className="h-[420px]">

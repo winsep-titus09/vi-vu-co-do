@@ -1,84 +1,19 @@
 // src/pages/Blog/index.jsx
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
 import BlogCard from "../../components/Cards/BlogCard";
+import Spinner from "../../components/Loaders/Spinner";
+import EmptyState from "../../components/Loaders/EmptyState";
+import { useArticles, useArticleCategories } from "../../features/posts/hooks";
 
 // Import Icons
 import { IconSearch } from "../../icons/IconSearch.jsx";
 import { IconChevronDown } from "../../icons/IconChevronDown.jsx";
 import IconInstagram from "../../icons/IconInstagram.jsx";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-const categories = [
-  { id: "all", label: "Tất cả chủ đề" },
-  { id: "food", label: "Ẩm thực Huế" },
-  { id: "culture", label: "Văn hóa & Di sản" },
-  { id: "tips", label: "Kinh nghiệm du lịch" },
-  { id: "art", label: "Nghệ thuật & Nhiếp ảnh" },
-];
-
-const blogPosts = [
-  {
-    id: 1,
-    title: "10 trải nghiệm về đêm 'không ngủ' tại Cố đô Huế",
-    slug: "10-trai-nghiem-ve-dem-hue",
-    date: "15 Th3, 2025",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/cautrangtien1.jpg",
-    categoryId: "tips",
-  },
-  {
-    id: 2,
-    title: "Truy tìm quán Bún Bò Huế chuẩn vị người bản địa",
-    slug: "quan-bun-bo-hue-chuan-vi",
-    date: "12 Th3, 2025",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
-    categoryId: "food",
-  },
-  {
-    id: 3,
-    title: "Bí ẩn phong thủy lăng Tự Đức: Khi kiến trúc kể chuyện",
-    slug: "phong-thuy-lang-tu-duc",
-    date: "10 Th3, 2025",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
-    categoryId: "culture",
-  },
-  {
-    id: 4,
-    title: "Một ngày làm nông dân tại làng rau Trà Quế",
-    slug: "lang-rau-thuy-bieu",
-    date: "08 Th3, 2025",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg",
-    categoryId: "art",
-  },
-  {
-    id: 5,
-    title: "Check-in làng hương Thủy Xuân rực rỡ",
-    slug: "lang-huong-thuy-xuan",
-    date: "05 Th3, 2025",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuatuhieu1.jpg",
-    categoryId: "tips",
-  },
-  {
-    id: 6,
-    title: "Thưởng trà & Nghe pháp thoại tại chùa Từ Hiếu",
-    slug: "thien-tra-tu-hieu",
-    date: "01 Th3, 2025",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/ngomon_3d_placeholder.jpg",
-    categoryId: "culture",
-  },
-];
-
-// Mock Gallery
+// Mock Gallery (static content - Instagram feed)
 const galleryImages = [
   "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
   "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/hoanghon.jpg",
@@ -91,18 +26,47 @@ const galleryImages = [
 export default function BlogPage() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-
   const [isTopicOpen, setIsTopicOpen] = useState(false);
   const topicRef = useRef(null);
 
-  const filteredPosts = blogPosts.filter((post) => {
-    const matchCategory =
-      activeCategory === "all" || post.categoryId === activeCategory;
-    const matchSearch = post.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    return matchCategory && matchSearch;
-  });
+  // Fetch categories from API
+  const { categories: apiCategories, isLoading: categoriesLoading } =
+    useArticleCategories();
+
+  // Build categories array with "all" option
+  const categories = useMemo(() => {
+    const all = { _id: "all", name: "Tất cả chủ đề", slug: "all" };
+    return [all, ...(apiCategories || [])];
+  }, [apiCategories]);
+
+  // Fetch articles with filters
+  const params = useMemo(() => {
+    const p = { limit: 20 };
+    if (searchQuery) p.q = searchQuery;
+    if (activeCategory !== "all") p.categoryId = activeCategory;
+    return p;
+  }, [searchQuery, activeCategory]);
+
+  const { articles, isLoading, error } = useArticles(params);
+
+  // Map articles to BlogCard format
+  const mappedArticles = useMemo(() => {
+    return (articles || []).map((article) => ({
+      id: article._id,
+      title: article.title,
+      slug: article.slug || article._id,
+      date: new Date(
+        article.publishedAt || article.createdAt
+      ).toLocaleDateString("vi-VN"),
+      image:
+        article.cover_image ||
+        article.images?.[0] ||
+        "/images/placeholders/hero_slide_1.jpg",
+      category: article.categoryId?.name || "Bài viết",
+      categoryId: article.categoryId?._id,
+      author: article.authorId?.name || "Vi Vu Cố Đô",
+    }));
+  }, [articles]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -151,7 +115,7 @@ export default function BlogPage() {
                   `}
                 >
                   <span className="text-sm font-medium text-text-primary truncate">
-                    {categories.find((c) => c.id === activeCategory)?.label ||
+                    {categories.find((c) => c._id === activeCategory)?.name ||
                       "Chủ đề"}
                   </span>
                   <IconChevronDown
@@ -165,21 +129,21 @@ export default function BlogPage() {
                   <div className="absolute top-full right-0 w-full mt-2 bg-white rounded-2xl shadow-xl border border-border-light py-2 z-50 animate-fade-in-up">
                     {categories.map((cat) => (
                       <div
-                        key={cat.id}
+                        key={cat._id}
                         onClick={() => {
-                          setActiveCategory(cat.id);
+                          setActiveCategory(cat._id);
                           setIsTopicOpen(false);
                         }}
                         className={`
                           px-4 py-2.5 text-sm cursor-pointer transition-colors
                           ${
-                            activeCategory === cat.id
+                            activeCategory === cat._id
                               ? "bg-primary/10 text-primary font-bold"
                               : "text-text-primary hover:bg-bg-main hover:text-primary"
                           }
                         `}
                       >
-                        {cat.label}
+                        {cat.name}
                       </div>
                     ))}
                   </div>
@@ -207,26 +171,37 @@ export default function BlogPage() {
         <div className="hidden md:flex flex-wrap items-center gap-3 pb-2 border-b border-border-light/60">
           {categories.map((cat) => (
             <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
+              key={cat._id}
+              onClick={() => setActiveCategory(cat._id)}
               className={`
                 px-6 py-2.5 rounded-full text-sm font-bold transition-all border
                 ${
-                  activeCategory === cat.id
+                  activeCategory === cat._id
                     ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
                     : "bg-white text-text-secondary border-border-light hover:border-primary hover:text-primary"
                 }
               `}
             >
-              {cat.label}
+              {cat.name}
             </button>
           ))}
         </div>
 
         {/* 3. BLOG GRID */}
-        {filteredPosts.length > 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center items-center py-20">
+            <Spinner size="lg" />
+          </div>
+        ) : error ? (
+          <EmptyState
+            title="Lỗi tải dữ liệu"
+            message={error}
+            actionLabel="Thử lại"
+            onAction={() => window.location.reload()}
+          />
+        ) : mappedArticles.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
-            {filteredPosts.map((post) => (
+            {mappedArticles.map((post) => (
               <div key={post.id}>
                 <BlogCard post={post} />
               </div>

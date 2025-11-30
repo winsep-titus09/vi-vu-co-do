@@ -3,6 +3,11 @@
 import React, { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
+import Spinner from "../../components/Loaders/Spinner";
+import EmptyState from "../../components/Loaders/EmptyState";
+import { useArticle } from "../../features/posts/hooks";
+import { toursApi } from "../../features/tours/api";
+import { formatDate } from "../../lib/formatters";
 // Correct icon imports: only some come from IconBox, others from individual files
 import {
   IconClock,
@@ -15,82 +20,34 @@ import {
 import { IconUser } from "../../icons/IconUser";
 import IconArrowRight from "../../icons/IconArrowRight";
 import BlogCard from "../../components/Cards/BlogCard";
-
-// Import thêm các icon mạng xã hội nếu có (hoặc dùng tạm text)
-
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Blog post details
-const postData = {
-  id: 1,
-  title:
-    "10 trải nghiệm về đêm 'không ngủ' tại Cố đô Huế: Từ Hoàng cung ra Phố thị",
-  category: "Kinh nghiệm du lịch",
-  date: "15 Tháng 3, 2025",
-  author: "Minh Hương",
-  readTime: "6 phút đọc",
-  image:
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/cautrangtien1.jpg",
-  // Nội dung giả lập HTML
-  content: `
-    <p class="lead">Huế không chỉ trầm mặc với đền đài lăng tẩm. Khi hoàng hôn buông xuống bên dòng Hương Giang, một Huế rất khác sẽ thức giấc - rực rỡ, sống động và đầy mê hoặc.</p>
-    
-    <h2>1. Dạo thuyền rồng nghe Ca Huế</h2>
-    <p>Không thể nói đã đến Huế nếu chưa từng ngồi thuyền rồng trôi nhẹ trên sông Hương. Trong không gian tĩnh mịch của màn đêm, tiếng đàn tranh, đàn bầu hòa quyện cùng giọng hát ngọt ngào của các nghệ sĩ tạo nên một trải nghiệm thính giác khó quên.</p>
-    <blockquote>"Tiếng ca Huế trên sông Hương không chỉ là âm nhạc, đó là hồn cốt của vùng đất Cố đô được gửi gắm qua từng nhịp phách."</blockquote>
-    <p>Bạn có thể mua vé tại bến Tòa Khâm. Giá vé dao động từ 100.000đ - 150.000đ/người tùy thời điểm.</p>
-
-    <h2>2. Khám phá Đại Nội về đêm</h2>
-    <p>Chương trình "Đại Nội về đêm" mở ra một không gian lung linh huyền ảo. Ngọ Môn rực sáng ánh đèn, lầu Ngũ Phụng soi bóng nước hồ sen. Đây là cơ hội tuyệt vời để bạn chiêm ngưỡng vẻ đẹp kiến trúc cung đình dưới một góc nhìn hoàn toàn mới lạ.</p>
-    <img src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg" alt="Đại Nội về đêm" />
-    <p class="caption">Đại Nội Huế lung linh dưới ánh đèn nghệ thuật.</p>
-
-    <h2>3. Phố đi bộ Phạm Ngũ Lão - Chu Văn An - Võ Thị Sáu</h2>
-    <p>Được mệnh danh là "Khu phố Tây" của Huế, nơi đây tập trung nhiều quán bar, pub, nhà hàng nhộn nhịp. Không khí trẻ trung, sôi động khác hẳn với vẻ yên bình thường thấy của thành phố.</p>
-    
-    <h2>4. Thưởng thức ẩm thực đêm</h2>
-    <p>Đừng quên ghé chợ đêm cầu ngói Thanh Toàn hoặc khu vực chân cầu Tràng Tiền để thưởng thức bánh mì o Tho, bún bò mệ Kéo hay chè hẻm. Hương vị cay nồng đặc trưng của món Huế sẽ làm ấm lòng du khách trong tiết trời se lạnh về đêm.</p>
-  `,
-  relatedTour: {
-    id: 1,
-    title: "Tour Đêm Hoàng Cung & Trải nghiệm 3D",
-    price: 42,
-    rating: 4.9,
-    reviews: 122,
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/ngomon_3d_placeholder.jpg",
-  },
-};
-
-const relatedPosts = [
-  {
-    id: 2,
-    title: "Truy tìm quán Bún Bò Huế chuẩn vị người bản địa",
-    slug: "quan-bun-bo-hue-chuan-vi",
-    date: "12 Th3, 2025",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
-    category: "Ẩm thực",
-    categoryId: "food",
-    author: "Trần Văn",
-  },
-  {
-    id: 5,
-    title: "Check-in làng hương Thủy Xuân rực rỡ sắc màu",
-    slug: "lang-huong-thuy-xuan",
-    date: "05 Th3, 2025",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuatuhieu1.jpg",
-    category: "Điểm đến",
-    categoryId: "tips",
-    author: "Minh Anh",
-  },
-];
+import TourCard from "../../components/Cards/TourCard";
 
 export default function PostDetail() {
-  const { slug } = useParams();
+  const { slug } = useParams(); // slug is actually the article ID from routes
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [relatedTours, setRelatedTours] = useState([]);
+  const [toursLoading, setToursLoading] = useState(false);
+
+  // Fetch article from API
+  const { article, isLoading, error } = useArticle(slug);
+
+  // Fetch related tours
+  useEffect(() => {
+    const fetchRelatedTours = async () => {
+      try {
+        setToursLoading(true);
+        const response = await toursApi.getFeaturedTours(3);
+        const tours = response?.items || response || [];
+        setRelatedTours(tours.slice(0, 3));
+      } catch (err) {
+        console.error("Error fetching related tours:", err);
+      } finally {
+        setToursLoading(false);
+      }
+    };
+
+    fetchRelatedTours();
+  }, []);
 
   // Logic tính toán thanh tiến trình đọc
   useEffect(() => {
@@ -102,6 +59,52 @@ export default function PostDetail() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-bg-main flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !article) {
+    return (
+      <div className="min-h-screen bg-bg-main pt-20">
+        <div className="container-main">
+          <EmptyState
+            title="Không tìm thấy bài viết"
+            message={error || "Bài viết không tồn tại hoặc chưa được phê duyệt"}
+            actionLabel="Quay lại danh sách"
+            onAction={() => (window.location.href = "/blog")}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Map article data
+  const postData = {
+    id: article._id,
+    title: article.title,
+    category: article.categoryId?.name || "Bài viết",
+    date: formatDate(article.publishedAt || article.createdAt),
+    author: article.authorId?.name || "Vi Vu Cố Đô",
+    readTime: `${Math.ceil(
+      (article.content_html?.length || 0) / 1000
+    )} phút đọc`,
+    image:
+      article.cover_image ||
+      article.images?.[0] ||
+      "/images/placeholders/hero_slide_1.jpg",
+    content: article.content_html || "<p>Nội dung đang được cập nhật...</p>",
+    authorAvatar:
+      article.authorId?.avatar_url ||
+      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/guides/guide_female_1.jpg",
+    authorBio: article.authorId?.bio || "Hướng dẫn viên địa phương tại Huế",
+  };
 
   return (
     <div className="min-h-screen bg-bg-main pb-20 pt-0">
@@ -236,7 +239,7 @@ export default function PostDetail() {
             <div className="mt-8 p-6 md:p-8 rounded-3xl bg-white border border-border-light flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left shadow-sm">
               <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-primary/20 shadow-md shrink-0">
                 <img
-                  src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/guides/guide_female_1.jpg"
+                  src={postData.authorAvatar}
                   alt={postData.author}
                   className="w-full h-full object-cover"
                 />
@@ -249,156 +252,71 @@ export default function PostDetail() {
                   {postData.author}
                 </h3>
                 <p className="text-sm text-text-secondary leading-relaxed">
-                  Hướng dẫn viên tự do với 5 năm kinh nghiệm tại Huế. Đam mê
-                  lịch sử triều Nguyễn và nhiếp ảnh đường phố.
+                  {postData.authorBio}
                 </p>
-                <Link
-                  to="/guides/1"
-                  className="text-sm font-bold text-primary hover:underline mt-3 inline-flex items-center gap-1"
-                >
-                  Xem hồ sơ & Tour của tôi{" "}
-                  <IconArrowRight className="w-3 h-3" />
-                </Link>
+                {article.authorId && (
+                  <Link
+                    to={`/guides/${article.authorId._id}`}
+                    className="text-sm font-bold text-primary hover:underline mt-3 inline-flex items-center gap-1"
+                  >
+                    Xem hồ sơ & Tour của tôi{" "}
+                    <IconArrowRight className="w-3 h-3" />
+                  </Link>
+                )}
               </div>
             </div>
 
-            {/* --- NEW SECTION: BÀI VIẾT LIÊN QUAN --- */}
-            <div className="mt-16 pt-10 border-t border-border-light">
-              <h3 className="text-2xl font-heading font-bold text-text-primary mb-6">
-                Có thể bạn quan tâm
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {relatedPosts.map((post) => (
-                  <BlogCard key={post.id} post={post} layout="vertical" />
-                ))}
-              </div>
-            </div>
-
-            {/* --- NEW SECTION: BÌNH LUẬN --- */}
-            <div className="mt-12">
-              <h3 className="text-2xl font-heading font-bold text-text-primary mb-6">
-                Thảo luận (3)
-              </h3>
-
-              {/* Form Bình luận */}
-              <div className="bg-white p-6 rounded-3xl border border-border-light mb-8 shadow-sm">
-                <div className="flex gap-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
-                    Bạn
-                  </div>
-                  <div className="flex-1">
-                    <textarea
-                      placeholder="Bạn nghĩ sao về bài viết này? Hãy để lại bình luận..."
-                      className="w-full p-3 rounded-xl border border-border-light bg-bg-main/30 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-none h-24 transition-all text-sm"
-                    ></textarea>
-                    <div className="flex justify-end mt-3">
-                      <button className="px-6 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
-                        Gửi bình luận
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* List Bình luận (Demo) */}
-              <div className="space-y-6">
-                {[
-                  {
-                    name: "Hoàng Nam",
-                    date: "2 giờ trước",
-                    content:
-                      "Bài viết rất chi tiết! Mình dự định đi Huế tháng sau, chắc chắn sẽ thử trải nghiệm Ca Huế trên sông Hương.",
-                    avatar: "H",
-                  },
-                  {
-                    name: "Thu Thảo",
-                    date: "1 ngày trước",
-                    content:
-                      "Cho mình hỏi vé tham quan Đại Nội ban đêm mua ở đâu vậy ạ? Có cần đặt trước không?",
-                    avatar: "T",
-                  },
-                ].map((comment, idx) => (
-                  <div key={idx} className="flex gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-text-secondary font-bold shrink-0">
-                      {comment.avatar}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-sm font-bold text-text-primary">
-                          {comment.name}
-                        </h4>
-                        <span className="text-xs text-text-secondary">
-                          • {comment.date}
-                        </span>
-                      </div>
-                      <p className="text-sm text-text-secondary leading-relaxed bg-white p-3 rounded-xl border border-border-light rounded-tl-none inline-block shadow-sm">
-                        {comment.content}
-                      </p>
-                      <div className="flex gap-4 mt-1 ml-1">
-                        <button className="text-xs font-medium text-text-secondary hover:text-primary transition-colors">
-                          Trả lời
-                        </button>
-                        <button className="text-xs font-medium text-text-secondary hover:text-primary transition-colors">
-                          Thích
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* TODO: BÀI VIẾT LIÊN QUAN - Requires API endpoint for related articles */}
+            {/* TODO: BÌNH LUẬN - Requires comments API */}
           </div>
 
-          {/* --- RIGHT COLUMN: SIDEBAR (Tour Upsell) --- */}
+          {/* --- RIGHT COLUMN: SIDEBAR --- */}
           <div className="col-span-1 lg:col-span-4 lg:pl-8">
             <div className="sticky top-32 space-y-8">
-              {/* Widget: Tour Liên Quan (Conversion Focus) */}
-              <div className="rounded-3xl border border-border-light bg-white p-5 shadow-xl shadow-primary/5 relative overflow-hidden group">
-                <div className="absolute top-0 left-0 w-full h-1.5 bg-secondary"></div>
-
-                <p className="text-xs font-bold uppercase text-text-secondary mb-4 tracking-wider">
-                  Trải nghiệm đề xuất
-                </p>
-
-                <div className="relative h-52 rounded-2xl overflow-hidden mb-4 cursor-pointer">
-                  <img
-                    src={postData.relatedTour.image}
-                    alt={postData.relatedTour.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
-                  <div className="absolute bottom-3 left-3 text-white">
-                    <p className="text-xs font-medium opacity-90">
-                      Khởi hành hàng ngày
-                    </p>
-                  </div>
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-sm font-bold text-primary shadow-sm">
-                    ${postData.relatedTour.price}
-                  </div>
+              {/* Tour Liên Quan */}
+              <div className="rounded-3xl border border-border-light bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-lg font-heading font-bold text-text-primary">
+                    Tour đề xuất
+                  </h3>
+                  <Link
+                    to="/tours"
+                    className="text-sm font-bold text-primary hover:underline"
+                  >
+                    Xem tất cả
+                  </Link>
                 </div>
 
-                <Link to={`/tours/${postData.relatedTour.id}`}>
-                  <h4 className="text-xl font-heading font-bold text-text-primary mb-2 group-hover:text-primary transition-colors leading-tight">
-                    {postData.relatedTour.title}
-                  </h4>
-                </Link>
-
-                <div className="flex items-center justify-between text-sm text-text-secondary mb-5">
-                  <div className="flex items-center gap-1">
-                    <span className="font-bold text-text-primary">
-                      {postData.relatedTour.rating}
-                    </span>
-                    <IconStar className="w-4 h-4 text-secondary fill-current" />
+                {toursLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner size="md" />
                   </div>
-                  <span>({postData.relatedTour.reviews} đánh giá)</span>
-                </div>
-
-                <Link
-                  to={`/tours/${postData.relatedTour.id}`}
-                  className="flex items-center justify-center w-full py-3.5 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20"
-                >
-                  Đặt ngay hôm nay
-                </Link>
+                ) : relatedTours.length > 0 ? (
+                  <div className="space-y-4">
+                    {relatedTours.map((tour) => (
+                      <TourCard
+                        key={tour._id || tour.id}
+                        tour={{
+                          id: tour._id || tour.id,
+                          title: tour.title,
+                          description: tour.description,
+                          image:
+                            tour.cover_image ||
+                            tour.images?.[0] ||
+                            "/images/placeholders/hero_slide_1.jpg",
+                          location: tour.location?.name || "Huế",
+                          duration: tour.duration || "1 ngày",
+                          rating: tour.rating || 5,
+                          price: tour.price || 0,
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-text-secondary text-center py-8">
+                    Chưa có tour đề xuất
+                  </p>
+                )}
               </div>
             </div>
           </div>

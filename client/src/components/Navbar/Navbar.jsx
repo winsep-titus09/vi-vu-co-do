@@ -1,7 +1,7 @@
 // src/components/Navbar/Navbar.jsx
 
-import React, { useState } from "react";
-import { NavLink, useLocation, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { NavLink, useLocation, Link, useNavigate } from "react-router-dom";
 import { IconSearch } from "../../icons/IconSearch";
 import { IconUser } from "../../icons/IconUser";
 import { IconMenu } from "../../icons/IconMenu";
@@ -9,23 +9,80 @@ import { IconX } from "../../icons/IconX";
 import { IconChevronDown } from "../../icons/IconChevronDown";
 import { IconSettings, IconHistory, IconLogout } from "../../icons/IconCommon";
 import Drawer from "../Modals/Drawer";
+import { listArticleCategories } from "../../features/posts/api";
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openMobileSubmenu, setOpenMobileSubmenu] = useState(null);
-
-  // Mock logged-in state
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
-  const user = {
-    name: "Hoàng Nam",
-    avatar:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg",
-    role: "tourist", // 'tourist' | 'guide' | 'admin'
-  };
-
+  const [user, setUser] = useState(null);
+  const [blogCategories, setBlogCategories] = useState([]);
+  const navigate = useNavigate();
   const location = useLocation();
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const articles = await listArticleCategories();
+        setBlogCategories(articles || []);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Check if user is logged in
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = localStorage.getItem("token");
+      const userData = localStorage.getItem("user");
+
+      if (token && userData) {
+        try {
+          setUser(JSON.parse(userData));
+        } catch (error) {
+          console.error("Error parsing user data:", error);
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    };
+
+    // Check on mount
+    checkAuth();
+
+    // Listen for storage changes (for cross-tab sync)
+    window.addEventListener("storage", checkAuth);
+
+    return () => {
+      window.removeEventListener("storage", checkAuth);
+    };
+  }, []);
+
+  // Re-check auth on location change (for same-tab updates)
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const userData = localStorage.getItem("user");
+
+    if (!token || !userData) {
+      setUser(null);
+    } else {
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        setUser(null);
+      }
+    }
+  }, [location.pathname]);
+
   const isBlogActive = location.pathname.startsWith("/blog");
-  const isPlacesActive = location.pathname.startsWith("/places");
 
   const toggleMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -37,8 +94,7 @@ export default function Navbar() {
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    alert("Đã đăng xuất!");
+    navigate("/auth/signout");
   };
 
   // ============================================================================
@@ -91,58 +147,30 @@ export default function Navbar() {
               <div className="absolute top-full left-0 w-48 pt-4 opacity-0 pointer-events-none scale-95 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:scale-100 transition-all duration-200 ease-out">
                 <div className="bg-white rounded-card shadow-card border border-border-light py-2 overflow-hidden">
                   <NavLink
-                    to="/blog/am-thuc"
-                    className="block px-4 py-2.5 text-base text-text-primary hover:bg-primary-light hover:text-primary"
+                    to="/blog"
+                    className="block px-4 py-2.5 text-base text-text-primary hover:bg-primary-light hover:text-primary font-medium"
                   >
-                    Ẩm thực
+                    Tất cả bài viết
                   </NavLink>
-                  <NavLink
-                    to="/blog/di-san"
-                    className="block px-4 py-2.5 text-base text-text-primary hover:bg-primary-light hover:text-primary"
-                  >
-                    Di sản
-                  </NavLink>
+                  {blogCategories.length > 0 && (
+                    <div className="my-1 border-t border-border-light" />
+                  )}
+                  {blogCategories.map((category) => (
+                    <NavLink
+                      key={category._id}
+                      to={`/blog/${category.slug}`}
+                      className="block px-4 py-2.5 text-base text-text-primary hover:bg-primary-light hover:text-primary"
+                    >
+                      {category.name}
+                    </NavLink>
+                  ))}
                 </div>
               </div>
             </div>
 
-            {/* Dropdown "Địa điểm" */}
-            <div className="relative group">
-              <button
-                type="button"
-                className={dropdownBtnClasses(isPlacesActive)}
-              >
-                Địa điểm <IconChevronDown className="h-4 w-4 opacity-70" />
-              </button>
-              <div className="absolute top-full left-0 w-48 pt-4 opacity-0 pointer-events-none scale-95 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:scale-100 transition-all duration-200 ease-out">
-                <div className="bg-white rounded-card shadow-card border border-border-light py-2 overflow-hidden">
-                  <NavLink
-                    to="/places/lang-tam"
-                    className="block px-4 py-2.5 text-base text-text-primary hover:bg-primary-light hover:text-primary"
-                  >
-                    Lăng tẩm
-                  </NavLink>
-                  <NavLink
-                    to="/places/chua"
-                    className="block px-4 py-2.5 text-base text-text-primary hover:bg-primary-light hover:text-primary"
-                  >
-                    Chùa
-                  </NavLink>
-                  <NavLink
-                    to="/places/check-in"
-                    className="block px-4 py-2.5 text-base text-text-primary hover:bg-primary-light hover:text-primary"
-                  >
-                    Check-in
-                  </NavLink>
-                  <NavLink
-                    to="/places/song-huong"
-                    className="block px-4 py-2.5 text-base text-text-primary hover:bg-primary-light hover:text-primary"
-                  >
-                    Sông Hương
-                  </NavLink>
-                </div>
-              </div>
-            </div>
+            <NavLink to="/places" className={navLinkClasses}>
+              Địa điểm
+            </NavLink>
 
             <NavLink to="/guides" className={navLinkClasses}>
               Hướng dẫn viên
@@ -161,18 +189,24 @@ export default function Navbar() {
             <div className="h-5 w-px bg-border-light"></div>
 
             {/* LOGGED IN USER MENU */}
-            {isLoggedIn ? (
+            {user ? (
               <div className="relative group z-50">
                 <button className="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border border-transparent hover:bg-gray-100 transition-all group-hover:border-border-light">
                   <span className="text-sm font-bold text-text-primary">
                     {user.name}
                   </span>
-                  <div className="w-8 h-8 rounded-full overflow-hidden border border-border-light">
-                    <img
-                      src={user.avatar}
-                      alt="Avatar"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-border-light bg-primary-light">
+                    {user.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt="Avatar"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-primary font-bold text-sm">
+                        {user.name?.charAt(0)?.toUpperCase()}
+                      </div>
+                    )}
                   </div>
                 </button>
 
@@ -272,14 +306,20 @@ export default function Navbar() {
         <div className="flex flex-col h-full bg-bg-main">
           {/* Header Drawer */}
           <div className="flex items-center justify-between p-5 border-b border-border-light">
-            {isLoggedIn ? (
+            {user ? (
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-border-light">
-                  <img
-                    src={user.avatar}
-                    alt="Avatar"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-border-light bg-primary-light">
+                  {user.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-primary font-bold">
+                      {user.name?.charAt(0)?.toUpperCase()}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-bold text-text-primary">
@@ -351,72 +391,39 @@ export default function Navbar() {
               {openMobileSubmenu === "blog" && (
                 <div className="ml-4 pl-4 border-l border-border-light flex flex-col gap-1 my-1">
                   <NavLink
-                    to="/blog/am-thuc"
+                    to="/blog"
                     onClick={toggleMenu}
-                    className="block p-2 text-sm text-text-secondary hover:text-primary"
+                    className="block p-2 text-sm text-text-secondary hover:text-primary font-medium"
                   >
-                    Ẩm thực
+                    Tất cả bài viết
                   </NavLink>
-                  <NavLink
-                    to="/blog/di-san"
-                    onClick={toggleMenu}
-                    className="block p-2 text-sm text-text-secondary hover:text-primary"
-                  >
-                    Di sản
-                  </NavLink>
+                  {blogCategories.map((category) => (
+                    <NavLink
+                      key={category._id}
+                      to={`/blog/${category.slug}`}
+                      onClick={toggleMenu}
+                      className="block p-2 text-sm text-text-secondary hover:text-primary"
+                    >
+                      {category.name}
+                    </NavLink>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Mobile Accordions - Places */}
-            <div>
-              <button
-                type="button"
-                onClick={() => handleSubmenuToggle("places")}
-                className={`w-full flex justify-between items-center p-3 rounded-lg text-base font-medium ${
-                  isPlacesActive ? "text-primary" : "text-text-primary"
-                }`}
-              >
-                Địa điểm{" "}
-                <IconChevronDown
-                  className={`h-4 w-4 transition-transform ${
-                    openMobileSubmenu === "places" ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-              {openMobileSubmenu === "places" && (
-                <div className="ml-4 pl-4 border-l border-border-light flex flex-col gap-1 my-1">
-                  <NavLink
-                    to="/places/lang-tam"
-                    onClick={toggleMenu}
-                    className="block p-2 text-sm text-text-secondary hover:text-primary"
-                  >
-                    Lăng tẩm
-                  </NavLink>
-                  <NavLink
-                    to="/places/chua"
-                    onClick={toggleMenu}
-                    className="block p-2 text-sm text-text-secondary hover:text-primary"
-                  >
-                    Chùa
-                  </NavLink>
-                  <NavLink
-                    to="/places/check-in"
-                    onClick={toggleMenu}
-                    className="block p-2 text-sm text-text-secondary hover:text-primary"
-                  >
-                    Check-in
-                  </NavLink>
-                  <NavLink
-                    to="/places/song-huong"
-                    onClick={toggleMenu}
-                    className="block p-2 text-sm text-text-secondary hover:text-primary"
-                  >
-                    Sông Hương
-                  </NavLink>
-                </div>
-              )}
-            </div>
+            <NavLink
+              to="/places"
+              onClick={toggleMenu}
+              className={({ isActive }) =>
+                `block p-3 rounded-lg text-base font-medium ${
+                  isActive
+                    ? "bg-primary-light text-primary"
+                    : "text-text-primary"
+                }`
+              }
+            >
+              Địa điểm
+            </NavLink>
 
             <NavLink
               to="/guides"
@@ -435,7 +442,7 @@ export default function Navbar() {
             <div className="my-2 border-t border-border-light" />
 
             {/* Mobile Auth Links */}
-            {isLoggedIn ? (
+            {user ? (
               <>
                 <Link
                   to="/dashboard/tourist"

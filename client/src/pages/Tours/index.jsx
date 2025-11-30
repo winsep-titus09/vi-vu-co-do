@@ -7,82 +7,33 @@ import { IconChevronDown } from "../../icons/IconChevronDown";
 import IconChevronLeft from "../../icons/IconChevronLeft";
 import IconChevronRight from "../../icons/IconChevronRight";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
+import { toursApi } from "../../features/tours/api";
+import { IconLoader } from "../../icons/IconCommon";
 
-// Mock Data
-const toursData = [
-  {
-    id: 1,
-    title: "Bí mật Hoàng cung Huế",
-    location: "Đại Nội",
-    duration: "4 giờ",
-    rating: 4.8,
-    price: 45,
-    description:
-      "Khám phá những câu chuyện thâm cung bí sử ít người biết tại Tử Cấm Thành cùng nhà sử học.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  },
-  {
-    id: 2,
-    title: "Hoàng hôn trên phá Tam Giang",
-    location: "Quảng Điền",
-    duration: "5 giờ",
-    rating: 4.9,
-    price: 40,
-    description:
-      "Trải nghiệm đời sống ngư dân, chèo thuyền SUP và thưởng thức hải sản tươi sống ngay trên đầm phá.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/cautrangtien1.jpg",
-  },
-  {
-    id: 3,
-    title: "Food Tour: Ẩm thực đường phố",
-    location: "Chợ Đông Ba",
-    duration: "3 giờ",
-    rating: 5.0,
-    price: 25,
-    description:
-      "Thưởng thức 10 món đặc sản Huế: Bún bò, bánh bèo, nậm, lọc, chè hẻm... tại các quán gia truyền.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
-  },
-  {
-    id: 4,
-    title: "Lăng tẩm & Phong thủy",
-    location: "Lăng Tự Đức",
-    duration: "4 giờ",
-    rating: 4.7,
-    price: 35,
-    description:
-      "Tìm hiểu về kiến trúc phong thủy độc đáo trong các lăng tẩm triều Nguyễn.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
-  },
-  {
-    id: 5,
-    title: "Thiền trà tại Chùa Từ Hiếu",
-    location: "Dương Xuân",
-    duration: "3 giờ",
-    rating: 4.9,
-    price: 30,
-    description:
-      "Tìm về sự an yên, thưởng trà và nghe pháp thoại tại ngôi chùa cổ kính.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuatuhieu1.jpg",
-  },
-  {
-    id: 6,
-    title: "Đạp xe về làng Thanh Thủy",
-    location: "Thủy Thanh",
-    duration: "6 giờ",
-    rating: 4.8,
-    price: 50,
-    description:
-      "Khám phá cầu ngói Thanh Toàn, trải nghiệm làm nông dân và nấu ăn cùng người địa phương.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg",
-  },
-];
+// Helper to convert MongoDB Decimal128 to number
+const toNumber = (val) => {
+  if (val?.$numberDecimal) return parseFloat(val.$numberDecimal);
+  return parseFloat(val) || 0;
+};
+
+// Helper to normalize tour data from API
+const normalizeTour = (tour) => ({
+  id: tour._id || tour.id,
+  title: tour.name || tour.title,
+  location: tour.locations?.[0]?.locationId?.name || tour.location || "Huế",
+  duration: tour.duration || "N/A",
+  rating: toNumber(tour.average_rating || tour.rating || 0),
+  price: toNumber(tour.price || 0),
+  category: tour.category_id?.slug || tour.category,
+  description: tour.description || "",
+  image:
+    tour.cover_image_url ||
+    tour.image_url ||
+    tour.images?.[0] ||
+    tour.image ||
+    "",
+  ...tour,
+});
 
 // Sort options
 const sortOptions = [
@@ -94,10 +45,63 @@ const sortOptions = [
 ];
 
 export default function ToursPage() {
+  // State cho tours data
+  const [tours, setTours] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [filters, setFilters] = useState({});
+  const limit = 12;
+
   // State cho Dropdown Sắp xếp
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [sortBy, setSortBy] = useState("Phổ biến nhất");
   const sortRef = useRef(null);
+
+  // Fetch tours from API
+  useEffect(() => {
+    const fetchTours = async () => {
+      try {
+        setIsLoading(true);
+        const params = {
+          page: currentPage,
+          limit: limit,
+        };
+
+        // Map filter fields to API params
+        if (filters.keyword) params.q = filters.keyword;
+        if (filters.category) params.category_id = filters.category;
+        if (filters.date) params.start_date = filters.date;
+        if (filters.maxPrice) params.price_max = filters.maxPrice;
+
+        // Add sorting logic
+        if (sortBy === "Giá thấp đến cao") params.sort = "price";
+        else if (sortBy === "Giá cao đến thấp") params.sort = "-price";
+        else if (sortBy === "Đánh giá cao nhất")
+          params.sort = "-average_rating";
+        else if (sortBy === "Mới nhất") params.sort = "-createdAt";
+
+        const response = await toursApi.listTours(params);
+
+        const toursData = Array.isArray(response?.items)
+          ? response.items.map(normalizeTour)
+          : Array.isArray(response)
+          ? response.map(normalizeTour)
+          : [];
+
+        setTours(toursData);
+        setTotalCount(response?.total || toursData.length);
+        setTotalPages(Math.ceil((response?.total || toursData.length) / limit));
+      } catch (err) {
+        console.error("Fetch tours error:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTours();
+  }, [currentPage, sortBy, filters]);
 
   // Xử lý click outside
   useEffect(() => {
@@ -113,6 +117,16 @@ export default function ToursPage() {
   const handleSelectSort = (option) => {
     setSortBy(option);
     setIsSortOpen(false);
+  };
+
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
+  const handleClearFilters = () => {
+    setFilters({});
+    setCurrentPage(1);
   };
 
   return (
@@ -137,7 +151,7 @@ export default function ToursPage() {
           </div>
 
           {/* Filter Bar */}
-          <FilterBar />
+          <FilterBar onFilterChange={handleFilterChange} />
         </div>
       </section>
 
@@ -147,9 +161,7 @@ export default function ToursPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <span className="text-sm font-medium text-text-secondary">
             Hiển thị{" "}
-            <span className="text-text-primary font-bold">
-              {toursData.length}
-            </span>{" "}
+            <span className="text-text-primary font-bold">{totalCount}</span>{" "}
             kết quả
           </span>
 
@@ -204,10 +216,14 @@ export default function ToursPage() {
         </div>
 
         {/* Grid Tours */}
-        {toursData.length > 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <IconLoader className="w-8 h-8 text-primary animate-spin" />
+          </div>
+        ) : tours.length > 0 ? (
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {toursData.map((tour) => (
-              <TourCard key={tour.id} tour={tour} />
+            {tours.map((tour) => (
+              <TourCard key={tour._id || tour.id} tour={tour} />
             ))}
           </div>
         ) : (
@@ -215,41 +231,79 @@ export default function ToursPage() {
             <p className="text-text-secondary text-lg">
               Không tìm thấy tour nào phù hợp với bộ lọc của bạn.
             </p>
-            <button className="mt-4 text-primary font-bold hover:underline">
+            <button
+              onClick={handleClearFilters}
+              className="mt-4 text-primary font-bold hover:underline"
+            >
               Xóa bộ lọc
             </button>
           </div>
         )}
 
         {/* Pagination (Modern Style) */}
-        <div className="mt-16 flex items-center justify-center gap-2">
-          {/* Nút Trước */}
-          <button className="w-10 h-10 flex items-center justify-center rounded-full border border-border-light bg-white text-text-secondary hover:bg-primary/5 hover:text-primary hover:border-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-            <IconChevronLeft className="w-5 h-5" />
-          </button>
+        {totalPages > 1 && (
+          <div className="mt-16 flex items-center justify-center gap-2">
+            {/* Nút Trước */}
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="w-10 h-10 flex items-center justify-center rounded-full border border-border-light bg-white text-text-secondary hover:bg-primary/5 hover:text-primary hover:border-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <IconChevronLeft className="w-5 h-5" />
+            </button>
 
-          {/* Các trang */}
-          <button className="w-10 h-10 flex items-center justify-center rounded-full bg-primary text-white font-bold shadow-md shadow-primary/20 transition-transform hover:scale-105">
-            1
-          </button>
-          <button className="w-10 h-10 flex items-center justify-center rounded-full text-text-secondary hover:bg-white hover:text-primary hover:shadow-sm transition-all">
-            2
-          </button>
-          <button className="w-10 h-10 flex items-center justify-center rounded-full text-text-secondary hover:bg-white hover:text-primary hover:shadow-sm transition-all">
-            3
-          </button>
-          <span className="w-10 h-10 flex items-center justify-center text-text-secondary/50">
-            ...
-          </span>
-          <button className="w-10 h-10 flex items-center justify-center rounded-full text-text-secondary hover:bg-white hover:text-primary hover:shadow-sm transition-all">
-            8
-          </button>
+            {/* Các trang */}
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
 
-          {/* Nút Sau */}
-          <button className="w-10 h-10 flex items-center justify-center rounded-full border border-border-light bg-white text-text-secondary hover:bg-primary/5 hover:text-primary hover:border-primary transition-all">
-            <IconChevronRight className="w-5 h-5" />
-          </button>
-        </div>
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-10 h-10 flex items-center justify-center rounded-full font-bold transition-all ${
+                    currentPage === pageNum
+                      ? "bg-primary text-white shadow-md shadow-primary/20 scale-105"
+                      : "text-text-secondary hover:bg-white hover:text-primary hover:shadow-sm"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+
+            {totalPages > 5 && currentPage < totalPages - 2 && (
+              <>
+                <span className="w-10 h-10 flex items-center justify-center text-text-secondary/50">
+                  ...
+                </span>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  className="w-10 h-10 flex items-center justify-center rounded-full text-text-secondary hover:bg-white hover:text-primary hover:shadow-sm transition-all"
+                >
+                  {totalPages}
+                </button>
+              </>
+            )}
+
+            {/* Nút Sau */}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="w-10 h-10 flex items-center justify-center rounded-full border border-border-light bg-white text-text-secondary hover:bg-primary/5 hover:text-primary hover:border-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <IconChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );

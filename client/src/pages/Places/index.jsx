@@ -1,71 +1,19 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
 import { IconMapPin, Icon3D } from "../../icons/IconBox";
 import { IconUser } from "../../icons/IconUser";
+import { IconLoader } from "../../icons/IconCommon";
+import { placesApi } from "../../features/places/api";
 
-// --- MOCK DATA: Highlight Places ---
-const highlightPlaces = [
-  {
-    id: 1,
-    name: "Vịnh Lăng Cô",
-    location: "Huyện Phú Lộc",
-    tag: "THIÊN NHIÊN",
-    desc: "Một trong những vịnh biển đẹp nhất thế giới với làn nước trong xanh.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/cautrangtien1.jpg",
-    colSpan: "md:col-span-2",
-  },
-  {
-    id: 2,
-    name: "Lăng Tự Đức",
-    location: "Thủy Xuân, TP. Huế",
-    tag: "DI SẢN",
-    desc: "Kiến trúc cầu kỳ, phong cảnh hữu tình bậc nhất triều Nguyễn.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
-    colSpan: "md:col-span-1",
-  },
-  {
-    id: 3,
-    name: "Rừng ngập mặn Rú Chá",
-    location: "Hương Phong, TP. Huế",
-    tag: "KHÁM PHÁ",
-    desc: "Khu rừng nguyên sinh duy nhất còn lại trên phá Tam Giang.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/bachma1.jpg",
-    colSpan: "md:col-span-1",
-  },
-  {
-    id: 4,
-    name: "Đồi Vọng Cảnh",
-    location: "Thủy Biều, TP. Huế",
-    tag: "THƯ GIÃN",
-    desc: "Nơi ngắm hoàng hôn sông Hương đẹp nhất xứ Huế.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/bachma3.jpg",
-    colSpan: "md:col-span-2",
-  },
-  {
-    id: 5,
-    name: "Hồ Thủy Tiên",
-    location: "Thủy Bằng, Hương Thủy",
-    tag: "BÍ ẨN",
-    desc: "Công viên nước bỏ hoang nổi tiếng thế giới với vẻ đẹp ma mị.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/ngomon_3d_placeholder.jpg",
-    colSpan: "md:col-span-2",
-  },
-  {
-    id: 6,
-    name: "Cầu Ngói Thanh Toàn",
-    location: "Thủy Thanh, Hương Thủy",
-    tag: "LÀNG QUÊ",
-    desc: "Kiệt tác kiến trúc 'thượng gia hạ kiều' hiếm có tại Việt Nam.",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
-    colSpan: "md:col-span-1",
-  },
+// Grid layout pattern for places
+const gridPattern = [
+  "md:col-span-2",
+  "md:col-span-1",
+  "md:col-span-1",
+  "md:col-span-2",
+  "md:col-span-2",
+  "md:col-span-1",
 ];
 
 // Mock data: Features section
@@ -94,6 +42,65 @@ const features = [
 ];
 
 export default function PlacesPage() {
+  const [locations, setLocations] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        setIsLoading(true);
+        const response = await placesApi.listLocations();
+        setLocations(response || []);
+      } catch (err) {
+        console.error("Fetch locations error:", err);
+        setError(err.message || "Không thể tải danh sách địa điểm");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLocations();
+  }, []);
+
+  // Take first 6 locations for highlight grid
+  const highlightPlaces = locations.slice(0, 6).map((loc, idx) => ({
+    id: loc._id,
+    name: loc.name,
+    location: loc.address || loc.category_id?.name || "Huế",
+    tag: loc.category_id?.name?.toUpperCase() || "ĐỊA ĐIỂM",
+    desc: loc.description || "Khám phá vẻ đẹp độc đáo của địa điểm này.",
+    image:
+      loc.images?.[0] ||
+      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
+    colSpan: gridPattern[idx % gridPattern.length],
+    slug: loc.slug,
+  }));
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-bg-main flex items-center justify-center">
+        <IconLoader className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-bg-main flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-bg-main pb-0 pt-6 overflow-x-hidden">
       {/* --- PART 1: CONTAINER CONTENT (Có giới hạn chiều rộng) --- */}
@@ -113,46 +120,54 @@ export default function PlacesPage() {
         </div>
 
         {/* FEATURED PLACES GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {highlightPlaces.map((place) => (
-            <div
-              key={place.id}
-              className={`group relative overflow-hidden rounded-3xl cursor-pointer ${place.colSpan} h-80 md:h-[450px] shadow-md`}
-            >
-              <img
-                src={place.image}
-                alt={place.name}
-                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/70 transition-colors duration-500"></div>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-8 group-hover:translate-y-0 z-20">
-                <div className="flex items-center gap-1.5 text-secondary mb-3 font-bold text-xs uppercase tracking-widest">
-                  <IconMapPin className="w-4 h-4" />
-                  <span>{place.location}</span>
+        {highlightPlaces.length === 0 ? (
+          <div className="text-center py-20">
+            <p className="text-text-secondary text-lg mb-4">
+              Chưa có địa điểm nào được thêm vào.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {highlightPlaces.map((place) => (
+              <div
+                key={place.id}
+                className={`group relative overflow-hidden rounded-3xl cursor-pointer ${place.colSpan} h-80 md:h-[450px] shadow-md`}
+              >
+                <img
+                  src={place.image}
+                  alt={place.name}
+                  className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/70 transition-colors duration-500"></div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-8 group-hover:translate-y-0 z-20">
+                  <div className="flex items-center gap-1.5 text-secondary mb-3 font-bold text-xs uppercase tracking-widest">
+                    <IconMapPin className="w-4 h-4" />
+                    <span>{place.location}</span>
+                  </div>
+                  <div className="border border-white/60 px-8 py-4 mb-5 backdrop-blur-sm bg-white/5">
+                    <h3 className="text-2xl md:text-3xl font-heading font-bold text-white tracking-widest uppercase leading-tight">
+                      {place.name}
+                    </h3>
+                  </div>
+                  <p className="text-white/90 text-base max-w-md mb-8 font-medium leading-relaxed">
+                    {place.desc}
+                  </p>
+                  <Link
+                    to={`/places/${place.slug || place.id}`}
+                    className="bg-white text-black px-8 py-3 rounded-full font-bold text-sm hover:bg-secondary hover:text-white transition-all uppercase tracking-wider shadow-lg transform hover:-translate-y-1"
+                  >
+                    Xem chi tiết
+                  </Link>
                 </div>
-                <div className="border border-white/60 px-8 py-4 mb-5 backdrop-blur-sm bg-white/5">
-                  <h3 className="text-2xl md:text-3xl font-heading font-bold text-white tracking-widest uppercase leading-tight">
-                    {place.name}
-                  </h3>
+                <div className="absolute bottom-8 left-8 z-10 transition-all duration-300 group-hover:opacity-0 group-hover:translate-y-4">
+                  <p className="text-white font-bold text-xl tracking-[0.2em] uppercase drop-shadow-lg border-l-4 border-secondary pl-4">
+                    {place.tag}
+                  </p>
                 </div>
-                <p className="text-white/90 text-base max-w-md mb-8 font-medium leading-relaxed">
-                  {place.desc}
-                </p>
-                <Link
-                  to={`/places/${place.id}`}
-                  className="bg-white text-black px-8 py-3 rounded-full font-bold text-sm hover:bg-secondary hover:text-white transition-all uppercase tracking-wider shadow-lg transform hover:-translate-y-1"
-                >
-                  Xem chi tiết
-                </Link>
               </div>
-              <div className="absolute bottom-8 left-8 z-10 transition-all duration-300 group-hover:opacity-0 group-hover:translate-y-4">
-                <p className="text-white font-bold text-xl tracking-[0.2em] uppercase drop-shadow-lg border-l-4 border-secondary pl-4">
-                  {place.tag}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* --- PART 2: FULL WIDTH FEATURES SECTION (Tràn viền) --- */}

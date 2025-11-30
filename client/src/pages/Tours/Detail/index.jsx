@@ -1,13 +1,16 @@
 // src/pages/Tours/Detail/index.jsx
 
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 
 import Breadcrumbs from "../../../components/Breadcrumbs/Breadcrumbs";
+import { toursApi } from "../../../features/tours/api";
+import { reviewsApi } from "../../../features/reviews/api";
+import { IconLoader } from "../../../icons/IconCommon";
 // Removed: import TourCard from "../../../components/Cards/TourCard"; // Không dùng TourCard trong gợi ý mới này
 
 // Import icons
@@ -24,6 +27,12 @@ import {
 } from "../../../icons/IconBox"; // Đảm bảo các icon này tồn tại hoặc bạn có thể thay thế bằng icon khác phù hợp
 import IconArrowRight from "../../../icons/IconArrowRight";
 import { IconChevronDown } from "../../../icons/IconChevronDown";
+
+// Helper to convert MongoDB Decimal128 to number
+const toNumber = (val) => {
+  if (val?.$numberDecimal) return parseFloat(val.$numberDecimal);
+  return parseFloat(val) || 0;
+};
 
 // ============================================================================
 // CONSTANTS & MOCK DATA
@@ -69,6 +78,14 @@ const tourAmenities = [
 
 export default function TourDetailPage() {
   const navigate = useNavigate();
+  const { id } = useParams(); // Get tour ID from URL
+
+  // Tour data state
+  const [tour, setTour] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   // Form state
   const [selectedDate, setSelectedDate] = useState();
@@ -84,6 +101,48 @@ export default function TourDetailPage() {
   const dateRef = useRef(null);
   const guideRef = useRef(null);
 
+  // Fetch tour details from API
+  useEffect(() => {
+    const fetchTour = async () => {
+      try {
+        setIsLoading(true);
+        const response = await toursApi.getTour(id);
+        setTour(response);
+      } catch (err) {
+        console.error("Fetch tour error:", err);
+        setError(err.message || "Không thể tải thông tin tour");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchTour();
+    }
+  }, [id]);
+
+  // Fetch reviews for tour
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!tour?._id) return;
+      try {
+        setReviewsLoading(true);
+        const response = await reviewsApi.listTourReviews(tour._id, {
+          limit: 6,
+        });
+        setReviews(response?.items || []);
+      } catch (err) {
+        console.error("Fetch reviews error:", err);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, [tour?._id]);
+
+  const BASE_PRICE = tour ? toNumber(tour.price) : 42;
+  const CHILD_PRICE = BASE_PRICE / 2;
   const totalPrice = adults * BASE_PRICE + children * CHILD_PRICE;
 
   // Click Outside
@@ -118,8 +177,8 @@ export default function TourDetailPage() {
       return;
     }
     const bookingData = {
-      tourId: "tour_hue_night_01",
-      tourName: "Dạo bộ Phố Cổ về đêm",
+      tourId: tour?._id || "tour_hue_night_01",
+      tourName: tour?.name || "Dạo bộ Phố Cổ về đêm",
       date: format(selectedDate, "yyyy-MM-dd"),
       guests: { adults, children },
       totalPrice,
@@ -129,13 +188,74 @@ export default function TourDetailPage() {
     navigate("/booking/review", { state: bookingData });
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-bg-main flex items-center justify-center">
+        <IconLoader className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !tour) {
+    return (
+      <div className="min-h-screen bg-bg-main pb-20 pt-6">
+        <div className="container-main">
+          <Breadcrumbs
+            items={[
+              { label: "Chuyến tham quan", href: "/tours" },
+              { label: "Không tìm thấy" },
+            ]}
+          />
+          <div className="mt-20 text-center">
+            <h1 className="text-2xl font-bold text-text-primary mb-4">
+              Không tìm thấy tour
+            </h1>
+            <p className="text-text-secondary mb-6">
+              {error || "Tour bạn tìm kiếm không tồn tại hoặc đã bị xóa."}
+            </p>
+            <Link
+              to="/tours"
+              className="inline-block px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-colors"
+            >
+              Quay lại danh sách tour
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Extract data from tour
+  const tourName = tour.name || "Dạo bộ Phố Cổ về đêm";
+  const tourDescription = tour.description || "";
+  const tourLocation =
+    tour.locations?.[0]?.locationId?.name ||
+    tour.location ||
+    "Phố cổ, trung tâm";
+  const tourDuration = `${tour.duration || 3.5} ${
+    tour.duration_unit === "days" ? "ngày" : "giờ"
+  }`;
+  const tourRating = toNumber(tour.average_rating || 0);
+  const tourReviewCount = tour.review_count || tour.reviews_count || 0;
+  const tourCategory = tour.category_id?.name || "Lịch sử";
+  const tourImage =
+    tour.cover_image_url ||
+    tour.image_url ||
+    tour.images?.[0] ||
+    tour.gallery?.[0] ||
+    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg";
+  const mainGuide = tour.guides?.[0] || tour.guide_id;
+  const tourItinerary = tour.itinerary || [];
+
   return (
     <div className="min-h-screen bg-bg-main pb-20 pt-6">
       <div className="container-main space-y-8">
         <Breadcrumbs
           items={[
             { label: "Chuyến tham quan", href: "/tours" },
-            { label: "Dạo bộ Phố Cổ về đêm" },
+            { label: tourName },
           ]}
         />
 
@@ -145,28 +265,27 @@ export default function TourDetailPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="space-y-2">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-                  Lịch sử • Đi bộ đêm • Nhóm nhỏ
+                  {tourCategory} • Đi bộ đêm • Nhóm nhỏ
                 </p>
                 <h1 className="text-3xl md:text-4xl font-heading font-bold tracking-tight text-text-primary leading-tight">
-                  Dạo bộ Phố Cổ ban đêm & <br className="hidden md:inline" />
-                  Trải nghiệm 3D Nhà thờ Lớn
+                  {tourName}
                 </h1>
 
                 <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary font-medium">
                   <span className="inline-flex items-center gap-1.5">
                     <IconMapPin className="w-4 h-4" />
-                    Phố cổ, trung tâm
+                    {tourLocation}
                   </span>
                   <span className="w-1 h-1 rounded-full bg-border-light"></span>
                   <span className="inline-flex items-center gap-1.5">
                     <IconClock className="w-4 h-4" />
-                    3.5 giờ
+                    {tourDuration}
                   </span>
                   <span className="w-1 h-1 rounded-full bg-border-light"></span>
                   <span className="inline-flex items-center gap-1.5 text-[#BC4C00]">
                     <IconStar className="w-4 h-4" />
                     <span className="underline decoration-[#BC4C00]/30 underline-offset-2">
-                      4.9 (122 đánh giá)
+                      {tourRating.toFixed(1)} ({tourReviewCount} đánh giá)
                     </span>
                   </span>
                 </div>
@@ -179,8 +298,8 @@ export default function TourDetailPage() {
             <div className="flex flex-col gap-3 w-full lg:h-full">
               <div className="relative w-full aspect-video lg:aspect-auto lg:flex-1 min-h-0 rounded-2xl overflow-hidden bg-black group cursor-pointer">
                 <img
-                  src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg"
-                  alt="Main Video Thumbnail"
+                  src={tourImage}
+                  alt={tourName}
                   className="w-full h-full object-cover opacity-90 group-hover:opacity-75 transition-opacity duration-500"
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -193,31 +312,30 @@ export default function TourDetailPage() {
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-2 h-16 sm:h-20 shrink-0">
-                {/* Thumbnails */}
-                <div className="rounded-xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-primary transition-all">
-                  <img
-                    src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg"
-                    className="w-full h-full object-cover"
-                    alt="thumb"
-                  />
-                </div>
-                <div className="rounded-xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-primary transition-all">
-                  <img
-                    src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuatuhieu1.jpg"
-                    className="w-full h-full object-cover"
-                    alt="thumb"
-                  />
-                </div>
-                <div className="rounded-xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-primary transition-all">
-                  <img
-                    src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/cautrangtien1.jpg"
-                    className="w-full h-full object-cover"
-                    alt="thumb"
-                  />
-                </div>
-                <div className="rounded-xl overflow-hidden cursor-pointer bg-gray-100 flex items-center justify-center text-xs font-bold text-text-secondary border-2 border-transparent hover:border-primary transition-all hover:bg-primary/5 hover:text-primary">
-                  +8 ảnh
-                </div>
+                {/* Gallery Thumbnails from API */}
+                {tour?.gallery?.slice(0, 3).map((img, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-primary transition-all"
+                  >
+                    <img
+                      src={img}
+                      className="w-full h-full object-cover"
+                      alt={`Gallery ${idx + 1}`}
+                    />
+                  </div>
+                ))}
+                {tour?.gallery?.length > 3 && (
+                  <div className="rounded-xl overflow-hidden cursor-pointer bg-gray-100 flex items-center justify-center text-xs font-bold text-text-secondary border-2 border-transparent hover:border-primary transition-all hover:bg-primary/5 hover:text-primary">
+                    +{tour.gallery.length - 3} ảnh
+                  </div>
+                )}
+                {/* Fallback if no gallery */}
+                {(!tour?.gallery || tour.gallery.length === 0) && (
+                  <div className="col-span-4 text-center text-xs text-text-secondary py-4">
+                    Chưa có ảnh bổ sung
+                  </div>
+                )}
               </div>
             </div>
             <div className="w-full aspect-video lg:aspect-auto lg:h-full rounded-3xl border border-primary/20 bg-primary/5 p-1">
@@ -255,15 +373,8 @@ export default function TourDetailPage() {
                 </h2>
                 <div className="prose prose-sm text-text-secondary leading-relaxed space-y-3">
                   <p>
-                    Khi đèn thành phố vừa sáng, bạn bước vào những con ngõ hẹp
-                    và sân yên tĩnh nơi khói hương quyện quanh mái ngói. Chuyến
-                    đi bộ này đan xen kiến trúc, khẩu truyền và nghi lễ thường
-                    nhật làm nên diện mạo Phố Cổ về đêm.
-                  </p>
-                  <p>
-                    Bạn sẽ khám phá các đền ít người biết, phố nghề và quảng
-                    trường nhà thờ biểu tượng, được hỗ trợ bởi mô hình 3D tương
-                    tác hé lộ các lớp kiến trúc của di tích.
+                    {tourDescription ||
+                      "Khám phá những câu chuyện lịch sử và văn hóa của Huế thông qua chuyến tham quan độc đáo này."}
                   </p>
                 </div>
               </section>
@@ -271,38 +382,28 @@ export default function TourDetailPage() {
                 <h2 className="text-2xl font-heading font-bold text-text-primary">
                   Lịch trình
                 </h2>
-                <div className="relative border-l-2 border-border-light ml-3 space-y-6 pb-2">
-                  {[
-                    {
-                      time: "7:30 PM",
-                      title: "Gặp tại quảng trường & định hướng 3D",
-                      desc: "Giới thiệu, lưu ý an toàn, và xem nhanh mô hình 3D mặt tiền nhà thờ.",
-                    },
-                    {
-                      time: "8:15 PM",
-                      title: "Đền ẩn & bàn thờ ngõ",
-                      desc: "Thăm hai đền trong khu phố và quan sát lễ dâng buổi tối kèm bối cảnh từ HDV.",
-                    },
-                    {
-                      time: "9:30 PM",
-                      title: "Kể chuyện tại quán trà",
-                      desc: "Kết thúc với thưởng trà truyền thống và phần hỏi đáp về lịch sử.",
-                    },
-                  ].map((item, idx) => (
-                    <div key={idx} className="relative pl-6 group">
-                      <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-primary group-hover:bg-primary transition-colors"></div>
-                      <span className="text-xs font-bold text-primary uppercase tracking-wide">
-                        {item.time}
-                      </span>
-                      <h4 className="text-base font-bold text-text-primary mt-0.5">
-                        {item.title}
-                      </h4>
-                      <p className="text-sm text-text-secondary mt-1">
-                        {item.desc}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                {tourItinerary?.length > 0 ? (
+                  <div className="relative border-l-2 border-border-light ml-3 space-y-6 pb-2">
+                    {tourItinerary.map((item, idx) => (
+                      <div key={idx} className="relative pl-6 group">
+                        <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-primary group-hover:bg-primary transition-colors"></div>
+                        <span className="text-xs font-bold text-primary uppercase tracking-wide">
+                          Ngày {item.day || idx + 1}
+                        </span>
+                        <h4 className="text-base font-bold text-text-primary mt-0.5">
+                          {item.title || "Hoạt động"}
+                        </h4>
+                        <p className="text-sm text-text-secondary mt-1">
+                          {item.details || "Chi tiết sẽ được cung cấp sau."}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-text-secondary italic">
+                    Lịch trình chi tiết sẽ được gửi sau khi đặt tour.
+                  </p>
+                )}
               </section>
             </div>
 
@@ -313,24 +414,32 @@ export default function TourDetailPage() {
                   <h3 className="text-sm font-bold text-text-primary font-heading">
                     Hướng dẫn viên
                   </h3>
-                  <Link
-                    to="/guides/1"
-                    className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
-                  >
-                    Xem hồ sơ <IconArrowRight className="w-3 h-3" />
-                  </Link>
+                  {mainGuide && (
+                    <Link
+                      to={`/guides/${mainGuide.guideId?._id || mainGuide._id}`}
+                      className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
+                    >
+                      Xem hồ sơ <IconArrowRight className="w-3 h-3" />
+                    </Link>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
                     <img
-                      src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/guides/guide_female_1.jpg"
+                      src={
+                        mainGuide?.guideId?.avatar_url ||
+                        mainGuide?.avatar_url ||
+                        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/guides/guide_female_1.jpg"
+                      }
                       className="w-full h-full object-cover"
                       alt="Guide"
                     />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-text-primary">
-                      Minh Hương
+                      {mainGuide?.guideId?.name ||
+                        mainGuide?.name ||
+                        "Minh Hương"}
                     </p>
                     <p className="text-[10px] text-text-secondary uppercase tracking-wide">
                       Nhà sử học • EN / VI
@@ -625,61 +734,68 @@ export default function TourDetailPage() {
             <h2 className="text-2xl font-heading font-bold text-text-primary mb-6">
               Đánh giá{" "}
               <span className="text-lg font-normal text-text-secondary">
-                (122)
+                ({tourReviewCount})
               </span>
             </h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-white border border-border-light p-5 rounded-2xl shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-200"></div>
-                    <div>
-                      <p className="text-sm font-bold text-text-primary">
-                        Aisha Rahman
-                      </p>
-                      <p className="text-[10px] text-text-secondary">
-                        Tháng 3, 2025
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex text-[#BC4C00]">
-                    <IconStar className="w-3.5 h-3.5" />
-                    <IconStar className="w-3.5 h-3.5" />
-                    <IconStar className="w-3.5 h-3.5" />
-                    <IconStar className="w-3.5 h-3.5" />
-                    <IconStar className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <p className="text-sm text-text-secondary leading-relaxed italic">
-                  "Mô hình 3D thực sự giúp tôi hình dung được kiến trúc..."
-                </p>
+            {reviewsLoading ? (
+              <div className="text-center py-8">
+                <IconLoader className="w-6 h-6 text-primary animate-spin mx-auto" />
               </div>
-              <div className="bg-white border border-border-light p-5 rounded-2xl shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-200"></div>
-                    <div>
-                      <p className="text-sm font-bold text-text-primary">
-                        Minh Anh
-                      </p>
-                      <p className="text-[10px] text-text-secondary">
-                        Tháng 2, 2025
-                      </p>
+            ) : reviews.length > 0 ? (
+              <div className="grid md:grid-cols-2 gap-6">
+                {reviews.map((review, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-white border border-border-light p-5 rounded-2xl shadow-sm"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+                          {review.reviewer?.avatar_url && (
+                            <img
+                              src={review.reviewer.avatar_url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-text-primary">
+                            {review.reviewer?.name || "Khách hàng"}
+                          </p>
+                          <p className="text-[10px] text-text-secondary">
+                            {review.createdAt
+                              ? format(
+                                  new Date(review.createdAt),
+                                  "dd/MM/yyyy",
+                                  { locale: vi }
+                                )
+                              : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex text-[#BC4C00]">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <IconStar
+                            key={i}
+                            className={`w-3.5 h-3.5 ${
+                              i < review.rating ? "" : "opacity-30"
+                            }`}
+                          />
+                        ))}
+                      </div>
                     </div>
+                    <p className="text-sm text-text-secondary leading-relaxed italic">
+                      "{review.comment || "Trải nghiệm tuyệt vời!"}"
+                    </p>
                   </div>
-                  <div className="flex text-[#BC4C00]">
-                    <IconStar className="w-3.5 h-3.5" />
-                    <IconStar className="w-3.5 h-3.5" />
-                    <IconStar className="w-3.5 h-3.5" />
-                    <IconStar className="w-3.5 h-3.5" />
-                    <IconStar className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <p className="text-sm text-text-secondary leading-relaxed italic">
-                  "Một trải nghiệm không thể quên..."
-                </p>
+                ))}
               </div>
-            </div>
+            ) : (
+              <p className="text-sm text-text-secondary italic text-center py-8">
+                Chưa có đánh giá nào. Hãy là người đầu tiên!
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -2,95 +2,13 @@ import React, { useState } from "react";
 import { IconCheck } from "../../../icons/IconBox";
 import { IconX } from "../../../icons/IconX";
 import { IconChevronDown } from "../../../icons/IconChevronDown";
-
-// ============================================================================
-// INLINE ICONS
-// ============================================================================
-const IconBell = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />{" "}
-    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />{" "}
-  </svg>
-);
-const IconImage = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />{" "}
-    <circle cx="9" cy="9" r="2" />{" "}
-    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />{" "}
-  </svg>
-);
-const IconBold = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <path d="M6 12h8a4 4 0 0 0 0-8H6v8Zm0 0h9a4 4 0 0 1 0 8H6v-8Z" />{" "}
-  </svg>
-);
-const IconItalic = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <line x1="19" y1="4" x2="10" y2="4" />{" "}
-    <line x1="14" y1="20" x2="5" y2="20" />{" "}
-    <line x1="15" y1="4" x2="9" y2="20" />{" "}
-  </svg>
-);
-const IconList = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {" "}
-    <line x1="8" y1="6" x2="21" y2="6" />{" "}
-    <line x1="8" y1="12" x2="21" y2="12" />{" "}
-    <line x1="8" y1="18" x2="21" y2="18" />{" "}
-    <line x1="3" y1="6" x2="3.01" y2="6" />{" "}
-    <line x1="3" y1="12" x2="3.01" y2="12" />{" "}
-    <line x1="3" y1="18" x2="3.01" y2="18" />{" "}
-  </svg>
-);
+import {
+  IconBell,
+  IconImage,
+  IconBold,
+  IconItalic,
+  IconList,
+} from "../../../icons/IconCommon";
 
 const POST_TYPES = [
   "Thông báo hệ thống",

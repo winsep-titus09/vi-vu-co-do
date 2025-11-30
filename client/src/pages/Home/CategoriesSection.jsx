@@ -1,69 +1,74 @@
 // src/pages/Home/CategoriesSection.jsx
 
-import React from "react";
+import React, { useMemo } from "react";
 import IconHeritage from "../../icons/IconHeritage.jsx";
 import IconFood from "../../icons/IconFood.jsx";
 import IconNature from "../../icons/IconNature.jsx";
 import IconMusic from "../../icons/IconMusic.jsx";
 import IconCraft from "../../icons/IconCraft.jsx";
 import IconLotus from "../../icons/IconLotus.jsx";
+import Spinner from "../../components/Loaders/Spinner";
+import { useTourCategories } from "../../features/tours/hooks";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Tour categories
-const categories = [
-  {
-    id: "01",
-    title: "Di sản Cố đô",
-    desc: "Khám phá Đại Nội, lăng tẩm và những dấu ấn lịch sử vàng son của triều Nguyễn.",
-    icon: <IconHeritage className="w-10 h-10" />,
-  },
-  {
-    id: "02",
-    title: "Ẩm thực Huế",
-    desc: "Thưởng thức tinh hoa ẩm thực cung đình và hương vị dân dã đậm đà khó quên.",
-    icon: <IconFood className="w-10 h-10" />,
-  },
-  {
-    id: "03",
-    title: "Thiên nhiên thơ mộng",
-    desc: "Du ngoạn sông Hương, núi Ngự và phá Tam Giang mênh mang sóng nước.",
-    icon: <IconNature className="w-10 h-10" />,
-  },
-  {
-    id: "04",
-    title: "Nhã nhạc & Nghệ thuật",
-    desc: "Đắm mình trong không gian văn hóa với Nhã nhạc cung đình và nghệ thuật diễn xướng.",
-    icon: <IconMusic className="w-10 h-10" />,
-  },
-  {
-    id: "05",
-    title: "Làng nghề truyền thống",
-    desc: "Trải nghiệm làm nón bài thơ, hoa giấy và gốm sứ cùng nghệ nhân bản địa.",
-    icon: <IconCraft className="w-10 h-10" />,
-  },
-  {
-    id: "06",
-    title: "Du lịch Tâm linh",
-    desc: "Tìm về sự an yên tại những ngôi chùa cổ kính và linh thiêng bậc nhất.",
-    icon: <IconLotus className="w-10 h-10" />,
-  },
-  {
-    id: "07",
-    title: "Áo dài truyền thống",
-    desc: "Trải nghiệm mặc thử và chụp ảnh với cổ phục Nhật Bình, áo dài ngũ thân.",
-    icon: <IconHeritage className="w-10 h-10" />,
-  },
-];
+// Map icon names to components
+const iconMap = {
+  heritage: <IconHeritage className="w-10 h-10" />,
+  food: <IconFood className="w-10 h-10" />,
+  nature: <IconNature className="w-10 h-10" />,
+  music: <IconMusic className="w-10 h-10" />,
+  craft: <IconCraft className="w-10 h-10" />,
+  lotus: <IconLotus className="w-10 h-10" />,
+  default: <IconHeritage className="w-10 h-10" />,
+};
 
 export default function CategoriesSection() {
+  // Fetch categories from API
+  const { categories: apiCategories, isLoading } = useTourCategories();
+
+  // Map API categories to display format
+  const categories = useMemo(() => {
+    return (apiCategories || []).map((cat, index) => {
+      // Try to match icon from slug/name
+      const slug = cat.slug || "";
+      let iconKey = "default";
+
+      if (slug.includes("di-san") || slug.includes("heritage"))
+        iconKey = "heritage";
+      else if (slug.includes("am-thuc") || slug.includes("food"))
+        iconKey = "food";
+      else if (slug.includes("thien-nhien") || slug.includes("nature"))
+        iconKey = "nature";
+      else if (slug.includes("nghe-thuat") || slug.includes("music"))
+        iconKey = "music";
+      else if (slug.includes("nghe") || slug.includes("craft"))
+        iconKey = "craft";
+      else if (slug.includes("tam-linh") || slug.includes("lotus"))
+        iconKey = "lotus";
+
+      return {
+        id: String(index + 1).padStart(2, "0"),
+        title: cat.name,
+        desc: cat.description || `Khám phá ${cat.name} tại Huế`,
+        icon: iconMap[iconKey],
+        slug: cat.slug,
+      };
+    });
+  }, [apiCategories]);
+  // Loading state
+  if (isLoading) {
+    return (
+      <section className="pb-20 lg:pb-28 bg-[#fcfaf5]">
+        <div className="container-main px-6 md:px-16 lg:px-24 flex justify-center items-center py-20">
+          <Spinner size="lg" />
+        </div>
+      </section>
+    );
+  }
+
   return (
-    // Bỏ padding-top (pb-20) để sát với section trên
     <section className="pb-20 lg:pb-28 bg-[#fcfaf5]">
       <div className="container-main px-6 md:px-16 lg:px-24">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-16">
-          {/* CẬP NHẬT: Thêm .slice(0, 6) để giới hạn hiển thị 6 mục đầu tiên */}
           {categories.slice(0, 6).map((item) => (
             <div key={item.id} className="flex gap-5 group">
               {/* Cột trái: Số nền + Icon */}

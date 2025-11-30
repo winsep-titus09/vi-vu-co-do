@@ -1,5 +1,13 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  useMyBookings,
+  useBookingActions,
+} from "../../../features/booking/hooks";
+import Spinner from "../../../components/Loaders/Spinner";
+import EmptyState from "../../../components/Loaders/EmptyState";
+import ConfirmModal from "../../../components/Modals/ConfirmModal";
+import apiClient from "../../../lib/api-client";
 import {
   IconCalendar,
   IconMapPin,
@@ -12,74 +20,13 @@ import ReviewModal from "../../../components/Modals/ReviewModal";
 import TicketModal from "../../../components/Modals/TicketModal";
 
 // ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Booking history
-const bookings = [
-  {
-    id: "BK-2025-001",
-    tourName: "Bí mật Hoàng cung Huế & Trải nghiệm trà chiều",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-    date: "20/05/2025",
-    time: "08:00 AM",
-    duration: "4 giờ",
-    guide: "Minh Hương",
-    price: "1.800.000đ",
-    guests: 2,
-    status: "confirmed",
-  },
-  {
-    id: "BK-2025-002",
-    tourName: "Food Tour: Ẩm thực đường phố Huế",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
-    date: "15/04/2025",
-    time: "17:00 PM",
-    duration: "3 giờ",
-    guide: "Trần Văn",
-    price: "500.000đ",
-    guests: 1,
-    status: "completed",
-    isRated: false,
-  },
-  {
-    id: "BK-2024-099",
-    tourName: "Lăng Tự Đức & Đồi Vọng Cảnh",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
-    date: "10/02/2025",
-    time: "09:00 AM",
-    duration: "4 giờ",
-    guide: "Alex Nguyen",
-    price: "1.200.000đ",
-    guests: 2,
-    status: "completed",
-    isRated: true,
-  },
-  {
-    id: "BK-2024-080",
-    tourName: "Sông Hương ca Huế thính phòng",
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/cautrangtien1.jpg",
-    date: "01/01/2025",
-    time: "19:00 PM",
-    duration: "2 giờ",
-    guide: "Lê Bình",
-    price: "300.000đ",
-    guests: 1,
-    status: "cancelled",
-  },
-];
-
-// ============================================================================
 // TAB CONFIGURATION
 // ============================================================================
 const tabs = [
   { id: "all", label: "Tất cả" },
   { id: "confirmed", label: "Sắp tới" },
   { id: "completed", label: "Hoàn thành" },
-  { id: "cancelled", label: "Đã hủy" },
+  { id: "canceled", label: "Đã hủy" },
 ];
 
 export default function HistoryPage() {
@@ -88,6 +35,91 @@ export default function HistoryPage() {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+
+  const navigate = useNavigate();
+  const { cancelBooking, isProcessing } = useBookingActions();
+
+  // Fetch bookings from API
+  const { bookings: apiBookings, isLoading, error } = useMyBookings();
+
+  // Transform API bookings to UI format
+  const bookings = useMemo(() => {
+    if (!apiBookings) return [];
+
+    return apiBookings.map((b) => ({
+      id: b._id,
+      tourId: b.tour_id?._id,
+      tourName: b.tour_id?.name || "Chuyến tham quan",
+      image:
+        b.tour_id?.cover_image_url || "/images/placeholders/hero_slide_4.jpg",
+      date: new Date(b.start_date).toLocaleDateString("vi-VN"),
+      time: b.start_time || "08:00",
+      duration: b.tour_id?.duration_hours
+        ? `${b.tour_id.duration_hours} giờ`
+        : "Chưa xác định",
+      guide:
+        b.intended_guide_id?.name ||
+        b.tour_id?.guide_id?.name ||
+        "Chưa phân công",
+      price: (b.total_price || 0).toLocaleString() + "đ",
+      guests: b.participants?.length || 1,
+      status: b.status || "pending",
+    }));
+  }, [apiBookings]);
+
+  // ============================================================================
+  // ACTION HANDLERS
+  // ============================================================================
+
+  const handleCancelBooking = async () => {
+    if (!selectedBooking || !cancelReason.trim()) {
+      alert("Vui lòng nhập lý do hủy tour");
+      return;
+    }
+
+    const result = await cancelBooking(selectedBooking.id, cancelReason);
+    if (result.success) {
+      setIsCancelModalOpen(false);
+      setSelectedBooking(null);
+      setCancelReason("");
+      alert(
+        "Đã hủy tour thành công. Tiền sẽ được hoàn lại trong 3-5 ngày làm việc."
+      );
+      window.location.reload();
+    } else {
+      alert(result.error || "Không thể hủy tour. Vui lòng thử lại.");
+    }
+  };
+
+  const handleRebook = (booking) => {
+    // Navigate to tour detail page to book again
+    navigate(`/tours/${booking.tourId}`);
+  };
+
+  const handleSubmitReview = async (reviewData) => {
+    try {
+      // Call review API using apiClient (has built-in auth)
+      await apiClient.post("/reviews/tour", {
+        bookingId: selectedBooking.id,
+        tour_rating: reviewData.rating,
+        tour_comment: reviewData.comment,
+      });
+
+      setIsReviewModalOpen(false);
+      setSelectedBooking(null);
+      alert("Đã gửi đánh giá thành công!");
+      window.location.reload();
+    } catch (error) {
+      console.error("Submit review error:", error);
+      alert(
+        error.message ||
+          error.response?.data?.message ||
+          "Không thể gửi đánh giá. Vui lòng thử lại."
+      );
+    }
+  };
 
   const filteredBookings = bookings.filter((item) => {
     const matchTab = activeTab === "all" || item.status === activeTab;
@@ -111,6 +143,7 @@ export default function HistoryPage() {
             Đã hoàn thành
           </span>
         );
+      case "canceled":
       case "cancelled":
         return (
           <span className="px-3 py-1 rounded-full bg-red-50 text-red-600 text-xs font-bold border border-red-100 whitespace-nowrap">
@@ -125,6 +158,18 @@ export default function HistoryPage() {
         );
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <EmptyState message={error} />;
+  }
 
   return (
     <div className="space-y-8">
@@ -244,7 +289,13 @@ export default function HistoryPage() {
                   <div className="flex gap-3 w-full md:w-auto justify-end">
                     {item.status === "confirmed" && (
                       <>
-                        <button className="flex-1 md:flex-none px-5 py-2 rounded-xl border border-border-light text-sm font-bold text-text-secondary hover:text-red-500 hover:border-red-200 transition-colors whitespace-nowrap">
+                        <button
+                          onClick={() => {
+                            setSelectedBooking(item);
+                            setIsCancelModalOpen(true);
+                          }}
+                          className="flex-1 md:flex-none px-5 py-2 rounded-xl border border-border-light text-sm font-bold text-text-secondary hover:text-red-500 hover:border-red-200 transition-colors whitespace-nowrap"
+                        >
                           Hủy tour
                         </button>
                         <button
@@ -261,7 +312,10 @@ export default function HistoryPage() {
 
                     {item.status === "completed" && (
                       <>
-                        <button className="flex-1 md:flex-none px-5 py-2 rounded-xl border border-border-light text-sm font-bold text-text-secondary hover:text-primary hover:border-primary transition-colors whitespace-nowrap">
+                        <button
+                          onClick={() => handleRebook(item)}
+                          className="flex-1 md:flex-none px-5 py-2 rounded-xl border border-border-light text-sm font-bold text-text-secondary hover:text-primary hover:border-primary transition-colors whitespace-nowrap"
+                        >
                           Đặt lại
                         </button>
                         {!item.isRated ? (
@@ -314,6 +368,47 @@ export default function HistoryPage() {
         )}
       </div>
 
+      {/* Cancel Booking Modal */}
+      <ConfirmModal
+        isOpen={isCancelModalOpen}
+        onClose={() => {
+          setIsCancelModalOpen(false);
+          setSelectedBooking(null);
+          setCancelReason("");
+        }}
+        onConfirm={handleCancelBooking}
+        title="Xác nhận hủy tour"
+        message={
+          <div className="space-y-4">
+            <p className="text-text-secondary">
+              Bạn có chắc chắn muốn hủy tour{" "}
+              <strong>{selectedBooking?.tourName}</strong>?
+            </p>
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Lý do hủy tour:
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Vui lòng nhập lý do hủy tour..."
+                className="w-full px-4 py-2 border border-border-light rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                rows={4}
+                required
+              />
+            </div>
+            <p className="text-sm text-text-secondary">
+              Tiền sẽ được hoàn lại vào tài khoản của bạn trong vòng 3-5 ngày
+              làm việc.
+            </p>
+          </div>
+        }
+        confirmText={isProcessing ? "Đang xử lý..." : "Xác nhận hủy"}
+        cancelText="Đóng"
+        confirmButtonClass="bg-red-500 hover:bg-red-600"
+        disabled={isProcessing}
+      />
+
       {/* Review Modal */}
       <ReviewModal
         isOpen={isReviewModalOpen}
@@ -322,6 +417,7 @@ export default function HistoryPage() {
           setSelectedBooking(null);
         }}
         booking={selectedBooking}
+        onSubmit={handleSubmitReview}
       />
 
       {/* Ticket Modal */}

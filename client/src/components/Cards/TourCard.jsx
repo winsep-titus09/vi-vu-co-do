@@ -14,7 +14,17 @@ import IconArrowRight from "../../icons/IconArrowRight.jsx";
  * TourCard - Style: Transparent + Border + Artistic Image
  */
 
+// Helper to safely convert values to numbers (handle MongoDB Decimal128)
+const toNumber = (val) => {
+  if (val?.$numberDecimal) return parseFloat(val.$numberDecimal);
+  return parseFloat(val) || 0;
+};
+
 export default function TourCard({ tour }) {
+  // Safely convert rating and price
+  const rating = toNumber(tour.rating);
+  const price = toNumber(tour.price);
+
   return (
     // 1. WRAPPER:
     // - Thêm border mỏng (border-border-light)
@@ -69,7 +79,7 @@ export default function TourCard({ tour }) {
           </h3>
           <span className="inline-flex items-center gap-1 text-xs font-bold text-[#BC4C00] bg-[#FEFAE0] rounded-full px-2 py-0.5 border border-[#BC4C00]/10 flex-shrink-0">
             <IconStar className="w-3 h-3" />
-            {tour.rating}
+            {rating.toFixed(1)}
           </span>
         </div>
 
@@ -79,7 +89,7 @@ export default function TourCard({ tour }) {
 
         <div className="flex items-center justify-between pt-3 border-t border-border-light mt-auto">
           <span className="text-base font-bold text-primary">
-            ${tour.price}{" "}
+            ${price.toFixed(0)}{" "}
             <span className="text-xs font-normal text-text-secondary">
               / người
             </span>

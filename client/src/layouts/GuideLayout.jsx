@@ -1,8 +1,8 @@
-import React, { useState } from "react";
-import { Outlet, NavLink, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Outlet, NavLink, Link, useNavigate } from "react-router-dom";
 import { IconMenu } from "../icons/IconMenu";
 import { IconX } from "../icons/IconX";
-import { IconMapPin, IconCalendar } from "../icons/IconBox";
+import { IconMapPin, IconCalendar, IconStar } from "../icons/IconBox";
 import {
   IconBell,
   IconDashboard,
@@ -10,7 +10,11 @@ import {
   IconWallet,
   IconSettings,
   IconEdit,
+  IconPlus,
 } from "../icons/IconCommon";
+import { authApi } from "../features/auth/api";
+import { useBookingRequests } from "../features/guides/hooks";
+import { useNotifications } from "../features/notifications/hooks";
 
 // Inline Icons specific to Guide layout
 const IconLogout = ({ className }) => (
@@ -62,54 +66,91 @@ const IconStarMenu = ({ className }) => (
   </svg>
 );
 
-const MENU = [
-  {
-    label: "Bảng điều khiển",
-    path: "/dashboard/guide",
-    icon: IconDashboard,
-    end: true,
-  },
-  {
-    label: "Yêu cầu đặt tour",
-    path: "/dashboard/guide/requests",
-    icon: IconInbox,
-    badge: 3, // Ví dụ: Hiển thị số lượng yêu cầu chưa đọc
-  },
-  {
-    label: "Tour của tôi",
-    path: "/dashboard/guide/my-tours",
-    icon: IconMapPin,
-  },
-  {
-    label: "Tạo tour mới",
-    path: "/dashboard/guide/create-tour",
-    icon: IconPlus,
-  },
-  {
-    label: "Lịch trình",
-    path: "/dashboard/guide/schedule",
-    icon: IconCalendar,
-  },
-  { label: "Thu nhập", path: "/dashboard/guide/earnings", icon: IconWallet },
-  {
-    label: "Đánh giá",
-    path: "/dashboard/guide/reviews",
-    icon: IconStar,
-  },
-  {
-    label: "Bài viết",
-    path: "/dashboard/guide/posts",
-    icon: IconEdit,
-  },
-  {
-    label: "Hồ sơ & Cài đặt",
-    path: "/dashboard/guide/profile-settings",
-    icon: IconSettings,
-  },
-];
-
 export default function GuideLayout() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const userData = await authApi.getCurrentUser();
+        setUser(userData);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  // Fetch pending booking requests count
+  const { requests } = useBookingRequests();
+  const pendingCount = requests?.length || 0;
+
+  // Fetch unread notifications count
+  const { notifications } = useNotifications({ limit: 50 });
+  const unreadCount = notifications?.filter((n) => !n.is_read)?.length || 0;
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+      localStorage.removeItem("token");
+      navigate("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+      localStorage.removeItem("token");
+      navigate("/");
+    }
+  };
+
+  // Dynamic menu with badge from API
+  const menuItems = [
+    {
+      label: "Bảng điều khiển",
+      path: "/dashboard/guide",
+      icon: IconDashboard,
+      end: true,
+    },
+    {
+      label: "Yêu cầu đặt tour",
+      path: "/dashboard/guide/requests",
+      icon: IconInbox,
+      badge: pendingCount > 0 ? pendingCount : null,
+    },
+    {
+      label: "Tour của tôi",
+      path: "/dashboard/guide/my-tours",
+      icon: IconMapPin,
+    },
+    {
+      label: "Tạo tour mới",
+      path: "/dashboard/guide/create-tour",
+      icon: IconPlus,
+    },
+    {
+      label: "Lịch trình",
+      path: "/dashboard/guide/schedule",
+      icon: IconCalendar,
+    },
+    { label: "Thu nhập", path: "/dashboard/guide/earnings", icon: IconWallet },
+    {
+      label: "Đánh giá",
+      path: "/dashboard/guide/reviews",
+      icon: IconStar,
+    },
+    {
+      label: "Bài viết",
+      path: "/dashboard/guide/posts",
+      icon: IconEdit,
+    },
+    {
+      label: "Hồ sơ & Cài đặt",
+      path: "/dashboard/guide/profile-settings",
+      icon: IconSettings,
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 flex font-body">
@@ -146,7 +187,7 @@ export default function GuideLayout() {
 
         {/* Menu Items */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-          {MENU.map((item) => {
+          {menuItems.map((item) => {
             const IconComponent = item.icon;
             return (
               <NavLink
@@ -163,52 +204,58 @@ export default function GuideLayout() {
                   }
                 `}
               >
-                <div className="flex items-center gap-3">
-                  <IconComponent className="w-5 h-5" />
-                  {item.label}
-                </div>
+                {({ isActive }) => (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <IconComponent className="w-5 h-5" />
+                      {item.label}
+                    </div>
 
-                {/* Badge display */}
-                {item.badge && (
-                  <span
-                    className={`
-                        px-2 py-0.5 rounded-full text-[10px]
-                        ${(({ isActive }) =>
-                          isActive
-                            ? "bg-white text-primary"
-                            : "bg-red-500 text-white")(
-                          window.location.pathname === item.path
-                        )}
-                    `}
-                  >
-                    {item.badge}
-                  </span>
+                    {/* Badge display */}
+                    {item.badge && (
+                      <span
+                        className={`
+                          px-2 py-0.5 rounded-full text-[10px] font-bold
+                          ${
+                            isActive
+                              ? "bg-white text-primary"
+                              : "bg-red-500 text-white"
+                          }
+                        `}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </>
                 )}
               </NavLink>
             );
           })}
 
           <div className="pt-4 mt-4 border-t border-gray-100">
-            <button className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all w-full">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all w-full"
+            >
               <IconLogout className="w-5 h-5" />
               Đăng xuất
             </button>
           </div>
         </nav>
 
-        {/* User Footer (Chỉ hiển thị thông tin, không còn nút logout) */}
+        {/* User Footer */}
         <div className="p-4 border-t border-gray-200 bg-gray-50/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border border-gray-300">
               <img
-                src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/guides/guide_female_1.jpg"
+                src={user?.avatar_url || "https://i.pravatar.cc/150?img=25"}
                 alt="Avatar"
                 className="w-full h-full object-cover"
               />
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-bold text-gray-900 truncate">
-                Minh Hương
+                {user?.name || "Hướng dẫn viên"}
               </p>
               <p className="text-xs text-green-600 font-medium flex items-center gap-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>{" "}
@@ -249,7 +296,11 @@ export default function GuideLayout() {
               title="Thông báo"
             >
               <IconBell className="w-6 h-6" />
-              <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
           </div>
         </header>

@@ -1,20 +1,31 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { authApi } from "../../features/auth/api";
 import Spinner from "../../components/Loaders/Spinner";
 
 export default function SignOut() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Logic xóa token/session ở đây
-    console.log("Clearing session...");
+    const handleLogout = async () => {
+      try {
+        // Call logout API
+        await authApi.logout();
+      } catch (error) {
+        console.error("Logout error:", error);
+      } finally {
+        // Clear local storage regardless of API response
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
 
-    // Chuyển hướng sau 1.5s để người dùng kịp nhìn thấy thông báo
-    const timer = setTimeout(() => {
-      navigate("/");
-    }, 1500);
+        // Redirect to home page after 1.5s
+        setTimeout(() => {
+          navigate("/");
+        }, 1500);
+      }
+    };
 
-    return () => clearTimeout(timer);
+    handleLogout();
   }, [navigate]);
 
   return (
