@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Yêu cầu rút tiền bị từ chối</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #222;
+        }
+
+        .header {
+            background: #b22222;
+            color: white;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .muted {
+            color: #666;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h2>{{appName}} — Yêu cầu rút tiền bị từ chối</h2>
+    </div>
+    <div class="content">
+        <p>Xin chào {{userName}},</p>
+
+        <p>Yêu cầu rút tiền của bạn (Mã: <strong>{{ payoutRequestId }}</strong>) đã bị từ chối.</p>
+
+        {{#if message}}
+        <p><strong>Lý do:</strong> {{ message }}</p>
+        {{/if}}
+
+        <p class="muted">Nếu bạn cần trợ giúp, liên hệ: {{ supportEmail }}</p>
+
+        <p>Trân trọng,<br />Đội ngũ {{appName}}</p>
+    </div>
+</body>
+
+</html>

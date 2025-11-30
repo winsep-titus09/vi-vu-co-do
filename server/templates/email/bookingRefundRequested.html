@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Yêu cầu hoàn tiền đã được gửi</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
+            background: #eef2f6;
+            margin: 0
+        }
+
+        .card {
+            max-width: 680px;
+            margin: 28px auto;
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06)
+        }
+
+        .title {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 8px
+        }
+
+        .meta {
+            background: #f8f9fb;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 14px 0;
+            color: #444
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 14px;
+            border-radius: 6px;
+            background: #0d6efd;
+            color: #fff;
+            text-decoration: none
+        }
+
+        .foot {
+            font-size: 13px;
+            color: #777;
+            margin-top: 18px
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <div class="title">Yêu cầu hoàn tiền đã được gửi</div>
+        <p>Chúng tôi đã nhận được yêu cầu hoàn tiền cho booking <strong>{{bookingCode}}</strong>. Yêu cầu đang chờ xử lý
+            bởi đội ngũ quản trị.</p>
+
+        <div class="meta">
+            <div><strong>Booking ID:</strong> {{bookingId}}</div>
+            <div><strong>Số tiền:</strong> {{amount}}</div>
+            <div><strong>Ghi chú:</strong> {{message}}</div>
+            <div><strong>Ngày gửi:</strong> {{requestedAt}}</div>
+        </div>
+
+        <p>Nếu bạn cần liên hệ hỗ trợ nhanh, vui lòng bấm nút bên dưới:</p>
+        <p><a class="btn" href="{{bookingUrl}}" target="_blank">Xem booking</a></p>
+
+        <div class="foot">
+            Bạn sẽ nhận email khi yêu cầu được chấp nhận hoặc từ chối. Thông tin hỗ trợ: <a
+                href="mailto:{{supportEmail}}">{{supportEmail}}</a>
+        </div>
+    </div>
+</body>
+
+</html>

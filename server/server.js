@@ -1,18 +1,24 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import connectDB from './config/db.js'; // Import hàm kết nối
-
-// ----- CẤU HÌNH -----
-// 1. Tải các biến môi trường từ file .env
+// server/server.js
+import dotenv from "dotenv";
 dotenv.config();
-// 2. Kết nối đến cơ sở dữ liệu MongoDB
-connectDB();
-// --------------------
 
-const app = express();
+import http from "http";
+import "./services/schedule.js";
+import app from "./app.js";
+import { connectDB } from "./config/db.js";
+import { initCloudinary } from "./config/cloud.js";
+import { initSocket } from "./sockets/index.js";
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server đang chạy trên cổng ${PORT}`);
+await connectDB();
+initCloudinary();
+
+const server = http.createServer(app);
+
+// Khởi tạo Socket.IO đúng chỗ, đúng 1 lần
+initSocket(server);
+
+server.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Hoàn tiền đã được thực hiện</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
+            background: #f5f7fb;
+            margin: 0
+        }
+
+        .wrap {
+            max-width: 680px;
+            margin: 28px auto;
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05)
+        }
+
+        h1 {
+            color: #198754;
+            margin: 0 0 8px
+        }
+
+        .meta {
+            background: #f0f6f4;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 12px 0;
+            color: #333
+        }
+
+        .cta {
+            display: inline-block;
+            padding: 10px 14px;
+            background: #0d6efd;
+            color: #fff;
+            border-radius: 6px;
+            text-decoration: none
+        }
+
+        .foot {
+            font-size: 13px;
+            color: #666;
+            margin-top: 12px
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <h1>Hoàn tiền đã được thực hiện</h1>
+        <p>Thưa {{userName || 'khách hàng'}},</p>
+        <p>Số tiền <strong>{{amount}}</strong> cho booking <strong>{{bookingCode}}</strong> đã được hoàn. Mã giao dịch:
+            <strong>{{transactionCode}}</strong>.</p>
+
+        <div class="meta">
+            <div><strong>Booking ID:</strong> {{bookingId}}</div>
+            <div><strong>Transaction ID:</strong> {{transactionId}}</div>
+            <div><strong>Thời gian:</strong> {{confirmedAt}}</div>
+        </div>
+
+        <p><a class="cta" href="{{bookingUrl}}" target="_blank">Xem chi tiết booking</a></p>
+
+        <div class="foot">
+            Nếu bạn chưa nhận được tiền trong vòng 3-5 ngày làm việc, vui lòng liên hệ: <a
+                href="mailto:{{supportEmail}}">{{supportEmail}}</a>
+        </div>
+    </div>
+</body>
+
+</html>

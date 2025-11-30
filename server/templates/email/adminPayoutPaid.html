@@ -1,0 +1,27 @@
+<!-- server/templates/email/adminPayoutPaid.html -->
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Payout đã được trả (Admin)</title>
+</head>
+
+<body>
+    <p>Admin,</p>
+
+    <p>Payout <strong>{{ payoutId }}</strong> cho HDV <strong>{{ guideName }}</strong> đã được trả.</p>
+
+    <p>Tour: {{ tourName }} ({{ tourDate }})</p>
+    <p><strong>Số tiền:</strong> {{ amount }}</p>
+
+    {{#if transactionId}}
+    <p>Mã giao dịch: {{ transactionId }}</p>
+    {{/if}}
+
+    <p>Xem chi tiết: <a href="{{ adminUrl }}">{{ adminUrl }}</a></p>
+
+    <p>Trân trọng,<br>{{ appName }}</p>
+</body>
+
+</html>
