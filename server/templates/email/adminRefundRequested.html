@@ -1,109 +1,165 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Yêu cầu hoàn tiền mới</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yêu cầu hoàn tiền mới - Vi Vu Cố Đô</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-            background: #f4f6f8;
-            margin: 0;
-            padding: 0;
-        }
-
-        .wrap {
-            max-width: 680px;
-            margin: 28px auto;
-            background: #ffffff;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        }
-
-        .header {
-            background: #0d6efd;
-            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
             padding: 20px;
-            text-align: left;
+            background-color: #f5f5f5;
         }
 
         .container {
-            padding: 24px;
-            color: #333;
-            line-height: 1.5;
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #e74c3c;
+            margin: 0;
+        }
+
+        .content {
+            padding: 20px 0;
+        }
+
+        .info-box {
+            background-color: #f8f9fa;
+            border: 2px dashed #e74c3c;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .warning p {
+            margin: 0;
+            color: #856404;
+        }
+
+        .amount {
+            font-size: 28px;
+            font-weight: bold;
+            color: #e74c3c;
+            text-align: center;
         }
 
         .btn {
             display: inline-block;
-            background: #0d6efd;
-            color: #fff;
+            padding: 12px 30px;
+            background-color: #e74c3c;
+            color: #ffffff !important;
             text-decoration: none;
-            padding: 10px 16px;
-            border-radius: 6px;
-            margin-top: 12px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 0;
         }
 
-        .meta {
-            background: #f7f9fb;
-            padding: 12px;
-            border-radius: 6px;
-            margin: 12px 0;
-            font-size: 14px;
-            color: #555;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        table th,
+        table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        table th {
+            background-color: #f8f9fa;
+            color: #333;
+            font-weight: 600;
+            width: 40%;
         }
 
         .footer {
-            font-size: 13px;
-            color: #777;
-            padding: 18px;
             text-align: center;
-            background: #fafafa;
-        }
-
-        .k {
-            color: #111;
-            font-weight: 600;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
         }
     </style>
 </head>
 
 <body>
-    <div class="wrap" role="article" aria-label="Yêu cầu hoàn tiền mới">
+    <div class="container">
         <div class="header">
-            <h2 style="margin:0">Yêu cầu hoàn tiền mới</h2>
+            <h1>🏛️ Vi Vu Cố Đô</h1>
         </div>
+        <div class="content">
+            <p>Xin chào <strong>Admin</strong>,</p>
+            <p>Có một yêu cầu hoàn tiền mới cần được xử lý.</p>
 
-        <div class="container">
-            <p>Xin chào,</p>
-
-            <p>Có một yêu cầu hoàn tiền mới đã được gửi từ khách hàng. Vui lòng kiểm tra và xử lý.</p>
-
-            <div class="meta">
-                <div><span class="k">Mã booking:</span> {{bookingCode}}</div>
-                <div><span class="k">Booking ID:</span> {{bookingId}}</div>
-                <div><span class="k">Số tiền:</span> {{amount}}</div>
-                <div><span class="k">Khách hàng:</span> {{customerName}} ({{customerEmail}})</div>
-                <div><span class="k">Transaction ID:</span> {{transactionId}}</div>
-                <div><span class="k">Ghi chú:</span> {{message}}</div>
+            <div class="info-box">
+                <h3 style="margin-top: 0; color: #e74c3c;">💳 Chi tiết yêu cầu hoàn tiền</h3>
+                <table>
+                    <tr>
+                        <th>Mã đơn đặt</th>
+                        <td><strong>{{bookingId}}</strong></td>
+                    </tr>
+                    <tr>
+                        <th>Khách hàng</th>
+                        <td>{{customerName}}</td>
+                    </tr>
+                    <tr>
+                        <th>Email</th>
+                        <td>{{customerEmail}}</td>
+                    </tr>
+                    <tr>
+                        <th>Tour</th>
+                        <td>{{tourName}}</td>
+                    </tr>
+                    <tr>
+                        <th>Lý do hoàn tiền</th>
+                        <td>{{refundReason}}</td>
+                    </tr>
+                    <tr>
+                        <th>Ngày yêu cầu</th>
+                        <td>{{requestDate}}</td>
+                    </tr>
+                </table>
+                <div class="amount">{{refundAmount}}</div>
             </div>
 
-            <p>
-                Bạn có thể mở chi tiết tại trang quản trị:
-            </p>
+            <div class="warning">
+                <p>⚠️ <strong>Lưu ý:</strong> Vui lòng xem xét và xử lý yêu cầu hoàn tiền này trong thời gian sớm nhất.
+                </p>
+            </div>
 
-            <p>
-                <a class="btn" href="{{adminUrl}}" target="_blank" rel="noopener">Mở yêu cầu hoàn tiền</a>
-            </p>
-
-            <p style="margin-top:18px; color:#555;">
-                Nếu bạn cần hỗ trợ thêm, vui lòng liên hệ: <a href="mailto:{{supportEmail}}">{{supportEmail}}</a>.
+            <p style="text-align: center;">
+                <a href="{{adminUrl}}" class="btn">Xử lý yêu cầu</a>
             </p>
         </div>
-
         <div class="footer">
-            © {{year}} ViVu — Hệ thống quản lý đặt tour
+            <p>© 2025 Vi Vu Cố Đô. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
         </div>
     </div>
 </body>

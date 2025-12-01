@@ -1,74 +1,182 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Hoàn tiền đã được thực hiện</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoàn tiền đã được thực hiện - Vi Vu Cố Đô</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
-            background: #f5f7fb;
-            margin: 0
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
         }
 
-        .wrap {
-            max-width: 680px;
-            margin: 28px auto;
-            background: #fff;
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #e74c3c;
+            margin: 0;
+        }
+
+        .content {
+            padding: 20px 0;
+        }
+
+        .success-box {
+            background-color: #d4edda;
+            border: 2px solid #28a745;
             border-radius: 8px;
             padding: 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05)
+            text-align: center;
+            margin: 20px 0;
         }
 
-        h1 {
-            color: #198754;
-            margin: 0 0 8px
+        .success-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
         }
 
-        .meta {
-            background: #f0f6f4;
-            padding: 12px;
-            border-radius: 6px;
-            margin: 12px 0;
-            color: #333
+        .success-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #155724;
         }
 
-        .cta {
-            display: inline-block;
-            padding: 10px 14px;
-            background: #0d6efd;
-            color: #fff;
-            border-radius: 6px;
-            text-decoration: none
+        .info-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
         }
 
-        .foot {
-            font-size: 13px;
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
             color: #666;
-            margin-top: 12px
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .amount {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .highlight {
+            background-color: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .highlight p {
+            margin: 0;
+            color: #0c5460;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: #e74c3c;
+            color: #ffffff;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+
+        .btn-container {
+            text-align: center;
+            margin: 25px 0;
+        }
+
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
         }
     </style>
 </head>
 
 <body>
-    <div class="wrap">
-        <h1>Hoàn tiền đã được thực hiện</h1>
-        <p>Thưa {{userName || 'khách hàng'}},</p>
-        <p>Số tiền <strong>{{amount}}</strong> cho booking <strong>{{bookingCode}}</strong> đã được hoàn. Mã giao dịch:
-            <strong>{{transactionCode}}</strong>.</p>
-
-        <div class="meta">
-            <div><strong>Booking ID:</strong> {{bookingId}}</div>
-            <div><strong>Transaction ID:</strong> {{transactionId}}</div>
-            <div><strong>Thời gian:</strong> {{confirmedAt}}</div>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Vi Vu Cố Đô</h1>
         </div>
+        <div class="content">
+            <p>Xin chào <strong>{{userName}}</strong>,</p>
 
-        <p><a class="cta" href="{{bookingUrl}}" target="_blank">Xem chi tiết booking</a></p>
+            <div class="success-box">
+                <div class="success-icon">💰</div>
+                <div class="success-text">Hoàn tiền đã được thực hiện!</div>
+            </div>
 
-        <div class="foot">
-            Nếu bạn chưa nhận được tiền trong vòng 3-5 ngày làm việc, vui lòng liên hệ: <a
-                href="mailto:{{supportEmail}}">{{supportEmail}}</a>
+            <p>Chúng tôi xin thông báo rằng yêu cầu hoàn tiền của bạn đã được xử lý thành công. Dưới đây là thông tin
+                chi tiết:</p>
+
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Mã đặt tour:</span>
+                    <span class="info-value">{{bookingCode}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Số tiền hoàn:</span>
+                    <span class="info-value amount">{{amount}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Mã giao dịch:</span>
+                    <span class="info-value">{{transactionId}}</span>
+                </div>
+            </div>
+
+            <div class="highlight">
+                <p>ℹ️ <strong>Thông tin:</strong></p>
+                <p>Tiền sẽ được hoàn về tài khoản của bạn trong vòng 3-5 ngày làm việc tùy thuộc vào ngân hàng.</p>
+            </div>
+
+            <div class="btn-container">
+                <a href="{{bookingUrl}}" class="btn">Xem chi tiết Booking</a>
+            </div>
+
+            <p>Nếu bạn chưa nhận được tiền sau thời gian trên, vui lòng liên hệ với chúng tôi qua email:
+                <strong>{{supportEmail}}</strong></p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Vi Vu Cố Đô. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
         </div>
     </div>
 </body>

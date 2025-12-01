@@ -3,16 +3,179 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Thanh toán thành công</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thanh toán thành công - Vi Vu Cố Đô</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #e74c3c;
+            margin: 0;
+        }
+
+        .content {
+            padding: 20px 0;
+        }
+
+        .success-box {
+            background-color: #d4edda;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .success-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .success-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #155724;
+        }
+
+        .info-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .highlight {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .highlight p {
+            margin: 0;
+            color: #856404;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: #e74c3c;
+            color: #ffffff;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+
+        .btn-container {
+            text-align: center;
+            margin: 25px 0;
+        }
+
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
 </head>
 
 <body>
-    <h1>Thanh toán thành công</h1>
-    <p>Chào {{userName}}, bạn đã thanh toán thành công cho tour <strong>{{tourName}}</strong> ngày
-        <strong>{{startDate}}</strong>.
-    </p>
-    <p>Mã đặt chỗ: <strong>{{bookingCode}}</strong></p>
-    <p>Xem chi tiết: <a href="{{bookingUrl}}">Chi tiết Booking</a></p>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Vi Vu Cố Đô</h1>
+        </div>
+        <div class="content">
+            <p>Xin chào <strong>{{userName}}</strong>,</p>
+
+            <div class="success-box">
+                <div class="success-icon">✅</div>
+                <div class="success-text">Thanh toán thành công!</div>
+            </div>
+
+            <p>Chúc mừng! Bạn đã thanh toán thành công cho chuyến tour của mình. Dưới đây là thông tin chi tiết:</p>
+
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Tour:</span>
+                    <span class="info-value">{{tourName}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Mã đặt tour:</span>
+                    <span class="info-value">{{bookingCode}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Ngày khởi hành:</span>
+                    <span class="info-value">{{tourDate}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Số tiền:</span>
+                    <span class="info-value">{{amount}}</span>
+                </div>
+            </div>
+
+            <div class="highlight">
+                <p>📌 <strong>Lưu ý:</strong></p>
+                <p>Vui lòng lưu lại mã đặt tour và kiểm tra email để nhận thông tin cập nhật về chuyến đi của bạn.</p>
+            </div>
+
+            <div class="btn-container">
+                <a href="{{bookingUrl}}" class="btn">Xem chi tiết Booking</a>
+            </div>
+
+            <p>Nếu bạn cần hỗ trợ, vui lòng liên hệ với chúng tôi qua email: <strong>{{supportEmail}}</strong></p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Vi Vu Cố Đô. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+        </div>
+    </div>
 </body>
 
 </html>

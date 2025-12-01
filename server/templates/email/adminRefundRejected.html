@@ -1,77 +1,141 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Yêu cầu hoàn tiền bị từ chối</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yêu cầu hoàn tiền bị từ chối - Vi Vu Cố Đô</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
-            background: #f7f8fa;
-            margin: 0
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
         }
 
-        .wrap {
-            max-width: 680px;
-            margin: 28px auto;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-            overflow: hidden
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
-        .head {
-            background: #dc3545;
-            color: #fff;
-            padding: 18px
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #e74c3c;
+            margin: 0;
         }
 
         .content {
-            padding: 20px;
-            color: #333
+            padding: 20px 0;
         }
 
-        .meta {
-            background: #f1f3f5;
-            padding: 12px;
-            border-radius: 6px
+        .info-box {
+            background-color: #f8f9fa;
+            border: 2px dashed #e74c3c;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .error p {
+            margin: 0;
+            color: #721c24;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        table th,
+        table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        table th {
+            background-color: #f8f9fa;
+            color: #333;
+            font-weight: 600;
+            width: 40%;
         }
 
         .footer {
-            padding: 14px;
             text-align: center;
-            background: #fafafa;
-            color: #777
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
         }
     </style>
 </head>
 
 <body>
-    <div class="wrap">
-        <div class="head">
-            <h2 style="margin:0">Yêu cầu hoàn tiền đã bị từ chối</h2>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Vi Vu Cố Đô</h1>
         </div>
         <div class="content">
-            <p>Xin chào,</p>
-            <p>Yêu cầu hoàn tiền cho booking <strong>{{bookingCode}}</strong> đã bị từ chối bởi admin.</p>
+            <p>Xin chào <strong>Admin</strong>,</p>
 
-            <div class="meta">
-                <div><strong>Booking ID:</strong> {{bookingId}}</div>
-                <div><strong>Transaction ID:</strong> {{transactionId}}</div>
-                <div><strong>Số tiền:</strong> {{amount}}</div>
-                <div><strong>Nguyên nhân:</strong> {{reason}}</div>
-                <div><strong>Người xử lý:</strong> {{rejectedBy}}</div>
+            <div class="error">
+                <p>❌ <strong>Yêu cầu hoàn tiền đã bị từ chối.</strong></p>
             </div>
 
-            <p style="margin-top:12px">Xem chi tiết: <a href="{{adminUrl}}" target="_blank">Trang quản trị hoàn tiền</a>
-            </p>
-
-            <p style="color:#555;margin-top:10px">Nếu cần thảo luận thêm, vui lòng liên hệ: <a
-                    href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+            <div class="info-box">
+                <h3 style="margin-top: 0; color: #e74c3c;">📋 Chi tiết</h3>
+                <table>
+                    <tr>
+                        <th>Mã đơn đặt</th>
+                        <td><strong>{{bookingId}}</strong></td>
+                    </tr>
+                    <tr>
+                        <th>Khách hàng</th>
+                        <td>{{customerName}}</td>
+                    </tr>
+                    <tr>
+                        <th>Tour</th>
+                        <td>{{tourName}}</td>
+                    </tr>
+                    <tr>
+                        <th>Số tiền yêu cầu</th>
+                        <td>{{refundAmount}}</td>
+                    </tr>
+                    <tr>
+                        <th>Lý do từ chối</th>
+                        <td>{{rejectionReason}}</td>
+                    </tr>
+                    <tr>
+                        <th>Ngày từ chối</th>
+                        <td>{{rejectedDate}}</td>
+                    </tr>
+                </table>
+            </div>
         </div>
-
-        <div class="footer">© {{year}} ViVu</div>
+        <div class="footer">
+            <p>© 2025 Vi Vu Cố Đô. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+        </div>
     </div>
 </body>
 

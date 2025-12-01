@@ -3,12 +3,149 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Yêu cầu làm HDV mới</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đơn đăng ký hướng dẫn viên mới - Vi Vu Cố Đô</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #e74c3c;
+            margin: 0;
+        }
+
+        .content {
+            padding: 20px 0;
+        }
+
+        .info-box {
+            background-color: #f8f9fa;
+            border: 2px dashed #e74c3c;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .info {
+            background-color: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .info p {
+            margin: 0;
+            color: #0c5460;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #e74c3c;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        table th,
+        table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        table th {
+            background-color: #f8f9fa;
+            color: #333;
+            font-weight: 600;
+            width: 40%;
+        }
+
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
 </head>
 
 <body>
-    <p>Có yêu cầu làm HDV mới từ: {{applicantName}} ({{applicantEmail}})</p>
-    <p>Xử lý: <a href="{{adminUrl}}">Trang quản trị</a></p>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Vi Vu Cố Đô</h1>
+        </div>
+        <div class="content">
+            <p>Xin chào <strong>Admin</strong>,</p>
+            <p>Có một đơn đăng ký hướng dẫn viên mới cần được xét duyệt.</p>
+
+            <div class="info-box">
+                <h3 style="margin-top: 0; color: #e74c3c;">📋 Thông tin ứng viên</h3>
+                <table>
+                    <tr>
+                        <th>Họ tên</th>
+                        <td>{{guideName}}</td>
+                    </tr>
+                    <tr>
+                        <th>Email</th>
+                        <td>{{guideEmail}}</td>
+                    </tr>
+                    <tr>
+                        <th>Số điện thoại</th>
+                        <td>{{guidePhone}}</td>
+                    </tr>
+                    <tr>
+                        <th>Ngày đăng ký</th>
+                        <td>{{applicationDate}}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="info">
+                <p>ℹ️ <strong>Lưu ý:</strong> Vui lòng xem xét và phê duyệt đơn đăng ký này trong thời gian sớm nhất.
+                </p>
+            </div>
+
+            <p style="text-align: center;">
+                <a href="{{adminUrl}}" class="btn">Xem chi tiết đơn đăng ký</a>
+            </p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Vi Vu Cố Đô. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+        </div>
+    </div>
 </body>
 
 </html>

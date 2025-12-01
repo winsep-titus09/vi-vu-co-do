@@ -91,3 +91,36 @@ export async function sendTemplateEmail({ to, subject, templateKey, data }) {
     console.log("[EMAIL] sendTemplateEmail", { to, subject, templateKey });
     return sendEmailRaw({ to, subject, html });
 }
+
+/**
+ * Gửi email mật khẩu mới
+ * @param {string} to - Email người nhận
+ * @param {string} userName - Tên người dùng
+ * @param {string} newPassword - Mật khẩu mới
+ */
+export const sendNewPasswordEmail = async (to, userName, newPassword) => {
+    try {
+        // Đọc template
+        const templatePath = path.join(__dirname, '../templates/email/forgot-password.html');
+        let emailTemplate = fs.readFileSync(templatePath, 'utf8');
+
+        // Thay thế placeholders
+        emailTemplate = emailTemplate.replace('{{userName}}', userName);
+        emailTemplate = emailTemplate.replace('{{newPassword}}', newPassword);
+
+        const mailOptions = {
+            from: `"Vi Vu Cố Đô" <${process.env.EMAIL_USER}>`,
+            to: to,
+            subject: '🔐 Mật khẩu mới - Vi Vu Cố Đô',
+            html: emailTemplate
+        };
+
+        const result = await transporter.sendMail(mailOptions);
+        console.log('Password reset email sent:', result.messageId);
+        return { success: true, messageId: result.messageId };
+
+    } catch (error) {
+        console.error('Error sending password reset email:', error);
+        throw error;
+    }
+};

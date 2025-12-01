@@ -16,7 +16,7 @@ const store =
 /** 1) Global: thoáng cho toàn bộ /api */
 export const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 400,
+    max: 1000, // Tăng từ 400 lên 1000
     standardHeaders: true,
     legacyHeaders: false,
     message: { status: 429, message: "Too many requests, please try again later." },
@@ -27,11 +27,11 @@ export const globalLimiter = rateLimit({
 });
 
 /** 2) Auth: riêng cho đăng nhập/đăng ký/refresh
- *  - Nới giới hạn đăng nhập: 10 lần / phút / IP (tuỳ chỉnh max theo nhu cầu)
+ *  - Nới giới hạn đăng nhập: 30 lần / phút / IP (tuỳ chỉnh max theo nhu cầu)
  */
 export const authLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 10,
+    max: 30, // Tăng từ 10 lên 30 lần/phút
     standardHeaders: true,
     legacyHeaders: false,
     message: { status: 429, message: "Too many login attempts. Try again later." },
@@ -44,7 +44,7 @@ export const authLimiter = rateLimit({
  */
 export const accountLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 30,
+    max: 60, // Tăng từ 30 lên 60
     standardHeaders: true,
     legacyHeaders: false,
     message: { status: 429, message: "Too many requests. Please slow down." },

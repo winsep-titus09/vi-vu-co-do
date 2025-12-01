@@ -5,6 +5,15 @@ import User from "../models/User.js";
 import Role from "../models/Role.js";
 import BlacklistedToken from "../models/BlacklistedToken.js";
 import { sendEmailRaw } from "../services/email.service.js";
+import { generateRandomPassword } from '../utils/password.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createTransporter } from '../config/email.js';
+
+// Thay thế __dirname cho ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const register = async (req, res) => {
   try {
@@ -174,83 +183,82 @@ export const getMe = async (req, res) => {
 };
 
 /**
+ * Quên mật khẩu - Tạo mật khẩu mới và gửi qua email
  * POST /api/auth/forgot-password
- * Body: { email }
  */
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
+    // Kiểm tra email có được cung cấp không
     if (!email) {
-      return res.status(400).json({ message: "Vui lòng nhập email." });
-    }
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      // Don't reveal if email exists for security
-      return res.json({
-        message: "Nếu email tồn tại, link đặt lại mật khẩu đã được gửi.",
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập địa chỉ email'
       });
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetTokenHash = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
+    // Kiểm tra định dạng email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Địa chỉ email không hợp lệ'
+      });
+    }
 
-    // Save reset token to user (expires in 1 hour)
-    user.resetPasswordToken = resetTokenHash;
-    user.resetPasswordExpire = Date.now() + 3600000; // 1 hour
+    // Tìm user với email đã cung cấp
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    // Nếu không tìm thấy user với email này
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy tài khoản với địa chỉ email này'
+      });
+    }
+
+    // Tạo mật khẩu ngẫu nhiên mới
+    const newPassword = generateRandomPassword(12);
+
+    // Hash mật khẩu mới
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Cập nhật mật khẩu mới cho user
+    user.password = hashedPassword;
     await user.save();
 
-    // Create reset URL
-    const resetUrl = `${process.env.CLIENT_URL}/auth/reset-password?token=${resetToken}`;
+    // Đọc template email
+    const templatePath = path.join(__dirname, '../templates/email/forgot-password.html');
+    let emailTemplate = fs.readFileSync(templatePath, 'utf8');
 
-    // Send email
-    try {
-      const resetUrl = `${process.env.CLIENT_URL}/auth/reset-password?token=${resetToken}`;
+    // Thay thế các placeholder trong template
+    emailTemplate = emailTemplate.replace('{{userName}}', user.name || user.email);
+    emailTemplate = emailTemplate.replace('{{newPassword}}', newPassword);
 
-      const html = `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2>Đặt lại mật khẩu</h2>
-                    <p>Xin chào ${user.name},</p>
-                    <p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản Vi Vu Cố Đô.</p>
-                    <p>Vui lòng nhấn vào nút bên dưới để đặt lại mật khẩu:</p>
-                    <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background-color: #7C3AED; color: white; text-decoration: none; border-radius: 8px; margin: 16px 0;">Đặt lại mật khẩu</a>
-                    <p>Hoặc sao chép link sau vào trình duyệt:</p>
-                    <p style="word-break: break-all; color: #666;">${resetUrl}</p>
-                    <p><strong>Link này sẽ hết hạn sau 1 giờ.</strong></p>
-                    <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
-                    <hr style="margin: 24px 0; border: none; border-top: 1px solid #eee;">
-                    <p style="color: #999; font-size: 12px;">Vi Vu Cố Đô - Khám phá Huế</p>
-                </div>
-            `;
+    // Tạo transporter và gửi email
+    const transporter = createTransporter();
 
-      await sendEmailRaw({
-        to: user.email,
-        subject: "Đặt lại mật khẩu - Vi Vu Cố Đô",
-        html,
-      });
+    await transporter.sendMail({
+      from: `"Vi Vu Cố Đô" <${process.env.SMTP_USER}>`,
+      to: user.email,
+      subject: '🔐 Mật khẩu mới - Vi Vu Cố Đô',
+      html: emailTemplate
+    });
 
-      res.json({
-        message: "Link đặt lại mật khẩu đã được gửi đến email của bạn.",
-      });
-    } catch (emailError) {
-      // Remove reset token if email fails
-      user.resetPasswordToken = undefined;
-      user.resetPasswordExpire = undefined;
-      await user.save();
+    // Trả về response thành công
+    res.status(200).json({
+      success: true,
+      message: 'Mật khẩu mới đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.'
+    });
 
-      console.error("Email send error:", emailError);
-      return res.status(500).json({
-        message: "Không thể gửi email. Vui lòng thử lại sau.",
-      });
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau.'
+    });
   }
 };
 

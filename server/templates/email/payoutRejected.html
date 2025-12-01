@@ -1,49 +1,172 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="vi">
 
 <head>
-    <meta charset="utf-8" />
-    <title>Yêu cầu rút tiền bị từ chối</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yêu cầu rút tiền bị từ chối - Vi Vu Cố Đô</title>
     <style>
         body {
-            font-family: Arial, Helvetica, sans-serif;
-            color: #222;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
         .header {
-            background: #b22222;
-            color: white;
-            padding: 16px;
             text-align: center;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #e74c3c;
+            margin: 0;
         }
 
         .content {
-            padding: 20px;
+            padding: 20px 0;
         }
 
-        .muted {
+        .error-box {
+            background-color: #fee2e2;
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .error-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .error-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #dc2626;
+        }
+
+        .info-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
             color: #666;
-            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .reason-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .reason-box p {
+            margin: 0;
+            color: #856404;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: #e74c3c;
+            color: #ffffff;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+
+        .btn-container {
+            text-align: center;
+            margin: 25px 0;
+        }
+
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
         }
     </style>
 </head>
 
 <body>
-    <div class="header">
-        <h2>{{appName}} — Yêu cầu rút tiền bị từ chối</h2>
-    </div>
-    <div class="content">
-        <p>Xin chào {{userName}},</p>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Vi Vu Cố Đô</h1>
+        </div>
+        <div class="content">
+            <p>Xin chào <strong>{{userName}}</strong>,</p>
 
-        <p>Yêu cầu rút tiền của bạn (Mã: <strong>{{ payoutRequestId }}</strong>) đã bị từ chối.</p>
+            <div class="error-box">
+                <div class="error-icon">❌</div>
+                <div class="error-text">Yêu cầu rút tiền bị từ chối</div>
+            </div>
 
-        {{#if message}}
-        <p><strong>Lý do:</strong> {{ message }}</p>
-        {{/if}}
+            <p>Rất tiếc, yêu cầu rút tiền của bạn đã bị từ chối bởi quản trị viên.</p>
 
-        <p class="muted">Nếu bạn cần trợ giúp, liên hệ: {{ supportEmail }}</p>
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Mã yêu cầu:</span>
+                    <span class="info-value">{{payoutRequestId}}</span>
+                </div>
+            </div>
 
-        <p>Trân trọng,<br />Đội ngũ {{appName}}</p>
+            {{#if message}}
+            <div class="reason-box">
+                <p>📋 <strong>Lý do từ chối:</strong></p>
+                <p>{{message}}</p>
+            </div>
+            {{/if}}
+
+            <div class="btn-container">
+                <a href="{{dashboardUrl}}" class="btn">Xem trang quản lý</a>
+            </div>
+
+            <p>Nếu bạn cần hỗ trợ hoặc có thắc mắc, vui lòng liên hệ với chúng tôi qua email:
+                <strong>{{supportEmail}}</strong>
+            </p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Vi Vu Cố Đô. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+        </div>
     </div>
 </body>
 

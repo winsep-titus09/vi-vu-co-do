@@ -1,64 +1,184 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="vi">
 
 <head>
-    <meta charset="utf-8" />
-    <title>Yêu cầu rút tiền đã được gửi</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yêu cầu rút tiền đã được gửi - Vi Vu Cố Đô</title>
     <style>
         body {
-            font-family: Arial, Helvetica, sans-serif;
-            color: #222;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
         .header {
-            background: #0f4c81;
-            color: white;
-            padding: 16px;
             text-align: center;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #e74c3c;
+            margin: 0;
         }
 
         .content {
+            padding: 20px 0;
+        }
+
+        .status-box {
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
             padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .status-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .status-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #856404;
+        }
+
+        .info-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .amount {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .highlight {
+            background-color: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .highlight p {
+            margin: 0;
+            color: #0c5460;
         }
 
         .btn {
             display: inline-block;
-            padding: 10px 14px;
-            background: #0f4c81;
-            color: #fff;
+            background-color: #e74c3c;
+            color: #ffffff;
+            padding: 12px 30px;
             text-decoration: none;
-            border-radius: 6px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 5px;
         }
 
-        .muted {
+        .btn-container {
+            text-align: center;
+            margin: 25px 0;
+        }
+
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
             color: #666;
-            font-size: 13px;
+            font-size: 14px;
         }
     </style>
 </head>
 
 <body>
-    <div class="header">
-        <h2>{{appName}} — Yêu cầu rút tiền</h2>
-    </div>
-    <div class="content">
-        <p>Xin chào {{userName}},</p>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Vi Vu Cố Đô</h1>
+        </div>
+        <div class="content">
+            <p>Xin chào <strong>{{userName}}</strong>,</p>
 
-        <p>Chúng tôi đã nhận được yêu cầu rút tiền của bạn với các thông tin:</p>
+            <div class="status-box">
+                <div class="status-icon">📤</div>
+                <div class="status-text">Yêu cầu rút tiền đã được gửi</div>
+            </div>
 
-        <ul>
-            <li><strong>Số tiền:</strong> {{ amount }}</li>
-            <li><strong>Mã yêu cầu:</strong> {{ payoutRequestId }}</li>
-            <li><strong>Thời gian yêu cầu:</strong> {{ requestedAt }}</li>
-        </ul>
+            <p>Chúng tôi đã nhận được yêu cầu rút tiền của bạn. Yêu cầu đang chờ xử lý bởi đội ngũ quản trị.</p>
 
-        {{#if bookingUrl}}
-        <p>Bạn có thể xem chi tiết yêu cầu tại: <a class="btn" href="{{bookingUrl}}">Xem chi tiết</a></p>
-        {{/if}}
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Số tiền:</span>
+                    <span class="info-value amount">{{amount}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Mã yêu cầu:</span>
+                    <span class="info-value">{{payoutRequestId}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Thời gian yêu cầu:</span>
+                    <span class="info-value">{{requestedAt}}</span>
+                </div>
+            </div>
 
-        <p class="muted">Nếu có thắc mắc, vui lòng liên hệ: {{ supportEmail }}</p>
+            <div class="highlight">
+                <p>⏳ <strong>Thời gian xử lý:</strong></p>
+                <p>Yêu cầu của bạn sẽ được xử lý trong vòng 1-3 ngày làm việc. Bạn sẽ nhận được email thông báo khi yêu
+                    cầu được chấp nhận hoặc từ chối.</p>
+            </div>
 
-        <p>Trân trọng,<br />Đội ngũ {{appName}}</p>
+            {{#if bookingUrl}}
+            <div class="btn-container">
+                <a href="{{bookingUrl}}" class="btn">Xem chi tiết yêu cầu</a>
+            </div>
+            {{/if}}
+
+            <p>Nếu bạn cần hỗ trợ, vui lòng liên hệ với chúng tôi qua email: <strong>{{supportEmail}}</strong></p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Vi Vu Cố Đô. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+        </div>
     </div>
 </body>
 

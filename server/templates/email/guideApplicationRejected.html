@@ -3,14 +3,152 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Hồ sơ HDV bị từ chối</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hồ sơ HDV bị từ chối - Vi Vu Cố Đô</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #e74c3c;
+            margin: 0;
+        }
+
+        .content {
+            padding: 20px 0;
+        }
+
+        .error-box {
+            background-color: #fee2e2;
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .error-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .error-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #dc2626;
+        }
+
+        .reason-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .reason-box p {
+            margin: 0;
+            color: #856404;
+        }
+
+        .highlight {
+            background-color: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .highlight p {
+            margin: 0;
+            color: #0c5460;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: #e74c3c;
+            color: #ffffff;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+
+        .btn-container {
+            text-align: center;
+            margin: 25px 0;
+        }
+
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
 </head>
 
 <body>
-    <h2>Xin chào {{userName}},</h2>
-    <p>Rất tiếc, yêu cầu trở thành HDV của bạn đã bị từ chối.</p>
-    <p>Lý do: {{reason}}</p>
-    <p>Cập nhật & gửi lại: <a href="{{applyUrl}}">Trang nộp hồ sơ</a></p>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Vi Vu Cố Đô</h1>
+        </div>
+        <div class="content">
+            <p>Xin chào <strong>{{userName}}</strong>,</p>
+
+            <div class="error-box">
+                <div class="error-icon">😔</div>
+                <div class="error-text">Hồ sơ HDV chưa được duyệt</div>
+            </div>
+
+            <p>Rất tiếc, yêu cầu trở thành hướng dẫn viên của bạn đã bị từ chối.</p>
+
+            <div class="reason-box">
+                <p>📋 <strong>Lý do từ chối:</strong></p>
+                <p>{{reason}}</p>
+            </div>
+
+            <div class="highlight">
+                <p>💡 <strong>Bạn có thể làm gì tiếp theo:</strong></p>
+                <p>• Cập nhật và bổ sung thông tin hồ sơ</p>
+                <p>• Kiểm tra lại các giấy tờ, chứng chỉ cần thiết</p>
+                <p>• Gửi lại đơn đăng ký sau khi đã hoàn thiện</p>
+            </div>
+
+            <div class="btn-container">
+                <a href="{{applyUrl}}" class="btn">Cập nhật & Gửi lại hồ sơ</a>
+            </div>
+
+            <p>Nếu bạn cần hỗ trợ, vui lòng liên hệ với chúng tôi qua email: <strong>{{supportEmail}}</strong></p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Vi Vu Cố Đô. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+        </div>
+    </div>
 </body>
 
 </html>

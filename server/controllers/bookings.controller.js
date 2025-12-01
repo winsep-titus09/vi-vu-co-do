@@ -313,6 +313,11 @@ export const createBooking = async (req, res) => {
         const guideBookingUrl = `${process.env.APP_BASE_URL}/guide/bookings/${booking._id}`;
         const tourName = tour.name || `#${booking._id}`;
 
+        // Lấy thông tin customer để truyền vào email
+        const customer = await User.findById(userId).select("name email phone").lean();
+        const groupSize = normalized.filter((p) => p.count_slot).length;
+        const tourDate = start ? start.toLocaleDateString("vi-VN") : "";
+
         if (status === "awaiting_payment") {
             await notifyUser({
                 userId,
@@ -324,12 +329,18 @@ export const createBooking = async (req, res) => {
                     bookingCode,
                     tourId: booking.tour_id,
                     tourName,
-                    dueDate: payment_due_at ? new Date(payment_due_at).toISOString() : undefined,
+                    tourDate,
+                    amount: total.toLocaleString("vi-VN") + " VNĐ",
+                    dueDate: payment_due_at ? new Date(payment_due_at).toLocaleString("vi-VN") : undefined,
                     bookingUrl,
+                    paymentUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}/payment`,
                 },
             }).catch(() => { });
         } else {
             if (intendedGuide) {
+                // Lấy thông tin guide để truyền vào email
+                const guide = await User.findById(intendedGuide).select("name").lean();
+
                 await notifyUser({
                     userId: intendedGuide,
                     type: "booking:request",
@@ -340,7 +351,17 @@ export const createBooking = async (req, res) => {
                         bookingCode,
                         tourId: booking.tour_id,
                         tourName,
+                        tourDate,
+                        groupSize: groupSize.toString(),
+                        amount: total.toLocaleString("vi-VN") + " VNĐ",
+                        // Thông tin khách hàng
+                        userName: customer?.name || "",
+                        userPhone: contact?.phone || customer?.phone || "",
+                        userEmail: customer?.email || "",
+                        // Thông tin guide
+                        guideName: guide?.name || "",
                         guideBookingUrl,
+                        bookingUrl: guideBookingUrl,
                     },
                 }).catch(() => { });
             }
@@ -354,6 +375,9 @@ export const createBooking = async (req, res) => {
                     bookingCode,
                     tourId: booking.tour_id,
                     tourName,
+                    tourDate,
+                    groupSize: groupSize.toString(),
+                    amount: total.toLocaleString("vi-VN") + " VNĐ",
                     bookingUrl,
                 },
             }).catch(() => { });
@@ -469,6 +493,8 @@ export const guideApproveBooking = async (req, res) => {
 
         const bookingCode = String(booking._id);
         const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
+        const totalPrice = booking.total_price ? Number(booking.total_price.toString()) : 0;
+        const tourDate = booking.start_date ? new Date(booking.start_date).toLocaleDateString("vi-VN") : "";
 
         await notifyUser({
             userId: booking.customer_id,
@@ -480,8 +506,11 @@ export const guideApproveBooking = async (req, res) => {
                 bookingCode,
                 tourId: booking.tour_id,
                 tourName,
-                dueDate: booking.payment_due_at ? new Date(booking.payment_due_at).toISOString() : undefined,
+                tourDate,
+                amount: totalPrice.toLocaleString("vi-VN") + " VNĐ",
+                dueDate: booking.payment_due_at ? new Date(booking.payment_due_at).toLocaleString("vi-VN") : undefined,
                 bookingUrl,
+                paymentUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}/payment`,
             },
         }).catch(() => { });
 
@@ -525,6 +554,8 @@ export const guideRejectBooking = async (req, res) => {
         };
         await booking.save();
 
+        const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
+
         await notifyUser({
             userId: booking.customer_id,
             type: "booking:rejected",
@@ -535,8 +566,8 @@ export const guideRejectBooking = async (req, res) => {
                 bookingCode: String(booking._id),
                 tourId: booking.tour_id,
                 tourName,
-                reason: note || "",
-                bookingUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}`,
+                reason: note || "Không có lý do cụ thể",
+                bookingUrl,
             },
         }).catch(() => { });
 

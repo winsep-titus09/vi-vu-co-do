@@ -1,67 +1,173 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Yêu cầu hoàn tiền bị từ chối</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yêu cầu hoàn tiền bị từ chối - Vi Vu Cố Đô</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
-            background: #fff6f6;
-            margin: 0
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
         }
 
-        .card {
-            max-width: 680px;
-            margin: 28px auto;
-            background: #fff;
+        .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #e74c3c;
+            margin: 0;
+        }
+
+        .content {
+            padding: 20px 0;
+        }
+
+        .error-box {
+            background-color: #fee2e2;
+            border: 2px solid #ef4444;
             border-radius: 8px;
             padding: 20px;
-            border: 1px solid #ffe5e5
+            text-align: center;
+            margin: 20px 0;
         }
 
-        h1 {
-            color: #d63384;
-            margin: 0 0 8px
+        .error-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
         }
 
-        .meta {
-            background: #fff3f3;
-            padding: 12px;
-            border-radius: 6px;
-            margin: 12px 0;
-            color: #333
+        .error-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #dc2626;
         }
 
-        .note {
-            color: #444
+        .info-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .reason-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .reason-box p {
+            margin: 0;
+            color: #856404;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: #e74c3c;
+            color: #ffffff;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+
+        .btn-container {
+            text-align: center;
+            margin: 25px 0;
         }
 
         .footer {
-            font-size: 13px;
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
             color: #666;
-            margin-top: 14px
+            font-size: 14px;
         }
     </style>
 </head>
 
 <body>
-    <div class="card">
-        <h1>Yêu cầu hoàn tiền bị từ chối</h1>
-        <p>Xin chào bạn,</p>
-
-        <p class="note">Yêu cầu hoàn tiền cho booking <strong>{{bookingCode}}</strong> đã bị từ chối bởi quản trị viên.
-        </p>
-
-        <div class="meta">
-            <div><strong>Booking ID:</strong> {{bookingId}}</div>
-            <div><strong>Transaction ID:</strong> {{transactionId}}</div>
-            <div><strong>Lý do:</strong> {{reason}}</div>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Vi Vu Cố Đô</h1>
         </div>
+        <div class="content">
+            <p>Xin chào <strong>{{userName}}</strong>,</p>
 
-        <p class="footer">Nếu bạn cần khiếu nại hoặc thắc mắc, vui lòng liên hệ: <a
-                href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+            <div class="error-box">
+                <div class="error-icon">❌</div>
+                <div class="error-text">Yêu cầu hoàn tiền bị từ chối</div>
+            </div>
+
+            <p>Rất tiếc, yêu cầu hoàn tiền của bạn đã bị từ chối bởi quản trị viên. Dưới đây là thông tin chi tiết:</p>
+
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Mã đặt tour:</span>
+                    <span class="info-value">{{bookingCode}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Mã giao dịch:</span>
+                    <span class="info-value">{{transactionId}}</span>
+                </div>
+            </div>
+
+            <div class="reason-box">
+                <p>📋 <strong>Lý do từ chối:</strong></p>
+                <p>{{reason}}</p>
+            </div>
+
+            <div class="btn-container">
+                <a href="{{bookingUrl}}" class="btn">Xem chi tiết Booking</a>
+            </div>
+
+            <p>Nếu bạn cần khiếu nại hoặc có thắc mắc, vui lòng liên hệ với chúng tôi qua email:
+                <strong>{{supportEmail}}</strong></p>
+        </div>
+        <div class="footer">
+            <p>© 2025 Vi Vu Cố Đô. Tất cả quyền được bảo lưu.</p>
+            <p>Email này được gửi tự động, vui lòng không trả lời.</p>
+        </div>
     </div>
 </body>
 
