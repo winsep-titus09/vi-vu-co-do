@@ -579,11 +579,10 @@ export const guideRejectBooking = async (req, res) => {
 };
 
 /**
- * COMPLETE booking: create-or-attach Payout occurrence (tourId+tourDate+guideId) and auto-credit once.
- * This implementation:
- *  - tries to create a Payout doc (unique index prevents duplicates)
- *  - if create succeeds -> marks payout paid and credits guide.balance once
- *  - if create fails with duplicate key -> finds existing payout & attaches booking id (no credit)
+ * COMPLETE booking: Tính tiền HDV theo total_price (theo đầu người và số lượt booking)
+ * Công thức:
+ *   - guideEarning = total_price - (total_price * 15%) 
+ *   - total_price đã được tính theo số người (trẻ em < 11 tuổi miễn phí)
  */
 export const completeBooking = async (req, res) => {
     const { id } = req.params;
@@ -615,12 +614,20 @@ export const completeBooking = async (req, res) => {
             return res.status(403).json({ message: "Bạn không có quyền hoàn tất booking này" });
         }
 
-        // Determine payout base price (fixed tour_price preferred)
-        const tourPrice = booking.tour_price ? Number(booking.tour_price.toString()) : (booking.total_price ? Number(booking.total_price.toString()) : 0);
-        const platformFee = Math.round(tourPrice * 0.10);
-        const guideEarning = tourPrice - platformFee;
+        // ===== Tính tiền HDV theo total_price (theo đầu người) =====
+        const totalRevenue = booking.total_price ? Number(booking.total_price.toString()) : 0;
 
-        // Normalize occurrence date to midnight (local midnight)
+        // Tính số người tính phí (count_slot = true)
+        const paidParticipants = (booking.participants || []).filter(p => p.count_slot).length;
+
+        // ===== PHÍ SÀN 15% =====
+        const platformFeePercentage = 0.15; // Đã thay đổi từ 0.10 thành 0.15
+        const platformFee = Math.round(totalRevenue * platformFeePercentage);
+
+        // HDV nhận = Tổng doanh thu - Phí sàn (15%)
+        const guideEarning = totalRevenue - platformFee;
+
+        // Normalize occurrence date to midnight
         const occDate = booking.start_date ? new Date(booking.start_date) : null;
         if (!occDate) {
             await session.abortTransaction();
@@ -630,76 +637,99 @@ export const completeBooking = async (req, res) => {
         occDate.setHours(0, 0, 0, 0);
 
         // Prepare payout doc
-        const reference = `payout-${String(booking.tour_id)}-${occDate.toISOString().slice(0, 10)}-${String(booking.intended_guide_id).slice(-6)}-${Date.now().toString(36)}`;
+        const reference = `payout-booking-${String(booking._id)}-${Date.now().toString(36)}`;
         const payoutPayload = {
             tourId: booking.tour_id,
             tourDate: occDate,
             guideId: booking.intended_guide_id,
-            baseAmount: tourPrice,
-            percentage: 0.1,
+            baseAmount: totalRevenue,
+            percentage: platformFeePercentage, // 0.15
             payoutAmount: guideEarning,
             relatedBookingIds: [booking._id],
             status: "pending",
             reference,
             createdBy: user?._id || null,
+            paidParticipants: paidParticipants,
         };
 
         let payoutDoc;
         try {
-            // Try create payout - unique composite index prevents duplicates
             const created = await Payout.create([payoutPayload], { session });
             payoutDoc = created[0];
 
-            // AUTO-CREDIT policy: mark paid and credit guide immediately.
             payoutDoc.status = "paid";
             payoutDoc.paidAt = new Date();
             payoutDoc.paidBy = user?._id || null;
             await payoutDoc.save({ session });
 
-            // credit guide
+            // Credit guide balance
             if (booking.intended_guide_id) {
                 const guide = await User.findById(booking.intended_guide_id).session(session);
                 if (!guide) throw new Error("Guide không tồn tại");
                 guide.balance = (guide.balance || 0) + guideEarning;
                 await guide.save({ session });
 
-                // create ledger transaction
+                // Create ledger transaction
                 try {
                     await Transaction.create([{
                         bookingId: booking._id,
                         userId: guide._id,
                         payeeUserId: guide._id,
-                        amount: mongoose.Types.Decimal128.fromString(String(tourPrice)),
+                        amount: mongoose.Types.Decimal128.fromString(String(totalRevenue)),
                         commission_fee: mongoose.Types.Decimal128.fromString(String(platformFee)),
                         net_amount: mongoose.Types.Decimal128.fromString(String(guideEarning)),
                         transaction_type: "payout",
                         status: "confirmed",
                         payment_gateway: "system",
                         transaction_code: `payout-${payoutDoc._id}`,
-                        note: `Auto payout for occurrence ${payoutDoc._id}`
+                        note: `Payout for booking ${booking._id} - ${paidParticipants} người - Phí sàn 15%`
                     }], { session });
                 } catch (txErr) {
                     console.error("completeBooking: failed to create Transaction ledger:", txErr);
-                    // Continue: payout already marked paid; ledger failure logged for admin
                 }
             }
         } catch (createErr) {
-            // Duplicate key -> another process created payout concurrently
             if (createErr && createErr.code === 11000) {
-                // Attach to existing payout
-                payoutDoc = await Payout.findOne({ tourId: booking.tour_id, tourDate: occDate, guideId: booking.intended_guide_id }).session(session);
+                payoutDoc = await Payout.findOne({
+                    tourId: booking.tour_id,
+                    tourDate: occDate,
+                    guideId: booking.intended_guide_id
+                }).session(session);
+
                 if (!payoutDoc) {
-                    // unexpected situation: rethrow
                     throw createErr;
                 }
-                // push booking id if not present
+
                 const has = (payoutDoc.relatedBookingIds || []).some(bid => String(bid) === String(booking._id));
                 if (!has) {
                     payoutDoc.relatedBookingIds = payoutDoc.relatedBookingIds || [];
                     payoutDoc.relatedBookingIds.push(booking._id);
+                    payoutDoc.baseAmount = (payoutDoc.baseAmount || 0) + totalRevenue;
+                    payoutDoc.payoutAmount = (payoutDoc.payoutAmount || 0) + guideEarning;
                     await payoutDoc.save({ session });
+
+                    if (booking.intended_guide_id) {
+                        const guide = await User.findById(booking.intended_guide_id).session(session);
+                        if (guide) {
+                            guide.balance = (guide.balance || 0) + guideEarning;
+                            await guide.save({ session });
+
+                            await Transaction.create([{
+                                bookingId: booking._id,
+                                userId: guide._id,
+                                payeeUserId: guide._id,
+                                amount: mongoose.Types.Decimal128.fromString(String(totalRevenue)),
+                                commission_fee: mongoose.Types.Decimal128.fromString(String(platformFee)),
+                                net_amount: mongoose.Types.Decimal128.fromString(String(guideEarning)),
+                                transaction_type: "payout",
+                                status: "confirmed",
+                                payment_gateway: "system",
+                                transaction_code: `payout-${payoutDoc._id}-${booking._id}`,
+                                note: `Additional payout for booking ${booking._id} - Phí sàn 15%`
+                            }], { session });
+                        }
+                    }
                 }
-                // Do NOT credit again - the process that created payout already handled credit (or admin will)
             } else {
                 throw createErr;
             }
@@ -722,15 +752,22 @@ export const completeBooking = async (req, res) => {
                 await notifyUser({
                     userId: booking.intended_guide_id,
                     type: "booking:completed",
-                    content: `Booking #${booking._id} đã hoàn tất. Thực nhận: ${guideEarning} (đã trừ phí sàn ${platformFee}).`,
+                    content: `Booking #${booking._id} đã hoàn tất. Số người: ${paidParticipants}. Tổng doanh thu: ${totalRevenue.toLocaleString('vi-VN')} VNĐ.  Thực nhận: ${guideEarning.toLocaleString('vi-VN')} VNĐ (đã trừ phí sàn 15%: ${platformFee.toLocaleString('vi-VN')} VNĐ).`,
                     url: `/guide/bookings/${booking._id}`,
-                    meta: { bookingId: booking._id, guideEarning, platformFee }
+                    meta: {
+                        bookingId: booking._id,
+                        guideEarning,
+                        platformFee,
+                        platformFeePercentage: 15,
+                        totalRevenue,
+                        paidParticipants
+                    }
                 }).catch(() => { });
             }
             await notifyUser({
                 userId: booking.customer_id,
                 type: "booking:completed:customer",
-                content: `Booking #${booking._id} đã hoàn tất. Cảm ơn bạn!`,
+                content: `Booking #${booking._id} đã hoàn tất. Cảm ơn bạn! `,
                 url: `/booking/${booking._id}`,
                 meta: { bookingId: booking._id }
             }).catch(() => { });

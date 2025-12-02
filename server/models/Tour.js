@@ -80,7 +80,7 @@ const TourSchema = new mongoose.Schema(
       {
         guideId: { type: mongoose.Types.ObjectId, ref: "User" },
         isMain: { type: Boolean, default: false },
-        percentage: { type: Number, default: 0.1 }, // mặc định 10% (0.1)
+        percentage: { type: Number, default: 0.15 }, // mặc định 10% (0.1)
       },
     ],
     guide_id: { type: mongoose.Types.ObjectId, ref: "User" },
