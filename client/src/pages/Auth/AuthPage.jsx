@@ -91,7 +91,10 @@ export default function AuthPage() {
       }
     } catch (err) {
       console.error("Auth error:", err);
-      setError(err.message || "Đã xảy ra lỗi. Vui lòng thử lại.");
+      const serverMessage = err?.response?.data?.message;
+      setError(
+        serverMessage || err.message || "Đã xảy ra lỗi. Vui lòng thử lại."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -107,7 +110,10 @@ export default function AuthPage() {
       setViewState("sent");
     } catch (err) {
       console.error("Forgot password error:", err);
-      setError(err.message || "Không thể gửi email. Vui lòng thử lại.");
+      const serverMessage = err?.response?.data?.message;
+      setError(
+        serverMessage || err.message || "Không thể gửi email. Vui lòng thử lại."
+      );
     } finally {
       setIsLoading(false);
     }

@@ -104,9 +104,6 @@ const AdminPlaces = lazy(() => import("../pages/Dashboard/Admin/Places"));
 const AdminFinance = lazy(() => import("../pages/Dashboard/Admin/Finance"));
 const AdminSettings = lazy(() => import("../pages/Dashboard/Admin/Settings"));
 const AdminPosts = lazy(() => import("../pages/Dashboard/Admin/Posts"));
-const AdminCreatePost = lazy(() =>
-  import("../pages/Dashboard/Admin/CreatePost")
-);
 const AdminReviews = lazy(() => import("../pages/Dashboard/Admin/Reviews"));
 
 // ============================================================================
@@ -556,14 +553,6 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <AdminPosts />
-          </Suspense>
-        ),
-      },
-      {
-        path: "create-post",
-        element: (
-          <Suspense fallback={<PageFallback />}>
-            <AdminCreatePost />
           </Suspense>
         ),
       },

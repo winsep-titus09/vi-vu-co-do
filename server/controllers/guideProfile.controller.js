@@ -1,5 +1,6 @@
 // controllers/guideProfile.controller.js
 import GuideProfile from "../models/GuideProfile.js";
+import User from "../models/User.js";
 import Review from "../models/Review.js";
 import { uploadVideoBufferToCloudinary } from "../services/uploader.js";
 import multer from "multer";
@@ -10,16 +11,72 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
 });
 
-export const uploadGuideVideo = upload.single("video");
+// Middleware: chỉ parse multipart nếu có file
+export const uploadGuideVideo = (req, res, next) => {
+  const contentType = req.headers["content-type"] || "";
+  if (contentType.includes("multipart/form-data")) {
+    return upload.single("video")(req, res, next);
+  }
+  // Nếu không phải multipart, bỏ qua multer
+  next();
+};
 
 /** Xem hồ sơ của chính mình */
 export const getMyGuideProfile = async (req, res) => {
   try {
-    const profile = await GuideProfile.findOne({ user_id: req.user._id });
-    if (!profile) {
-      return res.status(404).json({ message: "Chưa có hồ sơ hướng dẫn viên." });
+    // Lấy thông tin user
+    const user = await User.findById(req.user._id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy user." });
     }
-    res.json(profile);
+
+    // Lấy hoặc tạo guide profile
+    let profile = await GuideProfile.findOne({ user_id: req.user._id });
+
+    if (!profile) {
+      profile = await GuideProfile.create({
+        user_id: req.user._id,
+        introduction: "",
+        experience: "",
+        languages: ["Tiếng Việt"],
+        bank_account: {
+          bank_name: "",
+          account_number: "",
+          account_holder: "",
+        },
+        certificates: [],
+        expertise: "",
+      });
+    }
+
+    // Kết hợp thông tin user và guide profile
+    const combinedProfile = {
+      _id: profile._id,
+      user_id: profile.user_id,
+      // Từ User model
+      name: user.name,
+      email: user.email,
+      phone: user.phone_number || "",
+      avatar_url: user.avatar_url || "",
+      balance: user.balance || 0,
+      // Từ GuideProfile model
+      introduction: profile.introduction || "",
+      bio_video_url: profile.bio_video_url || "",
+      experience: profile.experience || "",
+      languages: profile.languages || [],
+      expertise: profile.expertise || "",
+      certificates: profile.certificates || [],
+      is_featured: profile.is_featured,
+      status: profile.status,
+      // Bank account (flatten for easier frontend use)
+      bank_name: profile.bank_account?.bank_name || "",
+      bank_account_number: profile.bank_account?.account_number || "",
+      bank_account_name: profile.bank_account?.account_holder || "",
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    };
+
+    res.json(combinedProfile);
   } catch (err) {
     console.error("getMyGuideProfile error:", err);
     res.status(500).json({ message: "Lỗi máy chủ khi lấy hồ sơ của bạn." });
@@ -39,20 +96,56 @@ export const updateMyGuideProfile = async (req, res) => {
       }
     };
 
-    const updateData = {
-      ...(body.introduction && { introduction: body.introduction }),
-      ...(body.experience && { experience: body.experience }),
-      ...(body.languages && { languages: parseMaybeJson(body.languages) }),
-      ...(body.bank_account && {
-        bank_account: parseMaybeJson(body.bank_account),
-      }),
-      ...(body.certificates && {
-        certificates: parseMaybeJson(body.certificates),
-      }),
-      ...(typeof body.expertise !== "undefined" && {
-        expertise: (body.expertise || "").trim() || null,
-      }),
-    };
+    // Cập nhật User model (name, phone, avatar)
+    const userUpdateData = {};
+    if (body.name !== undefined) userUpdateData.name = body.name;
+    if (body.phone !== undefined) userUpdateData.phone_number = body.phone;
+    if (body.avatar_url !== undefined)
+      userUpdateData.avatar_url = body.avatar_url;
+
+    if (Object.keys(userUpdateData).length > 0) {
+      await User.findByIdAndUpdate(req.user._id, { $set: userUpdateData });
+    }
+
+    // Cập nhật GuideProfile model
+    const profileUpdateData = {};
+
+    if (body.introduction !== undefined)
+      profileUpdateData.introduction = body.introduction;
+    if (body.experience !== undefined)
+      profileUpdateData.experience = body.experience;
+    if (body.bio_video_url !== undefined)
+      profileUpdateData.bio_video_url = body.bio_video_url;
+    if (body.languages !== undefined)
+      profileUpdateData.languages = parseMaybeJson(body.languages);
+    if (body.expertise !== undefined) {
+      profileUpdateData.expertise = (body.expertise || "").trim() || null;
+    }
+    if (body.certificates !== undefined) {
+      profileUpdateData.certificates = parseMaybeJson(body.certificates);
+    }
+
+    // Bank account - có thể gửi riêng lẻ hoặc object
+    if (body.bank_name || body.bank_account_number || body.bank_account_name) {
+      // Lấy profile hiện tại để merge
+      const currentProfile = await GuideProfile.findOne({
+        user_id: req.user._id,
+      });
+      profileUpdateData.bank_account = {
+        bank_name:
+          body.bank_name || currentProfile?.bank_account?.bank_name || "",
+        account_number:
+          body.bank_account_number ||
+          currentProfile?.bank_account?.account_number ||
+          "",
+        account_holder:
+          body.bank_account_name ||
+          currentProfile?.bank_account?.account_holder ||
+          "",
+      };
+    } else if (body.bank_account) {
+      profileUpdateData.bank_account = parseMaybeJson(body.bank_account);
+    }
 
     // Nếu có file video
     if (req.file && req.file.buffer) {
@@ -60,16 +153,41 @@ export const updateMyGuideProfile = async (req, res) => {
         req.file.buffer,
         "guides/videos"
       );
-      updateData.bio_video_url = uploaded.secure_url;
+      profileUpdateData.bio_video_url = uploaded.secure_url;
     }
 
     const profile = await GuideProfile.findOneAndUpdate(
       { user_id: req.user._id },
-      { $set: updateData },
+      { $set: profileUpdateData },
       { new: true, upsert: true }
     );
 
-    res.json({ message: "Cập nhật hồ sơ thành công.", data: profile });
+    // Lấy user mới nhất
+    const user = await User.findById(req.user._id).select("-password");
+
+    // Trả về combined profile
+    const combinedProfile = {
+      _id: profile._id,
+      user_id: profile.user_id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone_number || "",
+      avatar_url: user.avatar_url || "",
+      balance: user.balance || 0,
+      introduction: profile.introduction || "",
+      bio_video_url: profile.bio_video_url || "",
+      experience: profile.experience || "",
+      languages: profile.languages || [],
+      expertise: profile.expertise || "",
+      certificates: profile.certificates || [],
+      is_featured: profile.is_featured,
+      status: profile.status,
+      bank_name: profile.bank_account?.bank_name || "",
+      bank_account_number: profile.bank_account?.account_number || "",
+      bank_account_name: profile.bank_account?.account_holder || "",
+    };
+
+    res.json({ message: "Cập nhật hồ sơ thành công.", data: combinedProfile });
   } catch (err) {
     console.error("updateMyGuideProfile error:", err);
     res.status(500).json({ message: "Lỗi máy chủ khi cập nhật hồ sơ." });

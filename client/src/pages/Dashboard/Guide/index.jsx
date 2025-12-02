@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   IconCalendar,
@@ -14,12 +14,17 @@ import {
   useBookingRequests,
   useUpcomingBookings,
   useMonthlyEarnings,
+  useMyGuideProfile,
+  useWeeklyStats,
 } from "../../../features/guides/hooks";
 import guidesApi from "../../../features/guides/api";
 import { formatCurrency } from "../../../lib/formatters";
+import apiClient from "../../../lib/api-client";
+import { useToast } from "../../../components/Toast/useToast";
 
 export default function GuideDashboard() {
   const [isOnline, setIsOnline] = useState(true);
+  const toast = useToast();
 
   // Fetch data from API
   const {
@@ -29,32 +34,70 @@ export default function GuideDashboard() {
   } = useBookingRequests();
   const { bookings: upcomingSchedule, isLoading: loadingSchedule } =
     useUpcomingBookings();
-  const { data: earningsData, isLoading: loadingEarnings } = useMonthlyEarnings(
-    new Date().getFullYear()
-  );
+  const { data: earningsData } = useMonthlyEarnings(new Date().getFullYear());
+  const { profile: guideProfile } = useMyGuideProfile();
+  const { data: weeklyStats } = useWeeklyStats();
 
-  // Get user info
-  const userInfo = JSON.parse(localStorage.getItem("user") || "{}");
-  const guideName = userInfo.name || "Hướng dẫn viên";
+  // Fetch guide rating stats
+  const [ratingStats, setRatingStats] = useState({ avgRating: 0, count: 0 });
+  useEffect(() => {
+    const fetchRating = async () => {
+      try {
+        const userId =
+          guideProfile?.user_id ||
+          JSON.parse(localStorage.getItem("user") || "{}")._id;
+        if (userId) {
+          const res = await apiClient.get(`/reviews/guides/${userId}/stats`);
+          setRatingStats({
+            avgRating: res.avg_guide_rating || 0,
+            count: res.count || 0,
+          });
+        }
+      } catch (err) {
+        console.error("Fetch rating error:", err);
+      }
+    };
+    if (guideProfile) {
+      fetchRating();
+    }
+  }, [guideProfile]);
+
+  // Get user info from profile or localStorage
+  const guideName = guideProfile?.name || "Hướng dẫn viên";
 
   // Calculate stats from data
+  // API trả về months[0-11] với month = 1-12
+  const currentMonthIndex = new Date().getMonth(); // 0-11
+  const currentMonthData = earningsData?.months?.[currentMonthIndex]; // months[0] = Jan, months[11] = Dec
   const stats = {
     pendingBookings: requests.length,
     upcomingTours: upcomingSchedule.length,
-    monthEarnings: earningsData
-      ? formatCurrency(earningsData.months?.[new Date().getMonth()]?.total || 0)
+    monthEarnings: currentMonthData?.total
+      ? formatCurrency(currentMonthData.total)
       : "0đ",
-    rating: 4.9, // TODO: Get from API
+    rating: ratingStats.avgRating ? ratingStats.avgRating.toFixed(1) : "--",
+  };
+
+  // Helper to count guests from booking
+  const countGuests = (booking) => {
+    if (booking.num_guests) return booking.num_guests;
+    if (booking.participants && Array.isArray(booking.participants)) {
+      return booking.participants.reduce(
+        (sum, p) => sum + (p.count_slot || p.quantity || 0),
+        0
+      );
+    }
+    return 0;
   };
 
   // Handle approve booking
   const handleApprove = async (bookingId) => {
     try {
       await guidesApi.approveBooking(bookingId);
-      alert("Đã chấp nhận yêu cầu đặt tour!");
+      toast.success("Thành công!", "Đã chấp nhận yêu cầu đặt tour.");
       refetchRequests();
     } catch (error) {
-      alert(error.message || "Không thể chấp nhận yêu cầu");
+      toast.error("Lỗi", error.message || "Không thể chấp nhận yêu cầu");
     }
   };
 
@@ -63,10 +106,10 @@ export default function GuideDashboard() {
     const note = prompt("Lý do từ chối (không bắt buộc):");
     try {
       await guidesApi.rejectBooking(bookingId, note || "");
-      alert("Đã từ chối yêu cầu đặt tour!");
+      toast.success("Thành công!", "Đã từ chối yêu cầu đặt tour.");
       refetchRequests();
     } catch (error) {
-      alert(error.message || "Không thể từ chối yêu cầu");
+      toast.error("Lỗi", error.message || "Không thể từ chối yêu cầu");
     }
   };
 
@@ -252,9 +295,7 @@ export default function GuideDashboard() {
                           </span>
                           <span className="flex items-center gap-1 bg-bg-main px-2 py-1 rounded">
                             <IconUser className="w-3.5 h-3.5 text-primary" />{" "}
-                            {req.participants?.filter((p) => p.count_slot)
-                              .length || 0}{" "}
-                            khách
+                            {countGuests(req)} khách
                           </span>
                           <span className="font-bold text-green-600 px-2 py-1 bg-green-50 rounded">
                             {formatCurrency(req.total_price)}
@@ -326,10 +367,7 @@ export default function GuideDashboard() {
                         {item.tour_id?.name || "Tour"}
                       </p>
                       <p className="text-xs text-text-secondary mt-1">
-                        {item.start_time || "08:00"} •{" "}
-                        {item.participants?.filter((p) => p.count_slot)
-                          .length || 0}{" "}
-                        khách
+                        {item.start_time || "08:00"} • {countGuests(item)} khách
                       </p>
                       <div className="flex items-center gap-1 mt-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
@@ -348,7 +386,7 @@ export default function GuideDashboard() {
             )}
             <div className="mt-6 pt-4 border-t border-border-light text-center">
               <Link
-                to="#"
+                to="/dashboard/guide/schedule"
                 className="text-sm font-bold text-primary hover:underline"
               >
                 Xem toàn bộ lịch trình →
@@ -367,20 +405,42 @@ export default function GuideDashboard() {
                 <div>
                   <div className="flex justify-between text-xs font-bold mb-1 uppercase tracking-wider">
                     <span className="text-white/70">Phản hồi</span>
-                    <span className="text-green-400">92%</span>
+                    <span className="text-green-400">
+                      {weeklyStats?.response?.rate ?? 100}%
+                    </span>
                   </div>
                   <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-400 w-[92%] rounded-full"></div>
+                    <div
+                      className="h-full bg-green-400 rounded-full transition-all"
+                      style={{
+                        width: `${weeklyStats?.response?.rate ?? 100}%`,
+                      }}
+                    ></div>
                   </div>
+                  <p className="text-[10px] text-white/50 mt-1">
+                    {weeklyStats?.response?.processed ?? 0}/
+                    {weeklyStats?.response?.total ?? 0} yêu cầu đã xử lý
+                  </p>
                 </div>
                 <div>
                   <div className="flex justify-between text-xs font-bold mb-1 uppercase tracking-wider">
                     <span className="text-white/70">Hoàn thành</span>
-                    <span className="text-secondary">4/5</span>
+                    <span className="text-secondary">
+                      {weeklyStats?.completion?.completed ?? 0}/
+                      {weeklyStats?.completion?.total ?? 0}
+                    </span>
                   </div>
                   <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-secondary w-[80%] rounded-full"></div>
+                    <div
+                      className="h-full bg-secondary rounded-full transition-all"
+                      style={{
+                        width: `${weeklyStats?.completion?.rate ?? 100}%`,
+                      }}
+                    ></div>
                   </div>
+                  <p className="text-[10px] text-white/50 mt-1">
+                    Tour hoàn thành trong tuần
+                  </p>
                 </div>
               </div>
             </div>

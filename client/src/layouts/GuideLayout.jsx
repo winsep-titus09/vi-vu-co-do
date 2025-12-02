@@ -13,7 +13,10 @@ import {
   IconPlus,
 } from "../icons/IconCommon";
 import { authApi } from "../features/auth/api";
-import { useBookingRequests } from "../features/guides/hooks";
+import {
+  useBookingRequests,
+  useMyGuideProfile,
+} from "../features/guides/hooks";
 import { useNotifications } from "../features/notifications/hooks";
 
 // Inline Icons specific to Guide layout
@@ -68,21 +71,18 @@ const IconStarMenu = ({ className }) => (
 
 export default function GuideLayout() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
-  const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
-  // Fetch current user
+  // Fetch guide profile (includes user info)
+  const { profile: guideProfile } = useMyGuideProfile();
+
+  // Check authentication
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const userData = await authApi.getCurrentUser();
-        setUser(userData);
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      }
-    };
-    fetchUser();
-  }, []);
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/sign-in");
+    }
+  }, [navigate]);
 
   // Fetch pending booking requests count
   const { requests } = useBookingRequests();
@@ -248,14 +248,16 @@ export default function GuideLayout() {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border border-gray-300">
               <img
-                src={user?.avatar_url || "https://i.pravatar.cc/150?img=25"}
+                src={
+                  guideProfile?.avatar_url || "https://i.pravatar.cc/150?img=25"
+                }
                 alt="Avatar"
                 className="w-full h-full object-cover"
               />
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-bold text-gray-900 truncate">
-                {user?.name || "Hướng dẫn viên"}
+                {guideProfile?.name || "Hướng dẫn viên"}
               </p>
               <p className="text-xs text-green-600 font-medium flex items-center gap-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>{" "}

@@ -3,8 +3,10 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { connectDB } from "../config/db.js";
 import User from "../models/User.js";
+import Role from "../models/Role.js";
 import Review from "../models/Review.js";
-import GuideProfile from "../models/GuideProfile.js";
+import Booking from "../models/Booking.js";
+import Tour from "../models/Tour.js";
 
 dotenv.config();
 
@@ -12,140 +14,144 @@ async function seedGuideReviews() {
   try {
     await connectDB();
 
-    // Get all guides and tourists
-    const guides = await User.find({ role: "guide" }).lean();
-    const tourists = await User.find({ role: "tourist" }).lean();
+    // Get role IDs
+    const guideRole = await Role.findOne({ name: "guide" }).lean();
+    const touristRole = await Role.findOne({ name: "tourist" }).lean();
+
+    if (!guideRole || !touristRole) {
+      console.log("⚠️ Roles not found.");
+      process.exit(0);
+    }
+
+    // Get guides and tourists using role_id
+    // Ưu tiên guide đang test (guide@example.com)
+    const testGuide = await User.findOne({ email: "guide@example.com" }).lean();
+    const otherGuides = await User.find({
+      role_id: guideRole._id,
+      email: { $ne: "guide@example.com" },
+    })
+      .limit(2)
+      .lean();
+
+    const guides = testGuide ? [testGuide, ...otherGuides] : otherGuides;
+    const tourists = await User.find({ role_id: touristRole._id })
+      .limit(5)
+      .lean();
+    const tours = await Tour.find({ status: "active" }).limit(5).lean();
 
     if (!guides.length) {
-      console.log("⚠️ No guides found. Please seed guides first.");
+      console.log("⚠️ No guides found.");
       process.exit(0);
     }
 
     if (!tourists.length) {
-      console.log("⚠️ No tourists found. Creating sample tourists...");
-      // Create sample tourists
-      const sampleTourists = [
-        {
-          name: "Hoàng Nam",
-          email: "hoangnam@example.com",
-          password: "password123",
-          role: "tourist",
-        },
-        {
-          name: "Thanh Hà",
-          email: "thanhha@example.com",
-          password: "password123",
-          role: "tourist",
-        },
-        {
-          name: "Minh Tuấn",
-          email: "minhtuan@example.com",
-          password: "password123",
-          role: "tourist",
-        },
-        {
-          name: "Thu Hương",
-          email: "thuhuong@example.com",
-          password: "password123",
-          role: "tourist",
-        },
-      ];
-      await User.insertMany(sampleTourists);
-      tourists.push(...(await User.find({ role: "tourist" }).lean()));
-      console.log(`✅ Created ${sampleTourists.length} sample tourists`);
+      console.log("⚠️ No tourists found.");
+      process.exit(0);
+    }
+
+    if (!tours.length) {
+      console.log("⚠️ No tours found.");
+      process.exit(0);
     }
 
     console.log(
-      `📋 Found ${guides.length} guides and ${tourists.length} tourists`
+      `📋 Found ${guides.length} guides, ${tourists.length} tourists, ${tours.length} tours`
     );
 
-    // Clear existing guide reviews
-    await Review.deleteMany({ review_type: "guide" });
-    console.log("🗑️ Cleared existing guide reviews");
-
-    const reviews = [];
+    // Review comments
     const reviewComments = [
-      "Hướng dẫn viên rất nhiệt tình và am hiểu lịch sử. Cách kể chuyện lôi cuốn, không hề nhàm chán!",
-      "Chuyến đi tuyệt vời nhờ có guide chuyên nghiệp. Rất đáng tiền và sẽ quay lại!",
-      "Guide rất tận tâm, luôn quan tâm đến từng thành viên trong đoàn. Kiến thức sâu rộng về văn hóa địa phương.",
-      "Một trải nghiệm tuyệt vời! Guide vui tính và am hiểu, khiến chuyến đi thêm ý nghĩa.",
-      "Chuyên nghiệp, đúng giờ, kiến thức tốt. Rất hài lòng với dịch vụ.",
-      "Guide rất nhiệt tình hướng dẫn và chụp ảnh đẹp cho cả đoàn. Sẽ giới thiệu cho bạn bè!",
-      "Kinh nghiệm phong phú, giải thích rất dễ hiểu. Chuyến đi rất thú vị!",
-      "Thái độ phục vụ tốt, luôn sẵn sàng hỗ trợ. Đáng tin cậy!",
+      "Hướng dẫn viên rất nhiệt tình và am hiểu lịch sử. Chuyến đi tuyệt vời!",
+      "Anh/chị hướng dẫn rất chuyên nghiệp, giải thích chi tiết và thú vị.",
+      "Tour rất hay, hướng dẫn viên thân thiện. Highly recommended!",
+      "Great experience! The guide was very knowledgeable about Hue's history.",
+      "Gia đình mình rất hài lòng. Các bé rất thích cách chị hướng dẫn kể chuyện.",
+      "Tour ổn, hướng dẫn viên nhiệt tình.",
+      "Perfect! Best tour guide ever. Will definitely book again!",
+      "Rất đáng tiền, chụp ảnh siêu đẹp. Anh hướng dẫn còn chỉ góc chụp đẹp nữa.",
     ];
 
+    const guideReplies = [
+      "Cảm ơn bạn đã đánh giá! Rất vui vì bạn đã có trải nghiệm tuyệt vời. Hẹn gặp lại!",
+      "Thank you so much! Hope to see you again in Hue!",
+      "Cảm ơn góp ý của bạn. Mình sẽ cố gắng cải thiện!",
+      null, // No reply
+      null,
+    ];
+
+    let createdBookings = 0;
+    let createdReviews = 0;
+
     for (const guide of guides) {
-      // Each guide gets 3-6 reviews
-      const numReviews = Math.floor(Math.random() * 4) + 3; // 3-6 reviews
+      console.log(`\n🔄 Creating reviews for guide: ${guide.name}`);
+
+      // Create 3-5 reviews per guide
+      const numReviews = Math.floor(Math.random() * 3) + 3;
 
       for (let i = 0; i < numReviews; i++) {
-        const randomTourist =
-          tourists[Math.floor(Math.random() * tourists.length)];
-        const rating = Math.random() > 0.2 ? 5 : Math.random() > 0.5 ? 4 : 3; // 80% are 5 stars
+        const tourist = tourists[i % tourists.length];
+        const tour = tours[i % tours.length];
+        const rating = Math.random() > 0.3 ? 5 : Math.random() > 0.5 ? 4 : 3;
 
-        const daysAgo = Math.floor(Math.random() * 90); // Reviews within last 90 days
-        const reviewDate = new Date();
-        reviewDate.setDate(reviewDate.getDate() - daysAgo);
+        // Create past date (1-8 weeks ago)
+        const weeksAgo = Math.floor(Math.random() * 8) + 1;
+        const pastDate = new Date();
+        pastDate.setDate(pastDate.getDate() - weeksAgo * 7);
 
-        reviews.push({
-          user_id: randomTourist._id,
-          review_type: "guide",
-          guide_id: guide._id,
-          rating,
-          comment:
-            reviewComments[Math.floor(Math.random() * reviewComments.length)],
-          status: "approved",
-          createdAt: reviewDate,
-          updatedAt: reviewDate,
+        // Create booking
+        const booking = await Booking.create({
+          customer_id: tourist._id,
+          tour_id: tour._id,
+          intended_guide_id: guide._id,
+          status: "completed",
+          start_date: pastDate,
+          end_date: pastDate,
+          total_price: tour.price || 500000,
+          paid_amount: tour.price || 500000,
+          paidAmount: tour.price || 500000,
+          num_guests: Math.floor(Math.random() * 4) + 1,
+          createdAt: pastDate,
+          updatedAt: new Date(),
         });
+
+        createdBookings++;
+
+        // Create review
+        const reviewData = {
+          bookingId: booking._id,
+          guide_rating: rating,
+          guide_comment:
+            reviewComments[Math.floor(Math.random() * reviewComments.length)],
+          guide_rated_at: new Date(pastDate.getTime() + 24 * 60 * 60 * 1000),
+          tour_rating: rating,
+          tour_comment: "Tour tổ chức tốt.",
+          tour_rated_at: new Date(pastDate.getTime() + 24 * 60 * 60 * 1000),
+        };
+
+        // Maybe add reply
+        const reply =
+          guideReplies[Math.floor(Math.random() * guideReplies.length)];
+        if (reply) {
+          reviewData.guide_reply = reply;
+          reviewData.guide_reply_at = new Date(
+            pastDate.getTime() + 48 * 60 * 60 * 1000
+          );
+        }
+
+        await Review.create(reviewData);
+        createdReviews++;
+
+        console.log(
+          `  ⭐ Created: ${rating} stars${reply ? " (with reply)" : ""}`
+        );
       }
     }
 
-    await Review.insertMany(reviews);
     console.log(
-      `✅ Created ${reviews.length} reviews for ${guides.length} guides`
+      `\n✅ Done! Created ${createdBookings} bookings and ${createdReviews} reviews.`
     );
-
-    // Update guide profiles with rating and review count
-    for (const guide of guides) {
-      const guideReviews = reviews.filter(
-        (r) => r.guide_id.toString() === guide._id.toString()
-      );
-      const avgRating =
-        guideReviews.reduce((sum, r) => sum + r.rating, 0) /
-        guideReviews.length;
-
-      await GuideProfile.findOneAndUpdate(
-        { user_id: guide._id },
-        {
-          rating: Math.round(avgRating * 10) / 10,
-          reviewCount: guideReviews.length,
-        }
-      );
-    }
-    console.log("✅ Updated guide profiles with ratings and review counts");
-
-    // Show sample reviews
-    const samples = await Review.find({ review_type: "guide" })
-      .populate("user_id", "name")
-      .populate("guide_id", "name")
-      .limit(5)
-      .lean();
-
-    console.log("\n⭐ Sample reviews:");
-    samples.forEach((review) => {
-      console.log(
-        `  - ${review.user_id.name} → ${review.guide_id.name}: ${
-          review.rating
-        }⭐ "${review.comment.substring(0, 60)}..."`
-      );
-    });
-
-    console.log("\n✅ Seeding completed!");
     process.exit(0);
   } catch (error) {
-    console.error("❌ Error seeding reviews:", error);
+    console.error("❌ Error:", error);
     process.exit(1);
   }
 }

@@ -12,6 +12,7 @@ import {
 import { useMyTours } from "../../../features/guides/hooks";
 import guidesApi from "../../../features/guides/api";
 import { formatCurrency } from "../../../lib/formatters";
+import { useToast } from "../../../components/Toast/useToast";
 
 // Inline Icons
 const IconLoader = ({ className }) => (
@@ -39,6 +40,7 @@ const tabs = [
 export default function GuideMyTours() {
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
+  const toast = useToast();
 
   // Fetch tours from API
   const { tours, isLoading, error, refetch } = useMyTours({
@@ -58,10 +60,10 @@ export default function GuideMyTours() {
     if (!window.confirm("Bạn có chắc muốn xóa tour này?")) return;
     try {
       await guidesApi.deleteTour(tourId);
-      alert("Đã xóa tour thành công!");
+      toast.success("Thành công!", "Đã xóa tour khỏi hệ thống.");
       refetch();
     } catch (err) {
-      alert(err.message || "Không thể xóa tour");
+      toast.error("Lỗi", err.message || "Không thể xóa tour");
     }
   };
 

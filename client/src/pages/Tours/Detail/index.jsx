@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useToast } from "../../../components/Toast/useToast";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { DayPicker } from "react-day-picker";
@@ -170,9 +171,13 @@ export default function TourDetailPage() {
   };
 
   // Submit Handler
+  const toast = useToast();
   const handleBooking = () => {
     if (!selectedDate) {
-      alert("Vui lòng chọn ngày khởi hành để tiếp tục!");
+      toast.warning(
+        "Chưa chọn ngày",
+        "Vui lòng chọn ngày khởi hành để tiếp tục!"
+      );
       setIsDateOpen(true);
       return;
     }

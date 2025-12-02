@@ -72,6 +72,12 @@ export const guidesApi = {
     return response;
   },
 
+  // Get guide weekly performance stats
+  getWeeklyStats: async () => {
+    const response = await apiClient.get("/guides/me/weekly-stats");
+    return response;
+  },
+
   // Get guide bookings with filters
   getBookings: async (params = {}) => {
     const { status, page = 1, limit = 50, grouped = false } = params;
@@ -93,9 +99,10 @@ export const guidesApi = {
   getMonthlyEarnings: async (year) => {
     const queryParams = new URLSearchParams({
       year: String(year || new Date().getFullYear()),
-      mode: "paid",
     });
-    const response = await apiClient.get(`/guides/me/earnings?${queryParams}`);
+    const response = await apiClient.get(
+      `/guides/me/earnings/monthly?${queryParams}`
+    );
     return response;
   },
 
@@ -233,11 +240,50 @@ export const guidesApi = {
     return response;
   },
 
-  // Remove busy dates
+  // Remove busy dates - use POST with _method override since some proxies don't support DELETE with body
   removeBusyDates: async (dates) => {
-    const response = await apiClient.delete("/guides/busy-dates", {
-      data: { dates },
+    // Try DELETE first, fallback to POST if needed
+    try {
+      const response = await apiClient.request({
+        method: "DELETE",
+        url: "/guides/busy-dates",
+        data: { dates },
+      });
+      return response;
+    } catch (err) {
+      console.error("DELETE failed, trying POST fallback:", err);
+      // Fallback: use POST with action field
+      const response = await apiClient.post("/guides/busy-dates/remove", {
+        dates,
+      });
+      return response;
+    }
+  },
+
+  // ========== REVIEWS API ==========
+
+  // Get my reviews (as guide)
+  getMyReviews: async (params = {}) => {
+    const { page = 1, limit = 10, rating = "all" } = params;
+    const queryParams = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
     });
+    if (rating && rating !== "all") {
+      queryParams.set("rating", rating);
+    }
+    const response = await apiClient.get(`/guides/me/reviews?${queryParams}`);
+    return response;
+  },
+
+  // Reply to a review
+  replyToReview: async (reviewId, reply) => {
+    const response = await apiClient.post(
+      `/guides/me/reviews/${reviewId}/reply`,
+      {
+        reply,
+      }
+    );
     return response;
   },
 };

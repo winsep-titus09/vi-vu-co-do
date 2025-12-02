@@ -670,3 +670,203 @@ export const getLocationRatingStats = async (req, res) => {
     return res.status(500).json({ message: "Lỗi máy chủ." });
   }
 };
+
+// ========================================
+// GUIDE REVIEWS MANAGEMENT
+// ========================================
+
+/**
+ * GET /api/guides/me/reviews
+ * Lấy danh sách reviews của HDV đang đăng nhập
+ */
+export const getMyGuideReviews = async (req, res) => {
+  try {
+    const guideId = req.user._id;
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 10, 1),
+      50
+    );
+    const ratingFilter = req.query.rating; // "all", "5", "4", etc.
+
+    const now = new Date();
+    const matchBooking = {
+      intended_guide_id: new mongoose.Types.ObjectId(guideId),
+      end_date: { $lte: now },
+      status: { $in: ["paid", "completed"] },
+    };
+
+    // Build rating filter if specified
+    const ratingMatch =
+      ratingFilter && ratingFilter !== "all"
+        ? { "rev.guide_rating": parseInt(ratingFilter, 10) }
+        : { "rev.guide_rating": { $type: "number" } };
+
+    const [result] = await Booking.aggregate([
+      { $match: matchBooking },
+      {
+        $lookup: {
+          from: "reviews",
+          localField: "_id",
+          foreignField: "bookingId",
+          as: "rev",
+        },
+      },
+      { $unwind: "$rev" },
+      { $match: ratingMatch },
+      {
+        $lookup: {
+          from: "users",
+          localField: "customer_id",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "tours",
+          localField: "tour_id",
+          foreignField: "_id",
+          as: "tour",
+        },
+      },
+      { $unwind: { path: "$tour", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: "$rev._id",
+          bookingId: "$_id",
+          rating: "$rev.guide_rating",
+          comment: "$rev.guide_comment",
+          reply: "$rev.guide_reply",
+          replyAt: "$rev.guide_reply_at",
+          createdAt: "$rev.guide_rated_at",
+          user: {
+            _id: "$user._id",
+            name: "$user.name",
+            avatar_url: "$user.avatar_url",
+          },
+          tour: {
+            _id: "$tour._id",
+            name: "$tour.name",
+            slug: "$tour.slug",
+          },
+        },
+      },
+      {
+        $facet: {
+          items: [
+            { $sort: { createdAt: -1 } },
+            { $skip: (page - 1) * limit },
+            { $limit: limit },
+          ],
+          meta: [
+            {
+              $group: {
+                _id: null,
+                count: { $sum: 1 },
+                avgRating: { $avg: "$rating" },
+                five_star: { $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] } },
+                four_star: { $sum: { $cond: [{ $eq: ["$rating", 4] }, 1, 0] } },
+                three_star: {
+                  $sum: { $cond: [{ $eq: ["$rating", 3] }, 1, 0] },
+                },
+                two_star: { $sum: { $cond: [{ $eq: ["$rating", 2] }, 1, 0] } },
+                one_star: { $sum: { $cond: [{ $eq: ["$rating", 1] }, 1, 0] } },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const items = result?.items || [];
+    const meta = result?.meta?.[0] || {
+      count: 0,
+      avgRating: null,
+      five_star: 0,
+      four_star: 0,
+      three_star: 0,
+      two_star: 0,
+      one_star: 0,
+    };
+
+    return res.json({
+      items,
+      page,
+      limit,
+      total: meta.count || 0,
+      avgRating: meta.avgRating ? parseFloat(meta.avgRating.toFixed(1)) : null,
+      distribution: {
+        5: meta.five_star,
+        4: meta.four_star,
+        3: meta.three_star,
+        2: meta.two_star,
+        1: meta.one_star,
+      },
+    });
+  } catch (err) {
+    console.error("getMyGuideReviews error:", err);
+    return res.status(500).json({ message: "Lỗi máy chủ." });
+  }
+};
+
+/**
+ * POST /api/guides/me/reviews/:reviewId/reply
+ * HDV phản hồi một review
+ */
+export const replyToReview = async (req, res) => {
+  try {
+    const guideId = req.user._id;
+    const { reviewId } = req.params;
+    const { reply } = req.body;
+
+    if (!reply || typeof reply !== "string" || reply.trim().length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Nội dung phản hồi không được để trống." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      return res.status(400).json({ message: "reviewId không hợp lệ." });
+    }
+
+    // Tìm review và kiểm tra quyền
+    const review = await Review.findById(reviewId).lean();
+    if (!review) {
+      return res.status(404).json({ message: "Không tìm thấy đánh giá." });
+    }
+
+    // Kiểm tra booking thuộc về guide này
+    const booking = await Booking.findById(review.bookingId).lean();
+    if (!booking || String(booking.intended_guide_id) !== String(guideId)) {
+      return res
+        .status(403)
+        .json({ message: "Bạn không có quyền phản hồi đánh giá này." });
+    }
+
+    // Cập nhật reply
+    const updated = await Review.findByIdAndUpdate(
+      reviewId,
+      {
+        $set: {
+          guide_reply: reply.trim(),
+          guide_reply_at: new Date(),
+        },
+      },
+      { new: true }
+    );
+
+    return res.json({
+      message: "Đã gửi phản hồi thành công.",
+      review: {
+        _id: updated._id,
+        reply: updated.guide_reply,
+        replyAt: updated.guide_reply_at,
+      },
+    });
+  } catch (err) {
+    console.error("replyToReview error:", err);
+    return res.status(500).json({ message: "Lỗi máy chủ." });
+  }
+};

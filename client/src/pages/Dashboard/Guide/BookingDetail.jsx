@@ -21,6 +21,7 @@ import {
   IconWallet,
   IconInfo,
 } from "../../../icons/IconCommon";
+import { useToast } from "../../../components/Toast/useToast";
 
 // Inline Icons
 const IconLoader = ({ className }) => (
@@ -90,6 +91,7 @@ const getStatusBadge = (status) => {
 export default function GuideBookingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const {
     booking: bookingData,
     isLoading,
@@ -101,10 +103,10 @@ export default function GuideBookingDetail() {
   const handleApprove = async () => {
     try {
       await guidesApi.approveBooking(id);
-      alert("Đã chấp nhận yêu cầu đặt tour!");
+      toast.success("Thành công!", "Đã chấp nhận yêu cầu đặt tour.");
       refetch();
     } catch (error) {
-      alert(error.message || "Không thể chấp nhận yêu cầu");
+      toast.error("Lỗi", error.message || "Không thể chấp nhận yêu cầu");
     }
   };
 
@@ -114,10 +116,10 @@ export default function GuideBookingDetail() {
     if (note === null) return;
     try {
       await guidesApi.rejectBooking(id, note || "");
-      alert("Đã từ chối yêu cầu đặt tour!");
+      toast.success("Thành công!", "Đã từ chối yêu cầu đặt tour.");
       navigate("/dashboard/guide/requests");
     } catch (error) {
-      alert(error.message || "Không thể từ chối yêu cầu");
+      toast.error("Lỗi", error.message || "Không thể từ chối yêu cầu");
     }
   };
 
@@ -140,10 +142,32 @@ export default function GuideBookingDetail() {
     );
   }
 
+  const startDate = bookingData.start_date
+    ? new Date(bookingData.start_date)
+    : null;
+  const createdAt = bookingData.createdAt || bookingData.created_at || null;
+  const participants = bookingData.participants || [];
+  const countedParticipants = participants.filter((p) => p.count_slot);
+  const resolveAge = (participant) => {
+    if (typeof participant?.age_at_departure === "number")
+      return participant.age_at_departure;
+    if (typeof participant?.age_provided === "number")
+      return participant.age_provided;
+    return participant?.age;
+  };
+  const adults = countedParticipants.filter(
+    (p) => (resolveAge(p) ?? 0) >= 12
+  ).length;
+  const children = Math.max(countedParticipants.length - adults, 0);
+  const paymentGateway =
+    bookingData.payment_session?.gateway || bookingData.payment_method;
+
   // Map API data to display format
   const booking = {
     id: bookingData._id,
-    created_at: new Date(bookingData.created_at).toLocaleString("vi-VN"),
+    created_at: createdAt
+      ? new Date(createdAt).toLocaleString("vi-VN")
+      : "Không rõ thời gian",
     status:
       bookingData.status === "waiting_guide"
         ? "pending"
@@ -172,27 +196,32 @@ export default function GuideBookingDetail() {
       reviews: 0,
     },
     schedule: {
-      date: new Date(bookingData.start_date).toLocaleDateString("vi-VN"),
-      time: bookingData.start_time || "08:00",
-      guests: bookingData.participants?.filter((p) => p.count_slot).length || 0,
-      adults:
-        bookingData.participants?.filter((p) => p.count_slot && p.age >= 12)
-          .length || 0,
-      children:
-        bookingData.participants?.filter((p) => p.count_slot && p.age < 12)
-          .length || 0,
+      date: startDate ? startDate.toLocaleDateString("vi-VN") : "Đang cập nhật",
+      time: startDate
+        ? startDate.toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : bookingData.tour_id?.fixed_departure_time || "--:--",
+      guests:
+        countedParticipants.length || bookingData.contact?.guest_count || 0,
+      adults,
+      children,
     },
     payment: {
       total: formatCurrency(bookingData.total_price),
       method:
-        bookingData.payment_method === "momo"
+        paymentGateway === "momo"
           ? "Ví MoMo"
-          : bookingData.payment_method === "vnpay"
+          : paymentGateway === "vnpay"
           ? "VNPay"
           : "Tiền mặt",
-      paymentStatus: bookingData.payment_status || "pending",
+      paymentStatus:
+        bookingData.payment_session?.status ||
+        bookingData.payment_status ||
+        "pending",
     },
-    note: bookingData.customer_note || "Không có ghi chú",
+    note: bookingData.contact?.note?.trim() || "Không có ghi chú",
   };
 
   return (

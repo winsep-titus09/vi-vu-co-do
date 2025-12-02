@@ -19,6 +19,7 @@ import {
   useCreateTourRequest,
 } from "../../../features/guides/hooks";
 import { formatCurrency } from "../../../lib/formatters";
+import { useToast } from "../../../components/Toast/useToast";
 
 // Inline Icons
 const IconLoader = ({ className }) => (
@@ -42,6 +43,7 @@ export default function CreateTour() {
   const [selectedPlaces, setSelectedPlaces] = useState([]);
   const [previewImage, setPreviewImage] = useState(null);
   const [searchLocation, setSearchLocation] = useState("");
+  const toast = useToast();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -99,27 +101,27 @@ export default function CreateTour() {
   const validateStep = () => {
     if (step === 1) {
       if (!formData.name.trim()) {
-        alert("Vui lòng nhập tên tour");
+        toast.warning("Thiếu thông tin", "Vui lòng nhập tên tour");
         return false;
       }
       if (!formData.duration_hours) {
-        alert("Vui lòng nhập thời lượng tour");
+        toast.warning("Thiếu thông tin", "Vui lòng nhập thời lượng tour");
         return false;
       }
       if (!formData.category_id) {
-        alert("Vui lòng chọn danh mục tour");
+        toast.warning("Thiếu thông tin", "Vui lòng chọn danh mục tour");
         return false;
       }
     }
     if (step === 2) {
       if (selectedPlaces.length === 0) {
-        alert("Vui lòng chọn ít nhất 1 địa điểm");
+        toast.warning("Thiếu thông tin", "Vui lòng chọn ít nhất 1 địa điểm");
         return false;
       }
     }
     if (step === 3) {
       if (!formData.price) {
-        alert("Vui lòng nhập giá tour");
+        toast.warning("Thiếu thông tin", "Vui lòng nhập giá tour");
         return false;
       }
     }
@@ -139,7 +141,7 @@ export default function CreateTour() {
 
     // Validate category
     if (!formData.category_id) {
-      alert("Vui lòng chọn danh mục tour");
+      toast.warning("Thiếu thông tin", "Vui lòng chọn danh mục tour");
       setStep(1);
       return;
     }
@@ -184,7 +186,10 @@ export default function CreateTour() {
 
       console.log("Submitting tour request:", payload);
       await createTourRequest(payload);
-      alert("Đã gửi yêu cầu tạo tour thành công! Vui lòng chờ admin duyệt.");
+      toast.success(
+        "Thành công!",
+        "Đã gửi yêu cầu tạo tour. Vui lòng chờ admin duyệt."
+      );
       navigate("/dashboard/guide/my-tours");
     } catch (err) {
       console.error("Tour creation error:", err);
@@ -192,7 +197,7 @@ export default function CreateTour() {
         err?.message ||
         err?.detail?.toString() ||
         "Không thể tạo tour. Vui lòng thử lại.";
-      alert(errorMsg);
+      toast.error("Lỗi tạo tour", errorMsg);
     }
   };
 

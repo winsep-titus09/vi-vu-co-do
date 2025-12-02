@@ -38,11 +38,14 @@ apiClient.interceptors.response.use(
     return response.data;
   },
   (error) => {
-    // Handle 401 Unauthorized
+    // Handle 401 Unauthorized - chỉ redirect nếu không phải đang ở trang auth
     if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/auth/signin";
+      const isAuthPage = window.location.pathname.includes("/sign-");
+      if (!isAuthPage) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        // Không tự động redirect, để component xử lý
+      }
     }
 
     // Handle 403 Forbidden
@@ -55,7 +58,7 @@ apiClient.interceptors.response.use(
       console.error("Server error:", error.response.data);
     }
 
-    return Promise.reject(error.response?.data || error);
+    return Promise.reject(error);
   }
 );
 

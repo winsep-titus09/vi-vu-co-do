@@ -11,6 +11,7 @@ import { IconUser } from "../../../icons/IconUser";
 import { useGuideBookings } from "../../../features/guides/hooks";
 import guidesApi from "../../../features/guides/api";
 import { formatCurrency, formatTimeAgo } from "../../../lib/formatters";
+import { useToast } from "../../../components/Toast/useToast";
 
 // Inline Icons
 const IconLoader = ({ className }) => (
@@ -84,6 +85,7 @@ const tabs = [
 export default function BookingRequests() {
   const [activeTab, setActiveTab] = useState("pending");
   const [search, setSearch] = useState("");
+  const toast = useToast();
 
   // Determine status filter based on active tab
   const getStatusFilter = () => {
@@ -126,10 +128,10 @@ export default function BookingRequests() {
   const handleApprove = async (bookingId) => {
     try {
       await guidesApi.approveBooking(bookingId);
-      alert("Đã chấp nhận yêu cầu đặt tour!");
+      toast.success("Thành công!", "Đã chấp nhận yêu cầu đặt tour.");
       refetch();
     } catch (error) {
-      alert(error.message || "Không thể chấp nhận yêu cầu");
+      toast.error("Lỗi", error.message || "Không thể chấp nhận yêu cầu");
     }
   };
 
@@ -139,10 +141,10 @@ export default function BookingRequests() {
     if (note === null) return; // User cancelled
     try {
       await guidesApi.rejectBooking(bookingId, note || "");
-      alert("Đã từ chối yêu cầu đặt tour!");
+      toast.success("Thành công!", "Đã từ chối yêu cầu đặt tour.");
       refetch();
     } catch (error) {
-      alert(error.message || "Không thể từ chối yêu cầu");
+      toast.error("Lỗi", error.message || "Không thể từ chối yêu cầu");
     }
   };
 
@@ -248,6 +250,10 @@ export default function BookingRequests() {
           </div>
         ) : filteredRequests.length > 0 ? (
           filteredRequests.map((booking) => {
+            const startDate = booking.start_date
+              ? new Date(booking.start_date)
+              : null;
+            const createdAt = booking.createdAt || booking.created_at || null;
             const req = {
               id: booking._id,
               tourName: booking.tour_id?.name || "Tour",
@@ -257,13 +263,22 @@ export default function BookingRequests() {
                   booking.customer_id?.avatar_url ||
                   "https://i.pravatar.cc/150?img=11",
               },
-              date: new Date(booking.start_date).toLocaleDateString("vi-VN"),
-              time: booking.start_time || "08:00",
+              date: startDate
+                ? startDate.toLocaleDateString("vi-VN")
+                : "Đang cập nhật",
+              time: startDate
+                ? startDate.toLocaleTimeString("vi-VN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : booking.tour_id?.fixed_departure_time || "--:--",
               guests:
-                booking.participants?.filter((p) => p.count_slot).length || 0,
+                booking.participants?.filter((p) => p.count_slot).length ||
+                booking.contact?.guest_count ||
+                0,
               totalPrice: formatCurrency(booking.total_price),
-              note: booking.customer_note || "",
-              requestTime: formatTimeAgo(booking.created_at),
+              note: booking.contact?.note?.trim() || "",
+              requestTime: createdAt ? formatTimeAgo(createdAt) : "--",
               status: getDisplayStatus(booking),
             };
             return (

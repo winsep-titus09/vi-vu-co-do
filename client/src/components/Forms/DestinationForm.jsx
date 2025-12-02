@@ -1,6 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
+import { useToast } from "../Toast/useToast";
 import { IconMapPin, IconCheck } from "../../icons/IconBox";
-import { IconX } from "../../icons/IconX";
 import { IconChevronDown } from "../../icons/IconChevronDown";
 import {
   IconImage,
@@ -9,28 +9,59 @@ import {
   IconLoader,
 } from "../../icons/IconCommon";
 
-const CATEGORIES = ["Di sản", "Thiên nhiên", "Tâm linh", "Ẩm thực", "Check-in"];
+// Default coords for Hue city center
+const DEFAULT_COORDS = [107.5901, 16.4637]; // [lng, lat]
 
-export default function DestinationForm({ initialData, onSubmit, onCancel }) {
-  const [formData, setFormData] = useState(
-    initialData || {
+export default function DestinationForm({
+  initialData,
+  categories = [],
+  onSubmit,
+  onCancel,
+  isLoading = false,
+}) {
+  // Initialize form data from initialData or defaults
+  const [formData, setFormData] = useState(() => {
+    if (initialData) {
+      return {
+        name: initialData.name || "",
+        category_id:
+          initialData.category_id?._id || initialData.category_id || "",
+        address: initialData.address || "",
+        description: initialData.description || "",
+        coords: initialData.coords?.coordinates || DEFAULT_COORDS,
+        image: null, // File object for new image
+        existingImages: initialData.images || [],
+        has3D: initialData.threeDModels?.length > 0 || false,
+        modelFile: null,
+      };
+    }
+    return {
       name: "",
-      category: "Di sản",
+      category_id: categories[0]?._id || "",
       address: "",
       description: "",
+      coords: DEFAULT_COORDS,
       image: null,
+      existingImages: [],
       has3D: false,
       modelFile: null,
-    }
-  );
+    };
+  });
 
-  const [previewImg, setPreviewImg] = useState(initialData?.image || null);
+  const [previewImg, setPreviewImg] = useState(
+    initialData?.images?.[0] || null
+  );
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fileInputRef = useRef(null);
   const modelInputRef = useRef(null);
+
+  // Get selected category name for display
+  const selectedCategoryName = useMemo(() => {
+    const cat = categories.find((c) => c._id === formData.category_id);
+    return cat?.name || "Chọn danh mục";
+  }, [categories, formData.category_id]);
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -48,7 +79,7 @@ export default function DestinationForm({ initialData, onSubmit, onCancel }) {
   const handleImageChange = (e) => processFile(e.target.files[0]);
 
   const handleRemoveImage = () => {
-    setFormData((prev) => ({ ...prev, image: null }));
+    setFormData((prev) => ({ ...prev, image: null, existingImages: [] }));
     setPreviewImg(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -74,14 +105,53 @@ export default function DestinationForm({ initialData, onSubmit, onCancel }) {
     if (file) setFormData((prev) => ({ ...prev, modelFile: file }));
   };
 
-  const handleSubmit = (e) => {
+  const toast = useToast();
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    // Simulate async
-    setTimeout(() => {
-      onSubmit(formData);
-      setIsSubmitting(false);
-    }, 1000);
+
+    // Validate required fields
+    if (!formData.name.trim()) {
+      toast.warning("Thiếu thông tin", "Vui lòng nhập tên địa điểm");
+      return;
+    }
+    if (!formData.category_id) {
+      toast.warning("Thiếu thông tin", "Vui lòng chọn danh mục");
+      return;
+    }
+
+    // Build FormData for multipart upload
+    const fd = new FormData();
+    fd.append("name", formData.name.trim());
+    fd.append("category_id", formData.category_id);
+    if (formData.address) fd.append("address", formData.address.trim());
+    if (formData.description)
+      fd.append("description", formData.description.trim());
+
+    // Coords as JSON string
+    fd.append(
+      "coords",
+      JSON.stringify({
+        type: "Point",
+        coordinates: formData.coords,
+      })
+    );
+
+    // Image file
+    if (formData.image) {
+      fd.append("images", formData.image);
+    }
+
+    // 3D model file
+    if (formData.has3D && formData.modelFile) {
+      fd.append("model3d", formData.modelFile);
+    }
+
+    try {
+      await onSubmit(fd);
+    } catch (err) {
+      // Error handling done in parent
+    }
   };
 
   return (
@@ -106,7 +176,7 @@ export default function DestinationForm({ initialData, onSubmit, onCancel }) {
           {/* Custom Dropdown */}
           <div className="space-y-2 relative">
             <label className="text-xs font-bold text-text-secondary uppercase">
-              Danh mục
+              Danh mục <span className="text-red-500">*</span>
             </label>
             <button
               type="button"
@@ -118,7 +188,7 @@ export default function DestinationForm({ initialData, onSubmit, onCancel }) {
               }`}
             >
               <span className="font-medium text-text-primary">
-                {formData.category}
+                {selectedCategoryName}
               </span>
               <IconChevronDown
                 className={`w-4 h-4 text-text-secondary transition-transform duration-200 ${
@@ -133,26 +203,32 @@ export default function DestinationForm({ initialData, onSubmit, onCancel }) {
                   className="fixed inset-0 z-10"
                   onClick={() => setIsCategoryOpen(false)}
                 ></div>
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-border-light rounded-xl shadow-xl z-20 py-1 animate-fade-in-up overflow-hidden">
-                  {CATEGORIES.map((cat) => (
-                    <div
-                      key={cat}
-                      onClick={() => {
-                        handleChange("category", cat);
-                        setIsCategoryOpen(false);
-                      }}
-                      className={`px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center justify-between ${
-                        formData.category === cat
-                          ? "bg-primary/5 text-primary font-bold"
-                          : "text-text-primary hover:bg-gray-50"
-                      }`}
-                    >
-                      {cat}
-                      {formData.category === cat && (
-                        <IconCheck className="w-4 h-4" />
-                      )}
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-border-light rounded-xl shadow-xl z-20 py-1 animate-fade-in-up overflow-hidden max-h-48 overflow-y-auto">
+                  {categories.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-text-secondary">
+                      Không có danh mục
                     </div>
-                  ))}
+                  ) : (
+                    categories.map((cat) => (
+                      <div
+                        key={cat._id}
+                        onClick={() => {
+                          handleChange("category_id", cat._id);
+                          setIsCategoryOpen(false);
+                        }}
+                        className={`px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center justify-between ${
+                          formData.category_id === cat._id
+                            ? "bg-primary/5 text-primary font-bold"
+                            : "text-text-primary hover:bg-gray-50"
+                        }`}
+                      >
+                        {cat.name}
+                        {formData.category_id === cat._id && (
+                          <IconCheck className="w-4 h-4" />
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </>
             )}
@@ -341,24 +417,24 @@ export default function DestinationForm({ initialData, onSubmit, onCancel }) {
         <button
           type="button"
           onClick={onCancel}
-          disabled={isSubmitting}
+          disabled={isLoading}
           className="px-6 py-2.5 rounded-xl border border-border-light text-text-secondary font-bold text-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
         >
           Hủy bỏ
         </button>
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isLoading}
           className={`
             px-6 py-2.5 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/20 flex items-center gap-2 transition-all 
             ${
-              isSubmitting
+              isLoading
                 ? "opacity-70 cursor-not-allowed"
                 : "hover:bg-primary/90 active:scale-95"
             }
           `}
         >
-          {isSubmitting ? (
+          {isLoading ? (
             <>
               <IconLoader className="w-4 h-4 animate-spin" /> Đang lưu...
             </>

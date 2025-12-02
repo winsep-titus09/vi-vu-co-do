@@ -80,3 +80,33 @@ export const reviewsApi = {
     return response;
   },
 };
+
+// ============================================================================
+// ADMIN REVIEWS API FUNCTIONS
+// ============================================================================
+
+export const adminReviewsApi = {
+  // List all reviews with filters
+  listReviews: async (params = {}) => {
+    const response = await apiClient.get("/admin/reviews", { params });
+    return response;
+  },
+
+  // Get review statistics
+  getStats: async () => {
+    const response = await apiClient.get("/admin/reviews/stats");
+    return response;
+  },
+
+  // Update review status
+  updateStatus: async (id, data) => {
+    const response = await apiClient.put(`/admin/reviews/${id}/status`, data);
+    return response;
+  },
+
+  // Delete review permanently
+  deleteReview: async (id) => {
+    const response = await apiClient.delete(`/admin/reviews/${id}`);
+    return response;
+  },
+};

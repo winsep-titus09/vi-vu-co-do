@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useToast } from "../Toast/useToast";
 import { IconStar, IconCheck } from "../../icons/IconBox";
 import { IconX } from "../../icons/IconX";
 
@@ -25,6 +26,7 @@ export default function ReviewModal({ isOpen, onClose, booking, onSubmit }) {
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState("");
   const [images, setImages] = useState([]);
+  const toast = useToast();
 
   if (!isOpen || !booking) return null;
 
@@ -46,7 +48,7 @@ export default function ReviewModal({ isOpen, onClose, booking, onSubmit }) {
         comment,
         images,
       });
-      alert("Cảm ơn bạn đã đánh giá!");
+      toast.success("Cảm ơn bạn!", "Đánh giá của bạn đã được ghi nhận.");
       onClose();
     }
   };

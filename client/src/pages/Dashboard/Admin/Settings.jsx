@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useToast } from "../../../components/Toast/useToast";
 import { IconCheck } from "../../../icons/IconBox";
 import {
   IconSettings,
@@ -24,11 +25,13 @@ export default function AdminSettings() {
   const [showMomoSecret, setShowMomoSecret] = useState(false);
   const [isSaving, setIsSaving] = useState(false); // Loading state
 
+  const toast = useToast();
+
   const handleSave = () => {
     setIsSaving(true);
     setTimeout(() => {
       setIsSaving(false);
-      alert("Đã lưu cấu hình hệ thống!");
+      toast.success("Thành công!", "Đã lưu cấu hình hệ thống!");
     }, 1500); // Fake API delay
   };
 

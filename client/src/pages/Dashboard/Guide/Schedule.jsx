@@ -17,10 +17,19 @@ import Spinner from "../../../components/Loaders/Spinner";
 import { IconCalendar } from "../../../icons/IconCalendar";
 import IconChevronLeft from "../../../icons/IconChevronLeft";
 import IconChevronRight from "../../../icons/IconChevronRight";
-import { IconMapPin, IconClock } from "../../../icons/IconBox";
+import { IconClock } from "../../../icons/IconBox";
 import { IconUser } from "../../../icons/IconUser";
 import { IconX } from "../../../icons/IconX";
 import { IconPlus } from "../../../icons/IconPlus";
+import { useToast } from "../../../components/Toast/useToast";
+
+// Helper function to format date to yyyy-MM-dd in local timezone
+const formatDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 export default function Schedule() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -30,6 +39,7 @@ export default function Schedule() {
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth() + 1;
+  const toast = useToast();
 
   const { calendarData, isLoading, error, refetch } = useGuideCalendar(
     year,
@@ -42,16 +52,14 @@ export default function Schedule() {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
     const range = eachDayOfInterval({ start, end });
-
-    // Pad start of week
     const startPad = getDay(start);
     const paddedDays = [];
     for (let i = 0; i < startPad; i++) paddedDays.push(null);
     return [...paddedDays, ...range];
   }, [currentMonth]);
 
-  // Format selected date key for lookup
-  const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
+  // Format selected date key for lookup - use local timezone
+  const selectedDateKey = formatDateKey(selectedDate);
   const dayData = calendarData[selectedDateKey] || {
     bookings: [],
     isBusy: false,
@@ -61,7 +69,7 @@ export default function Schedule() {
   // Get status for a day
   const getDayStatus = (date) => {
     if (!date) return "empty";
-    const key = format(date, "yyyy-MM-dd");
+    const key = formatDateKey(date);
     const data = calendarData[key];
     if (!data) return "free";
     if (data.isBusy) return "busy";
@@ -76,9 +84,13 @@ export default function Schedule() {
       await addBusyDates([selectedDateKey], busyReason || "Nghỉ cá nhân");
       setBusyReason("");
       setShowBusyModal(false);
-      refetch();
+      await refetch();
     } catch (err) {
       console.error("Failed to add busy date:", err);
+      toast.error(
+        "Lỗi",
+        "Không thể đánh dấu ngày nghỉ: " + (err.message || "Lỗi không xác định")
+      );
     }
   };
 
@@ -87,15 +99,20 @@ export default function Schedule() {
     if (isSubmitting) return;
     try {
       await removeBusyDates([selectedDateKey]);
-      refetch();
+      await refetch();
     } catch (err) {
       console.error("Failed to remove busy date:", err);
+      toast.error(
+        "Lỗi",
+        "Không thể bỏ đánh dấu ngày nghỉ: " +
+          (err.message || "Lỗi không xác định")
+      );
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex justify-center items-center h-48">
         <Spinner size="lg" />
       </div>
     );
@@ -110,57 +127,53 @@ export default function Schedule() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">
-            Lịch làm việc
-          </h1>
-          <p className="text-sm text-text-secondary mt-1">
-            Quản lý lịch trình tour và ngày nghỉ của bạn
-          </p>
-        </div>
+      <div>
+        <h1 className="text-xl font-bold text-text-primary">Lịch làm việc</h1>
+        <p className="text-xs text-text-secondary mt-0.5">
+          Quản lý lịch trình tour và ngày nghỉ
+        </p>
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-8">
+      <div className="grid lg:grid-cols-12 gap-4">
         {/* --- LEFT: CALENDAR --- */}
-        <div className="lg:col-span-7 bg-white rounded-3xl shadow-card border border-border-light p-6">
+        <div className="lg:col-span-7 bg-white rounded-2xl shadow-card border border-border-light p-4">
           {/* Month navigation */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-text-primary">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-text-primary capitalize">
               {format(currentMonth, "MMMM yyyy", { locale: vi })}
             </h2>
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               <button
                 onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                className="p-2 rounded-full hover:bg-bg-main transition-colors"
+                className="p-1.5 rounded-full hover:bg-bg-main transition-colors"
               >
-                <IconChevronLeft className="w-5 h-5" />
+                <IconChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                className="p-2 rounded-full hover:bg-bg-main transition-colors"
+                className="p-1.5 rounded-full hover:bg-bg-main transition-colors"
               >
-                <IconChevronRight className="w-5 h-5" />
+                <IconChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
           {/* Day headers */}
-          <div className="grid grid-cols-7 gap-2 text-center mb-2">
+          <div className="grid grid-cols-7 gap-1 text-center mb-1">
             {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((d) => (
               <div
                 key={d}
-                className="text-xs font-semibold text-text-secondary py-2"
+                className="text-[10px] font-semibold text-text-secondary py-1"
               >
                 {d}
               </div>
             ))}
           </div>
 
-          {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-2">
+          {/* Calendar grid - smaller cells */}
+          <div className="grid grid-cols-7 gap-1">
             {days.map((day, idx) => {
               if (!day) {
                 return <div key={`empty-${idx}`} className="aspect-square" />;
@@ -180,12 +193,12 @@ export default function Schedule() {
                   key={day.toISOString()}
                   onClick={() => setSelectedDate(day)}
                   className={`
-                    aspect-square rounded-xl flex flex-col items-center justify-center
-                    text-sm font-medium transition-all relative
+                    aspect-square rounded-lg flex flex-col items-center justify-center
+                    text-xs font-medium transition-all relative
                     ${!isCurrentMonth ? "opacity-40" : ""}
                     ${
                       isSelected
-                        ? "bg-primary text-white shadow-lg ring-2 ring-primary/30"
+                        ? "bg-primary text-white shadow-md ring-1 ring-primary/30"
                         : isToday
                         ? "bg-accent/20 text-primary font-bold"
                         : "hover:bg-bg-main"
@@ -195,7 +208,7 @@ export default function Schedule() {
                   <span>{format(day, "d")}</span>
                   {dotColor && !isSelected && (
                     <span
-                      className={`w-1.5 h-1.5 rounded-full ${dotColor} absolute bottom-1`}
+                      className={`w-1 h-1 rounded-full ${dotColor} absolute bottom-0.5`}
                     ></span>
                   )}
                 </button>
@@ -203,61 +216,69 @@ export default function Schedule() {
             })}
           </div>
 
-          {/* Legend */}
-          <div className="mt-6 pt-4 border-t border-border-light flex flex-wrap gap-4 text-xs text-text-secondary">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-400"></span>
+          {/* Legend - compact */}
+          <div className="mt-3 pt-2 border-t border-border-light flex flex-wrap gap-3 text-[10px] text-text-secondary">
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span>
               Có tour
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-400"></span>
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
               Bận / Nghỉ
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-gray-200 border border-gray-300"></span>
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-200 border border-gray-300"></span>
               Trống
             </div>
           </div>
         </div>
 
         {/* --- RIGHT: TIMELINE --- */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:col-span-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
-              <IconCalendar className="w-5 h-5 text-primary" />
-              {format(selectedDate, "EEEE, d 'tháng' M", { locale: vi })}
+            <h3 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+              <IconCalendar className="w-4 h-4 text-primary" />
+              {format(selectedDate, "EEEE, d/M", { locale: vi })}
             </h3>
 
             {/* Add/Remove busy button */}
             {!dayData.isBusy ? (
               <button
-                onClick={() => setShowBusyModal(true)}
-                className="flex items-center gap-1 text-sm text-red-600 hover:text-red-700 transition-colors"
+                onClick={() => {
+                  console.log("Opening busy modal for date:", selectedDateKey);
+                  setShowBusyModal(true);
+                }}
+                disabled={isSubmitting}
+                className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 transition-colors disabled:opacity-50"
               >
-                <IconPlus className="w-4 h-4" />
+                <IconPlus className="w-3.5 h-3.5" />
                 Đánh dấu nghỉ
               </button>
             ) : (
               <button
                 onClick={handleRemoveBusy}
                 disabled={isSubmitting}
-                className="flex items-center gap-1 text-sm text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors disabled:opacity-50"
               >
-                <IconX className="w-4 h-4" />
-                Bỏ đánh dấu nghỉ
+                {isSubmitting ? (
+                  <Spinner size="sm" />
+                ) : (
+                  <IconX className="w-3.5 h-3.5" />
+                )}
+                Bỏ đánh dấu
               </button>
             )}
           </div>
 
           {/* Busy indicator */}
           {dayData.isBusy && (
-            <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex gap-4 relative overflow-hidden">
-              <div className="flex items-center justify-center px-4 border-r border-red-200">
-                <IconX className="w-6 h-6 text-red-500" />
+            <div className="bg-red-50 p-3 rounded-xl border border-red-100 flex gap-3 relative overflow-hidden">
+              <div className="flex items-center justify-center px-2 border-r border-red-200">
+                <IconX className="w-5 h-5 text-red-500" />
               </div>
               <div>
-                <h4 className="font-bold text-red-700">Ngày nghỉ</h4>
-                <p className="text-sm text-red-600">
+                <h4 className="font-bold text-red-700 text-sm">Ngày nghỉ</h4>
+                <p className="text-xs text-red-600">
                   {dayData.busyReason || "Nghỉ cá nhân"}
                 </p>
               </div>
@@ -267,66 +288,60 @@ export default function Schedule() {
 
           {/* Bookings */}
           {dayData.bookings && dayData.bookings.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-2 max-h-[280px] overflow-y-auto">
               {dayData.bookings.map((booking) => (
                 <Link
                   to={`/dashboard/guide/requests/${booking._id}`}
                   key={booking._id}
-                  className="bg-white p-5 rounded-2xl border border-border-light shadow-sm flex gap-4 relative overflow-hidden group hover:border-primary/50 transition-all"
+                  className="bg-white p-3 rounded-xl border border-border-light shadow-sm flex gap-3 relative overflow-hidden group hover:border-primary/50 transition-all"
                 >
                   {/* Time Sidebar */}
-                  <div className="flex flex-col items-center justify-center pr-4 border-r border-border-light min-w-[80px]">
-                    <span className="text-lg font-bold text-text-primary">
+                  <div className="flex flex-col items-center justify-center pr-2 border-r border-border-light min-w-[50px]">
+                    <span className="text-sm font-bold text-text-primary">
                       {booking.start_time || "08:00"}
-                    </span>
-                    <span className="text-xs text-text-secondary">
-                      {booking.end_time || "Cả ngày"}
                     </span>
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <h4 className="font-bold text-text-primary truncate mb-1 group-hover:text-primary transition-colors">
-                        {booking.tour_name}
-                      </h4>
-                    </div>
-                    <div className="flex flex-col gap-1 text-sm text-text-secondary">
-                      <div className="flex items-center gap-2">
-                        <IconUser className="w-4 h-4 text-primary" />
-                        {booking.customer_name} {booking.num_guests || 1} khách
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            booking.status === "confirmed"
-                              ? "bg-green-100 text-green-700"
-                              : booking.status === "pending"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {booking.status === "confirmed"
-                            ? "Đã xác nhận"
-                            : booking.status === "pending"
-                            ? "Chờ xác nhận"
-                            : booking.status === "completed"
-                            ? "Hoàn thành"
-                            : booking.status}
-                        </span>
-                        <span className="text-primary font-medium">
-                          {booking.total_price?.toLocaleString("vi-VN")}
-                        </span>
-                      </div>
+                    <h4 className="font-bold text-text-primary text-sm truncate group-hover:text-primary transition-colors">
+                      {booking.tour_name}
+                    </h4>
+                    <div className="flex items-center gap-2 text-xs text-text-secondary mt-0.5">
+                      <IconUser className="w-3 h-3 text-primary" />
+                      <span className="truncate">{booking.customer_name}</span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                          booking.status === "confirmed" ||
+                          booking.status === "paid"
+                            ? "bg-green-100 text-green-700"
+                            : booking.status === "pending" ||
+                              booking.status === "awaiting_payment"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {booking.status === "confirmed" ||
+                        booking.status === "paid"
+                          ? "Đã TT"
+                          : booking.status === "pending" ||
+                            booking.status === "awaiting_payment"
+                          ? "Chờ TT"
+                          : booking.status === "completed"
+                          ? "Xong"
+                          : booking.status}
+                      </span>
                     </div>
                   </div>
 
                   {/* Status Bar */}
                   <div
-                    className={`absolute top-0 left-0 w-1 h-full ${
-                      booking.status === "confirmed"
+                    className={`absolute top-0 left-0 w-0.5 h-full ${
+                      booking.status === "confirmed" ||
+                      booking.status === "paid"
                         ? "bg-green-500"
-                        : booking.status === "pending"
+                        : booking.status === "pending" ||
+                          booking.status === "awaiting_payment"
                         ? "bg-yellow-500"
                         : "bg-gray-400"
                     }`}
@@ -335,14 +350,14 @@ export default function Schedule() {
               ))}
             </div>
           ) : !dayData.isBusy ? (
-            <div className="bg-bg-main/50 rounded-3xl border border-dashed border-border-light h-64 flex flex-col items-center justify-center text-center p-6">
-              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-3 shadow-sm">
-                <IconClock className="w-8 h-8 text-text-secondary/50" />
+            <div className="bg-bg-main/50 rounded-2xl border border-dashed border-border-light h-40 flex flex-col items-center justify-center text-center p-4">
+              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center mb-2 shadow-sm">
+                <IconClock className="w-5 h-5 text-text-secondary/50" />
               </div>
-              <p className="text-text-secondary font-medium">
+              <p className="text-text-secondary font-medium text-xs">
                 Không có lịch trình.
               </p>
-              <p className="text-xs text-text-secondary mt-1">
+              <p className="text-[10px] text-text-secondary mt-0.5">
                 Bạn có thể nhận thêm tour hoặc nghỉ ngơi!
               </p>
             </div>
@@ -353,18 +368,18 @@ export default function Schedule() {
       {/* Busy Modal */}
       {showBusyModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl">
-            <h3 className="text-lg font-bold text-text-primary mb-4">
+          <div className="bg-white rounded-xl p-5 w-full max-w-sm mx-4 shadow-xl">
+            <h3 className="text-base font-bold text-text-primary mb-3">
               Đánh dấu ngày nghỉ
             </h3>
-            <p className="text-sm text-text-secondary mb-4">
+            <p className="text-xs text-text-secondary mb-3">
               Ngày:{" "}
               <span className="font-medium text-text-primary">
                 {format(selectedDate, "dd/MM/yyyy")}
               </span>
             </p>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-text-primary mb-2">
+              <label className="block text-xs font-medium text-text-primary mb-1">
                 Lý do (tùy chọn)
               </label>
               <input
@@ -372,25 +387,31 @@ export default function Schedule() {
                 value={busyReason}
                 onChange={(e) => setBusyReason(e.target.value)}
                 placeholder="VD: Nghỉ phép, việc gia đình..."
-                className="w-full px-4 py-2 border border-border-light rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-3 py-2 text-sm border border-border-light rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={() => {
                   setShowBusyModal(false);
                   setBusyReason("");
                 }}
-                className="flex-1 px-4 py-2 border border-border-light rounded-xl text-text-secondary hover:bg-bg-main transition-colors"
+                className="flex-1 px-3 py-2 text-sm border border-border-light rounded-lg text-text-secondary hover:bg-bg-main transition-colors"
               >
                 Hủy
               </button>
               <button
                 onClick={handleAddBusy}
                 disabled={isSubmitting}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50"
+                className="flex-1 px-3 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
               >
-                {isSubmitting ? "Đang xử lý..." : "Xác nhận"}
+                {isSubmitting ? (
+                  <>
+                    <Spinner size="sm" /> Đang xử lý...
+                  </>
+                ) : (
+                  "Xác nhận"
+                )}
               </button>
             </div>
           </div>

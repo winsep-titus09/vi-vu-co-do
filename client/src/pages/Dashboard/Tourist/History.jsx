@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useToast } from "../../../components/Toast/useToast";
 import {
   useMyBookings,
   useBookingActions,
@@ -39,6 +40,7 @@ export default function HistoryPage() {
   const [cancelReason, setCancelReason] = useState("");
 
   const navigate = useNavigate();
+  const toast = useToast();
   const { cancelBooking, isProcessing } = useBookingActions();
 
   // Fetch bookings from API
@@ -75,7 +77,7 @@ export default function HistoryPage() {
 
   const handleCancelBooking = async () => {
     if (!selectedBooking || !cancelReason.trim()) {
-      alert("Vui lòng nhập lý do hủy tour");
+      toast.warning("Thiếu thông tin", "Vui lòng nhập lý do hủy tour");
       return;
     }
 
@@ -84,12 +86,13 @@ export default function HistoryPage() {
       setIsCancelModalOpen(false);
       setSelectedBooking(null);
       setCancelReason("");
-      alert(
-        "Đã hủy tour thành công. Tiền sẽ được hoàn lại trong 3-5 ngày làm việc."
+      toast.success(
+        "Hủy tour thành công",
+        "Tiền sẽ được hoàn lại trong 3-5 ngày làm việc."
       );
       window.location.reload();
     } else {
-      alert(result.error || "Không thể hủy tour. Vui lòng thử lại.");
+      toast.error("Không thể hủy tour", result.error || "Vui lòng thử lại.");
     }
   };
 
@@ -109,11 +112,12 @@ export default function HistoryPage() {
 
       setIsReviewModalOpen(false);
       setSelectedBooking(null);
-      alert("Đã gửi đánh giá thành công!");
+      toast.success("Cảm ơn bạn!", "Đã gửi đánh giá thành công!");
       window.location.reload();
     } catch (error) {
       console.error("Submit review error:", error);
-      alert(
+      toast.error(
+        "Lỗi gửi đánh giá",
         error.message ||
           error.response?.data?.message ||
           "Không thể gửi đánh giá. Vui lòng thử lại."
