@@ -414,6 +414,35 @@ export function useMonthlyEarnings(year) {
 }
 
 /**
+ * Hook to get weekly performance stats
+ */
+export function useWeeklyStats() {
+  const [data, setData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await guidesApi.getWeeklyStats();
+        setData(response);
+      } catch (err) {
+        console.error("Fetch weekly stats error:", err);
+        setError(err.message || "Không thể tải thống kê tuần");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  return { data, isLoading, error };
+}
+
+/**
  * Hook to get single booking by ID
  */
 export function useBookingById(bookingId) {
@@ -729,4 +758,114 @@ export function useBusyDates() {
   };
 
   return { addBusyDates, removeBusyDates, isSubmitting, error };
+}
+
+/**
+ * Hook to fetch my reviews (as a guide) - for guide dashboard
+ */
+export function useMyGuideReviews(params = {}) {
+  const [data, setData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const { page = 1, limit = 10, rating = "all" } = params;
+
+  const fetchReviews = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await guidesApi.getMyReviews({ page, limit, rating });
+      setData(response);
+    } catch (err) {
+      console.error("Fetch guide reviews error:", err);
+      setError(err.message || "Không thể tải đánh giá");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReviews();
+  }, [page, limit, rating]);
+
+  return { data, isLoading, error, refetch: fetchReviews };
+}
+
+/**
+ * Hook to reply to a review
+ */
+export function useReplyToReview() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const replyToReview = async (reviewId, reply) => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      const response = await guidesApi.replyToReview(reviewId, reply);
+      return response;
+    } catch (err) {
+      console.error("Reply to review error:", err);
+      setError(err.message || "Không thể gửi phản hồi");
+      throw err;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return { replyToReview, isSubmitting, error };
+}
+
+/**
+ * Hook to fetch current guide's profile
+ */
+export function useMyGuideProfile() {
+  const [profile, setProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchProfile = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await guidesApi.getMyProfile();
+      setProfile(response);
+    } catch (err) {
+      console.error("Fetch my profile error:", err);
+      setError(err.message || "Không thể tải hồ sơ");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  return { profile, isLoading, error, refetch: fetchProfile };
+}
+
+/**
+ * Hook to update guide profile
+ */
+export function useUpdateGuideProfile() {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState(null);
+
+  const updateProfile = async (data) => {
+    try {
+      setIsUpdating(true);
+      setError(null);
+      const response = await guidesApi.updateMyProfile(data);
+      return response;
+    } catch (err) {
+      console.error("Update profile error:", err);
+      setError(err.message || "Không thể cập nhật hồ sơ");
+      return null;
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return { updateProfile, isUpdating, error };
 }

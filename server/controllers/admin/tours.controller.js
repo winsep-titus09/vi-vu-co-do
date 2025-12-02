@@ -2,56 +2,135 @@
 import mongoose from "mongoose";
 import Tour from "../../models/Tour.js";
 
+/** GET /api/admin/tours?status=pending&page=1&limit=10&search=keyword */
+export const listAdminTours = async (req, res) => {
+  try {
+    const { status, page = 1, limit = 20, search } = req.query;
+    const filter = {};
+
+    // Filter by approval status
+    if (status && status !== "all") {
+      if (status === "active") {
+        filter["approval.status"] = "approved";
+        filter.is_active = true;
+      } else if (status === "hidden") {
+        filter.$or = [{ "approval.status": "rejected" }, { is_active: false }];
+      } else {
+        filter["approval.status"] = status;
+      }
+    }
+
+    // Search by name
+    if (search) {
+      filter.name = { $regex: search, $options: "i" };
+    }
+
+    const pg = Math.max(Number(page) || 1, 1);
+    const lm = Math.min(Math.max(Number(limit) || 20, 1), 100);
+
+    const [items, total] = await Promise.all([
+      Tour.find(filter)
+        .populate("created_by", "name avatar_url")
+        .populate("category_id", "name slug")
+        .populate("categories", "name slug")
+        .populate("guides.guideId", "name avatar_url")
+        .populate("locations.locationId", "name")
+        .sort({ createdAt: -1 })
+        .skip((pg - 1) * lm)
+        .limit(lm)
+        .lean(),
+      Tour.countDocuments(filter),
+    ]);
+
+    // Count by status for tabs
+    const [pendingCount, activeCount, hiddenCount] = await Promise.all([
+      Tour.countDocuments({ "approval.status": "pending" }),
+      Tour.countDocuments({ "approval.status": "approved", is_active: true }),
+      Tour.countDocuments({
+        $or: [{ "approval.status": "rejected" }, { is_active: false }],
+      }),
+    ]);
+
+    return res.json({
+      items,
+      total,
+      page: pg,
+      pageSize: lm,
+      counts: {
+        all: pendingCount + activeCount + hiddenCount,
+        pending: pendingCount,
+        active: activeCount,
+        hidden: hiddenCount,
+      },
+    });
+  } catch (err) {
+    console.error("listAdminTours error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
+};
+
 /** GET /api/admin/tours/pending */
 export const listPendingTours = async (req, res) => {
-    try {
-        const items = await Tour.find({ "approval.status": "pending" })
-            .populate("created_by", "name")
-            .populate("category_id", "name")
-            .populate("guides.guideId", "name")
-            .sort({ createdAt: -1 });
-        res.json(items);
-    } catch (err) {
-        console.error("listPendingTours error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ." });
-    }
+  try {
+    const items = await Tour.find({ "approval.status": "pending" })
+      .populate("created_by", "name")
+      .populate("category_id", "name")
+      .populate("guides.guideId", "name")
+      .sort({ createdAt: -1 });
+    res.json(items);
+  } catch (err) {
+    console.error("listPendingTours error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
 };
 
 /** PATCH /api/admin/tours/:id/approve */
 export const approveTour = async (req, res) => {
-    try {
-        const { id } = req.params;
-        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "ID không hợp lệ." });
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ message: "ID không hợp lệ." });
 
-        const tour = await Tour.findById(id);
-        if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
+    const tour = await Tour.findById(id);
+    if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
 
-        tour.approval = { status: "approved", reviewed_by: req.user._id, reviewed_at: new Date(), notes: null };
-        await tour.save();
+    tour.approval = {
+      status: "approved",
+      reviewed_by: req.user._id,
+      reviewed_at: new Date(),
+      notes: null,
+    };
+    await tour.save();
 
-        res.json({ message: "Đã duyệt tour.", tour });
-    } catch (err) {
-        console.error("approveTour error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ." });
-    }
+    res.json({ message: "Đã duyệt tour.", tour });
+  } catch (err) {
+    console.error("approveTour error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
 };
 
 /** PATCH /api/admin/tours/:id/reject */
 export const rejectTour = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { notes } = req.body;
-        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "ID không hợp lệ." });
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ message: "ID không hợp lệ." });
 
-        const tour = await Tour.findById(id);
-        if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
+    const tour = await Tour.findById(id);
+    if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
 
-        tour.approval = { status: "rejected", reviewed_by: req.user._id, reviewed_at: new Date(), notes: notes || null };
-        await tour.save();
+    tour.approval = {
+      status: "rejected",
+      reviewed_by: req.user._id,
+      reviewed_at: new Date(),
+      notes: notes || null,
+    };
+    await tour.save();
 
-        res.json({ message: "Đã từ chối tour.", tour });
-    } catch (err) {
-        console.error("rejectTour error:", err);
-        res.status(500).json({ message: "Lỗi máy chủ." });
-    }
+    res.json({ message: "Đã từ chối tour.", tour });
+  } catch (err) {
+    console.error("rejectTour error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
 };

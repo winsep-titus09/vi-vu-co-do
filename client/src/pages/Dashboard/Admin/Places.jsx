@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { IconMapPin } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
@@ -8,103 +8,118 @@ import {
   IconEdit,
   IconTrash,
   IconInbox,
+  IconRefresh,
 } from "../../../icons/IconCommon";
-
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-const initialPlaces = [
-  {
-    id: 1,
-    name: "Đại Nội Huế",
-    category: "Di sản",
-    address: "TP. Huế",
-    has3D: true,
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  },
-  {
-    id: 2,
-    name: "Phá Tam Giang",
-    category: "Thiên nhiên",
-    address: "Quảng Điền",
-    has3D: false,
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/hoanghon.jpg",
-  },
-  {
-    id: 3,
-    name: "Chùa Thiên Mụ",
-    category: "Tâm linh",
-    address: "Hương Long, Huế",
-    has3D: true,
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
-  },
-];
-
-const CATEGORIES = ["Tất cả", "Di sản", "Thiên nhiên", "Tâm linh", "Ẩm thực"];
+import Spinner from "../../../components/Loaders/Spinner";
+import { useToast } from "../../../components/Toast/useToast";
+import {
+  useAdminLocations,
+  useLocationCategories,
+  useCreateLocation,
+  useUpdateLocation,
+  useDeleteLocation,
+} from "../../../features/admin/hooks";
 
 export default function AdminPlaces() {
-  const [places, setPlaces] = useState(initialPlaces);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [viewingPlace, setViewingPlace] = useState(null);
+  const [editingPlace, setEditingPlace] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
+  const toast = useToast();
 
   // Search and filter state
   const [search, setSearch] = useState("");
-  const [filterCategory, setFilterCategory] = useState("Tất cả");
+  const [filterCategoryId, setFilterCategoryId] = useState("");
 
-  // Logic lọc dữ liệu
-  const filteredPlaces = places.filter((place) => {
-    const matchSearch =
-      place.name.toLowerCase().includes(search.toLowerCase()) ||
-      place.address.toLowerCase().includes(search.toLowerCase());
-    const matchCategory =
-      filterCategory === "Tất cả" || place.category === filterCategory;
-    return matchSearch && matchCategory;
+  // API hooks
+  const { locations, isLoading, error, refetch } = useAdminLocations({
+    q: search || undefined,
+    category_id: filterCategoryId || undefined,
   });
 
-  const handleSave = (data) => {
-    if (editingPlace) {
-      setPlaces(
-        places.map((p) =>
-          p.id === editingPlace.id ? { ...data, id: editingPlace.id } : p
+  const { categories, isLoading: categoriesLoading } = useLocationCategories();
+  const { create } = useCreateLocation();
+  const { update } = useUpdateLocation();
+  const { remove } = useDeleteLocation();
+
+  // Filter categories with "Tất cả" option
+  const categoryTabs = useMemo(() => {
+    const tabs = [{ _id: "", name: "Tất cả" }];
+    if (categories?.length) {
+      tabs.push(...categories);
+    }
+    return tabs;
+  }, [categories]);
+
+  // Handle save (create or update)
+  const handleSave = useCallback(
+    async (formData) => {
+      try {
+        setActionLoading("saving");
+        if (editingPlace) {
+          await update(editingPlace._id, formData);
+          toast.success("Thành công!", "Đã cập nhật thông tin địa điểm.");
+        } else {
+          await create(formData);
+          toast.success("Thành công!", "Đã thêm địa điểm mới vào hệ thống.");
+        }
+        setIsModalOpen(false);
+        setEditingPlace(null);
+        refetch();
+      } catch (err) {
+        toast.error("Có lỗi xảy ra", err?.message || "Vui lòng thử lại sau.");
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [editingPlace, create, update, refetch, toast]
+  );
+
+  // Handle delete
+  const handleDelete = useCallback(
+    async (id, name) => {
+      if (
+        !window.confirm(
+          `Bạn có chắc muốn xóa địa điểm "${name}"? Hành động này không thể hoàn tác.`
         )
-      );
-      alert("Đã cập nhật địa điểm!");
-    } else {
-      setPlaces([
-        ...places,
-        {
-          ...data,
-          id: Date.now(),
-          image:
-            "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg",
-        },
-      ]);
-      alert("Đã thêm địa điểm mới!");
-    }
-    setIsModalOpen(false);
-    setEditingPlace(null);
-  };
+      ) {
+        return;
+      }
+      try {
+        setActionLoading(id);
+        await remove(id);
+        toast.success(
+          "Đã xóa!",
+          `Địa điểm "${name}" đã được xóa khỏi hệ thống.`
+        );
+        refetch();
+      } catch (err) {
+        toast.error("Lỗi khi xóa", err?.message || "Vui lòng thử lại sau.");
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [remove, refetch, toast]
+  );
 
-  const handleDelete = (id) => {
-    if (
-      window.confirm(
-        "Bạn có chắc muốn xóa địa điểm này? Hành động này không thể hoàn tác."
-      )
-    ) {
-      setPlaces(places.filter((p) => p.id !== id));
-    }
-  };
-
-  const openCreate = () => {
+  const openCreate = useCallback(() => {
     setEditingPlace(null);
     setIsModalOpen(true);
-  };
-  const openEdit = (place) => {
+  }, []);
+
+  const openEdit = useCallback((place) => {
     setEditingPlace(place);
     setIsModalOpen(true);
+  }, []);
+
+  // Get image URL
+  const getImageUrl = (place) => {
+    if (place.images?.length > 0) return place.images[0];
+    return "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg";
+  };
+
+  // Check if place has 3D model
+  const has3DModel = (place) => {
+    return place.threeDModels?.length > 0 || place.has3D;
   };
 
   return (
@@ -119,31 +134,47 @@ export default function AdminPlaces() {
             Kho dữ liệu địa danh, di tích cho hệ thống.
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="px-5 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 shadow-lg flex items-center gap-2 transition-all active:scale-95"
-        >
-          <IconPlus className="w-5 h-5" /> Thêm địa điểm
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={refetch}
+            disabled={isLoading}
+            className="p-2.5 rounded-xl border border-border-light text-text-secondary hover:text-primary hover:border-primary transition-colors disabled:opacity-50"
+            title="Làm mới"
+          >
+            <IconRefresh
+              className={`w-5 h-5 ${isLoading ? "animate-spin" : ""}`}
+            />
+          </button>
+          <button
+            onClick={openCreate}
+            className="px-5 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 shadow-lg flex items-center gap-2 transition-all active:scale-95"
+          >
+            <IconPlus className="w-5 h-5" /> Thêm địa điểm
+          </button>
+        </div>
       </div>
 
       {/* Filter toolbar */}
       <div className="bg-white p-4 rounded-2xl border border-border-light flex flex-col md:flex-row gap-4 shadow-sm">
         {/* Category Filter */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setFilterCategory(cat)}
-              className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                filterCategory === cat
-                  ? "bg-bg-main text-primary shadow-inner"
-                  : "text-text-secondary hover:bg-gray-50"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+          {categoriesLoading ? (
+            <Spinner className="w-5 h-5" />
+          ) : (
+            categoryTabs.map((cat) => (
+              <button
+                key={cat._id}
+                onClick={() => setFilterCategoryId(cat._id)}
+                className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  filterCategoryId === cat._id
+                    ? "bg-bg-main text-primary shadow-inner"
+                    : "text-text-secondary hover:bg-gray-50"
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))
+          )}
         </div>
 
         {/* Search Box */}
@@ -160,21 +191,36 @@ export default function AdminPlaces() {
       </div>
 
       {/* Content Grid */}
-      {filteredPlaces.length > 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center items-center py-20">
+          <Spinner />
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center py-20 text-red-500">
+          <p className="font-bold">Đã có lỗi xảy ra</p>
+          <p className="text-sm">{error}</p>
+          <button
+            onClick={refetch}
+            className="mt-4 px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold"
+          >
+            Thử lại
+          </button>
+        </div>
+      ) : locations.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-fade-in">
-          {filteredPlaces.map((place) => (
+          {locations.map((place) => (
             <div
-              key={place.id}
+              key={place._id}
               className="group bg-white rounded-2xl border border-border-light overflow-hidden hover:shadow-lg transition-all relative flex flex-col h-full"
             >
               {/* Image Area */}
               <div className="h-48 overflow-hidden relative">
                 <img
-                  src={place.image}
+                  src={getImageUrl(place)}
                   alt={place.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 />
-                {place.has3D && (
+                {has3DModel(place) && (
                   <span className="absolute top-3 left-3 bg-black/60 backdrop-blur text-white text-[10px] font-bold px-2 py-1 rounded-lg border border-white/20 shadow-sm flex items-center gap-1">
                     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>{" "}
                     3D Model
@@ -184,15 +230,21 @@ export default function AdminPlaces() {
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                   <button
                     onClick={() => openEdit(place)}
-                    className="p-3 rounded-full bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-lg transform translate-y-4 group-hover:translate-y-0 duration-300"
+                    disabled={actionLoading === place._id}
+                    className="p-3 rounded-full bg-white text-primary hover:bg-primary hover:text-white transition-all shadow-lg transform translate-y-4 group-hover:translate-y-0 duration-300 disabled:opacity-50"
                   >
                     <IconEdit className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => handleDelete(place.id)}
-                    className="p-3 rounded-full bg-white text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg transform translate-y-4 group-hover:translate-y-0 duration-300 delay-75"
+                    onClick={() => handleDelete(place._id, place.name)}
+                    disabled={actionLoading === place._id}
+                    className="p-3 rounded-full bg-white text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg transform translate-y-4 group-hover:translate-y-0 duration-300 delay-75 disabled:opacity-50"
                   >
-                    <IconTrash className="w-5 h-5" />
+                    {actionLoading === place._id ? (
+                      <Spinner className="w-5 h-5" />
+                    ) : (
+                      <IconTrash className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -208,11 +260,11 @@ export default function AdminPlaces() {
                   </h3>
                 </div>
                 <span className="text-[10px] font-bold text-text-secondary bg-gray-100 px-2 py-1 rounded w-fit mb-3 uppercase tracking-wide">
-                  {place.category}
+                  {place.category_id?.name || "Chưa phân loại"}
                 </span>
                 <p className="text-xs text-text-secondary flex items-start gap-1.5 mt-auto line-clamp-2">
                   <IconMapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />{" "}
-                  {place.address}
+                  {place.address || "Chưa có địa chỉ"}
                 </p>
               </div>
             </div>
@@ -255,8 +307,10 @@ export default function AdminPlaces() {
             <div className="p-6 overflow-y-auto custom-scrollbar">
               <DestinationForm
                 initialData={editingPlace}
+                categories={categories}
                 onSubmit={handleSave}
                 onCancel={() => setIsModalOpen(false)}
+                isLoading={actionLoading === "saving"}
               />
             </div>
           </div>

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useToast } from "../../../components/Toast/useToast";
 import { IconCheck } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
@@ -7,109 +8,200 @@ import {
   IconLock,
   IconUnlock,
   IconEye,
-  IconShield,
   IconVideo,
   IconFileText,
-  IconInbox,
   IconChevronLeft,
   IconChevronRight,
 } from "../../../icons/IconCommon";
+import Spinner from "../../../components/Loaders/Spinner";
+import ConfirmModal from "../../../components/Modals/ConfirmModal";
+import {
+  useAdminUsers,
+  useAdminUserActions,
+  useAdminGuideApplications,
+  useAdminGuideAppActions,
+} from "../../../features/users/hooks";
 
 // ============================================================================
-// MOCK DATA
+// HELPER FUNCTIONS
 // ============================================================================
-const usersData = [
-  {
-    id: 1,
-    name: "Nguyễn Văn A",
-    email: "nguyenvana@gmail.com",
-    role: "tourist",
-    status: "active",
-    joinDate: "12/05/2024",
-  },
-  {
-    id: 2,
-    name: "Minh Hương",
-    email: "huong.guide@vivucodo.com",
-    role: "guide",
-    status: "active",
-    joinDate: "10/01/2024",
-  },
-  {
-    id: 3,
-    name: "Trần Văn",
-    email: "tranvan@foodtour.com",
-    role: "guide",
-    status: "locked",
-    joinDate: "15/02/2024",
-  },
-  {
-    id: 4,
-    name: "Sarah Jenkins",
-    email: "sarah.j@uk.co",
-    role: "tourist",
-    status: "active",
-    joinDate: "20/05/2025",
-  },
-];
+const formatDate = (dateString) => {
+  if (!dateString) return "N/A";
+  return new Date(dateString).toLocaleDateString("vi-VN");
+};
 
-const pendingGuides = [
-  {
-    id: 99,
-    name: "Phạm Lan",
-    email: "lan.pham@craft.vn",
-    phone: "0905 111 222",
-    exp: "3 năm",
-    cert: "Thẻ HDV Nội địa - 123456",
-    certImage:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/ngomon_3d_placeholder.jpg",
-    video: "https://youtube.com/...",
-    bio: "Tôi sinh ra ở làng hương Thủy Xuân, muốn giới thiệu nghề truyền thống đến du khách.",
-    requestDate: "20 phút trước",
-  },
-  {
-    id: 100,
-    name: "James Đặng",
-    email: "james.dang@trekking.vn",
-    phone: "0905 888 999",
-    exp: "5 năm",
-    cert: "Thẻ HDV Quốc tế - 987654",
-    certImage:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-    video: "https://youtube.com/...",
-    bio: "Chuyên gia trekking và thám hiểm hang động tại Quảng Bình & Huế.",
-    requestDate: "1 ngày trước",
-  },
-];
+const formatTimeAgo = (dateString) => {
+  if (!dateString) return "N/A";
+  const now = new Date();
+  const date = new Date(dateString);
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 60) return `${diffMins} phút trước`;
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  return `${diffDays} ngày trước`;
+};
+
+function useDebounce(value, delay = 300) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
+const IconShieldCheck = ({ className }) => (
+  <svg
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+    />
+  </svg>
+);
 
 export default function AdminUsers() {
+  const toast = useToast();
+
+  // Tab & search state
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
-  const [lightboxImg, setLightboxImg] = useState(null); // Lightbox state
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebounce(search, 400);
 
-  // Logic Lọc User
-  const filteredUsers = usersData.filter((user) => {
-    const matchSearch =
-      user.name.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase());
-    if (activeTab === "all") return matchSearch;
-    return matchSearch && user.role === activeTab;
-  });
+  // Lightbox & modals
+  const [lightboxImg, setLightboxImg] = useState(null);
+  const [lockConfirm, setLockConfirm] = useState(null);
+  const [rejectConfirm, setRejectConfirm] = useState(null);
 
-  const toggleLockUser = (id) => {
-    alert(`Đã thay đổi trạng thái khóa cho User #${id}`);
+  // Cache for instant tab switching
+  const cacheRef = useRef({});
+
+  // Get role filter for API
+  const getRoleFilter = () => {
+    if (activeTab === "tourist") return "tourist";
+    if (activeTab === "guide") return "guide";
+    return undefined;
   };
 
-  const handleApprove = (id, isApproved) => {
-    if (isApproved) {
-      alert(`Đã chấp thuận HDV #${id}.`);
-    } else {
-      // Simple confirm for rejection
-      if (window.confirm(`Bạn có chắc chắn muốn từ chối HDV #${id}?`)) {
-        alert("Đã từ chối.");
-      }
+  // Fetch users
+  const { users, total, totalPages, isLoading, error, refetch } = useAdminUsers(
+    {
+      page,
+      limit: 10,
+      role: getRoleFilter(),
+      search: debouncedSearch || undefined,
+    }
+  );
+
+  // Fetch pending guide applications
+  const {
+    applications: pendingGuides,
+    isLoading: guidesLoading,
+    refetch: refetchGuides,
+  } = useAdminGuideApplications({ status: "pending" });
+
+  // Actions
+  const { updateStatus, isLoading: actionLoading } = useAdminUserActions();
+  const { reviewApplication, isLoading: reviewLoading } =
+    useAdminGuideAppActions();
+
+  // Cache results
+  const cacheKey = `${activeTab}-${page}-${debouncedSearch}`;
+  useEffect(() => {
+    if (users.length > 0 && !isLoading) {
+      cacheRef.current[cacheKey] = { users, total, totalPages };
+    }
+  }, [users, total, totalPages, isLoading, cacheKey]);
+
+  // Display data (use cache while loading)
+  const displayData = useMemo(() => {
+    if (!isLoading) return { users, total, totalPages };
+    const cached = cacheRef.current[cacheKey];
+    if (cached) return cached;
+    return { users, total, totalPages };
+  }, [isLoading, users, total, totalPages, cacheKey]);
+
+  // Client-side filter for instant feedback
+  const filteredUsers = useMemo(() => {
+    if (!search.trim()) return displayData.users;
+    const searchLower = search.toLowerCase();
+    return displayData.users.filter(
+      (user) =>
+        user.name?.toLowerCase().includes(searchLower) ||
+        user.email?.toLowerCase().includes(searchLower)
+    );
+  }, [displayData.users, search]);
+
+  // Handlers
+  const handleToggleLock = (user) => {
+    setLockConfirm(user);
+  };
+
+  const confirmToggleLock = async () => {
+    if (!lockConfirm) return;
+    try {
+      const newStatus = lockConfirm.status === "active" ? "banned" : "active";
+      await updateStatus(lockConfirm._id, newStatus);
+      toast.success(
+        "Thành công!",
+        newStatus === "banned"
+          ? `Đã khóa tài khoản ${lockConfirm.name}`
+          : `Đã mở khóa tài khoản ${lockConfirm.name}`
+      );
+      setLockConfirm(null);
+      refetch();
+    } catch (err) {
+      toast.error("Lỗi", err.message || "Không thể thay đổi trạng thái");
     }
   };
+
+  const handleApproveGuide = async (guide) => {
+    try {
+      await reviewApplication(guide._id, "approve");
+      toast.success("Thành công!", `Đã chấp thuận HDV ${guide.user_id?.name}`);
+      refetchGuides();
+    } catch (err) {
+      toast.error("Lỗi", err.message || "Không thể chấp thuận hồ sơ");
+    }
+  };
+
+  const handleRejectGuide = (guide) => {
+    setRejectConfirm(guide);
+  };
+
+  const confirmReject = async () => {
+    if (!rejectConfirm) return;
+    try {
+      await reviewApplication(rejectConfirm._id, "reject");
+      toast.info(
+        "Đã từ chối",
+        `HDV ${rejectConfirm.user_id?.name} đã bị từ chối.`
+      );
+      setRejectConfirm(null);
+      refetchGuides();
+    } catch (err) {
+      toast.error("Lỗi", err.message || "Không thể từ chối hồ sơ");
+    }
+  };
+
+  // Loading state for initial load
+  if (isLoading && users.length === 0 && activeTab !== "pending") {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-20 relative">
@@ -121,11 +213,19 @@ export default function AdminUsers() {
           </h1>
           <p className="text-text-secondary text-sm mt-1">
             Kiểm soát tài khoản và xét duyệt đối tác.
+            {displayData.total > 0 && activeTab !== "pending" && (
+              <span className="ml-2 font-bold">
+                Tổng: {displayData.total} người dùng
+              </span>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setActiveTab("pending")}
+            onClick={() => {
+              setActiveTab("pending");
+              setPage(1);
+            }}
             className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-2"
           >
             <IconShieldCheck className="w-4 h-4" /> Duyệt HDV (
@@ -133,6 +233,13 @@ export default function AdminUsers() {
           </button>
         </div>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Toolbar Tabs */}
       <div className="bg-white p-4 rounded-2xl border border-border-light flex flex-col md:flex-row justify-between gap-4 shadow-sm">
@@ -145,7 +252,10 @@ export default function AdminUsers() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setPage(1);
+              }}
               className={`
                 whitespace-nowrap px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2
                 ${
@@ -156,7 +266,7 @@ export default function AdminUsers() {
               `}
             >
               {tab.label}
-              {tab.icon && (
+              {tab.icon && pendingGuides.length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
               )}
             </button>
@@ -169,6 +279,7 @@ export default function AdminUsers() {
               type="text"
               placeholder="Tìm tên hoặc email..."
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border-light bg-bg-main/30 focus:bg-white focus:border-primary outline-none text-sm transition-all"
+              value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
@@ -180,7 +291,7 @@ export default function AdminUsers() {
       {activeTab !== "pending" && (
         <div className="bg-white rounded-3xl border border-border-light overflow-hidden shadow-sm animate-fade-in">
           {/* Empty state check */}
-          {filteredUsers.length === 0 ? (
+          {filteredUsers.length > 0 ? (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -196,14 +307,22 @@ export default function AdminUsers() {
                   <tbody>
                     {filteredUsers.map((user) => (
                       <tr
-                        key={user.id}
+                        key={user._id}
                         className="border-b border-border-light last:border-0 hover:bg-bg-main/20 transition-colors"
                       >
                         <td className="p-4 pl-6">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-text-secondary uppercase">
-                              {user.name.charAt(0)}
-                            </div>
+                            {user.avatar ? (
+                              <img
+                                src={user.avatar}
+                                alt={user.name}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-text-secondary uppercase">
+                                {user.name?.charAt(0) || "?"}
+                              </div>
+                            )}
                             <div>
                               <p className="font-bold text-text-primary">
                                 {user.name}
@@ -219,14 +338,20 @@ export default function AdminUsers() {
                             className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
                               user.role === "guide"
                                 ? "bg-purple-50 text-purple-700 border border-purple-100"
+                                : user.role === "admin"
+                                ? "bg-red-50 text-red-700 border border-red-100"
                                 : "bg-blue-50 text-blue-700 border border-blue-100"
                             }`}
                           >
-                            {user.role === "guide" ? "Partner" : "Tourist"}
+                            {user.role === "guide"
+                              ? "HDV"
+                              : user.role === "admin"
+                              ? "Admin"
+                              : "Du khách"}
                           </span>
                         </td>
                         <td className="p-4 text-text-secondary">
-                          {user.joinDate}
+                          {formatDate(user.createdAt)}
                         </td>
                         <td className="p-4">
                           {user.status === "active" ? (
@@ -248,25 +373,28 @@ export default function AdminUsers() {
                           >
                             <IconEye className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => toggleLockUser(user.id)}
-                            className={`p-2 rounded-lg ml-2 transition-colors ${
-                              user.status === "active"
-                                ? "hover:bg-red-50 text-text-secondary hover:text-red-600"
-                                : "hover:bg-green-50 text-red-500 hover:text-green-600"
-                            }`}
-                            title={
-                              user.status === "active"
-                                ? "Khóa tài khoản"
-                                : "Mở khóa"
-                            }
-                          >
-                            {user.status === "active" ? (
-                              <IconLock className="w-4 h-4" />
-                            ) : (
-                              <IconUnlock className="w-4 h-4" />
-                            )}
-                          </button>
+                          {user.role !== "admin" && (
+                            <button
+                              onClick={() => handleToggleLock(user)}
+                              disabled={actionLoading}
+                              className={`p-2 rounded-lg ml-2 transition-colors disabled:opacity-50 ${
+                                user.status === "active"
+                                  ? "hover:bg-red-50 text-text-secondary hover:text-red-600"
+                                  : "hover:bg-green-50 text-red-500 hover:text-green-600"
+                              }`}
+                              title={
+                                user.status === "active"
+                                  ? "Khóa tài khoản"
+                                  : "Mở khóa"
+                              }
+                            >
+                              {user.status === "active" ? (
+                                <IconLock className="w-4 h-4" />
+                              ) : (
+                                <IconUnlock className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -275,33 +403,69 @@ export default function AdminUsers() {
               </div>
 
               {/* Pagination */}
-              <div className="p-4 border-t border-border-light flex justify-between items-center text-xs text-text-secondary bg-white">
-                <span>
-                  Hiển thị <strong>1-10</strong> trên tổng số{" "}
-                  <strong>{filteredUsers.length}</strong>
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="p-2 rounded-lg border border-border-light hover:bg-bg-main disabled:opacity-50"
-                    disabled
-                  >
-                    <IconChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button className="px-3 py-1.5 rounded-lg border border-primary bg-primary text-white font-bold">
-                    1
-                  </button>
-                  <button className="px-3 py-1.5 rounded-lg border border-border-light hover:bg-bg-main font-bold">
-                    2
-                  </button>
-                  <span className="text-gray-400">...</span>
-                  <button className="px-3 py-1.5 rounded-lg border border-border-light hover:bg-bg-main font-bold">
-                    5
-                  </button>
-                  <button className="p-2 rounded-lg border border-border-light hover:bg-bg-main">
-                    <IconChevronRight className="w-4 h-4" />
-                  </button>
+              {displayData.totalPages > 1 && (
+                <div className="p-4 border-t border-border-light flex justify-between items-center text-xs text-text-secondary bg-white">
+                  <span>
+                    Hiển thị{" "}
+                    <strong>
+                      {(page - 1) * 10 + 1}-
+                      {Math.min(page * 10, displayData.total)}
+                    </strong>{" "}
+                    trên tổng số <strong>{displayData.total}</strong>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="p-2 rounded-lg border border-border-light hover:bg-bg-main disabled:opacity-50"
+                    >
+                      <IconChevronLeft className="w-4 h-4" />
+                    </button>
+                    {[...Array(Math.min(5, displayData.totalPages))].map(
+                      (_, i) => {
+                        const pageNum = i + 1;
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setPage(pageNum)}
+                            className={`px-3 py-1.5 rounded-lg border font-bold ${
+                              page === pageNum
+                                ? "border-primary bg-primary text-white"
+                                : "border-border-light hover:bg-bg-main"
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      }
+                    )}
+                    {displayData.totalPages > 5 && (
+                      <>
+                        <span className="text-gray-400">...</span>
+                        <button
+                          onClick={() => setPage(displayData.totalPages)}
+                          className={`px-3 py-1.5 rounded-lg border font-bold ${
+                            page === displayData.totalPages
+                              ? "border-primary bg-primary text-white"
+                              : "border-border-light hover:bg-bg-main"
+                          }`}
+                        >
+                          {displayData.totalPages}
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() =>
+                        setPage((p) => Math.min(displayData.totalPages, p + 1))
+                      }
+                      disabled={page === displayData.totalPages}
+                      className="p-2 rounded-lg border border-border-light hover:bg-bg-main disabled:opacity-50"
+                    >
+                      <IconChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-text-secondary">
@@ -320,10 +484,14 @@ export default function AdminUsers() {
       {/* --- VIEW 2: PENDING GUIDES --- */}
       {activeTab === "pending" && (
         <div className="grid grid-cols-1 gap-6 animate-fade-in">
-          {pendingGuides.length > 0 ? (
+          {guidesLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Spinner size="lg" />
+            </div>
+          ) : pendingGuides.length > 0 ? (
             pendingGuides.map((guide) => (
               <div
-                key={guide.id}
+                key={guide._id}
                 className="bg-white p-6 rounded-3xl border border-border-light shadow-sm hover:shadow-md transition-all"
               >
                 <div className="flex flex-col lg:flex-row gap-8">
@@ -332,89 +500,100 @@ export default function AdminUsers() {
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-2xl font-bold border-2 border-primary/20">
-                          {guide.name.charAt(0)}
+                          {guide.user_id?.name?.charAt(0) || "?"}
                         </div>
                         <div>
                           <h3 className="text-xl font-heading font-bold text-text-primary">
-                            {guide.name}
+                            {guide.user_id?.name || "Ẩn danh"}
                           </h3>
                           <p className="text-sm text-text-secondary">
-                            {guide.email} • {guide.phone}
+                            {guide.user_id?.email} •{" "}
+                            {guide.user_id?.phone_number || "Chưa có SĐT"}
                           </p>
                           <p className="text-xs text-orange-500 font-bold mt-1">
-                            Yêu cầu: {guide.requestDate}
+                            Yêu cầu: {formatTimeAgo(guide.createdAt)}
                           </p>
                         </div>
                       </div>
                     </div>
-                    <div className="bg-bg-main p-4 rounded-2xl border border-border-light text-sm text-text-secondary italic">
-                      "{guide.bio}"
-                    </div>
+                    {guide.about && (
+                      <div className="bg-bg-main p-4 rounded-2xl border border-border-light text-sm text-text-secondary italic">
+                        "{guide.about}"
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <p className="text-xs font-bold text-text-secondary uppercase">
                           Kinh nghiệm
                         </p>
                         <p className="font-bold text-text-primary">
-                          {guide.exp}
+                          {guide.experience_years || 0} năm
                         </p>
                       </div>
                       <div>
                         <p className="text-xs font-bold text-text-secondary uppercase">
-                          Chứng chỉ
+                          Ngôn ngữ
                         </p>
-                        <p className="font-bold text-primary">{guide.cert}</p>
+                        <p className="font-bold text-primary">
+                          {guide.languages?.join(", ") || "Tiếng Việt"}
+                        </p>
                       </div>
                     </div>
                   </div>
 
                   {/* Evidence */}
                   <div className="lg:w-80 space-y-4">
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-text-secondary uppercase flex items-center gap-1">
-                        <IconFileText className="w-3 h-3" /> Ảnh thẻ HDV / CCCD
-                      </p>
-                      {/* Lightbox trigger */}
-                      <div
-                        className="h-32 rounded-xl overflow-hidden border border-border-light bg-gray-100 relative group cursor-zoom-in"
-                        onClick={() => setLightboxImg(guide.certImage)}
-                      >
-                        <img
-                          src={guide.certImage}
-                          className="w-full h-full object-cover"
-                          alt="Cert"
-                        />
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <IconEye className="w-6 h-6 text-white" />
+                    {guide.id_cards?.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-text-secondary uppercase flex items-center gap-1">
+                          <IconFileText className="w-3 h-3" /> Ảnh thẻ HDV /
+                          CCCD
+                        </p>
+                        <div
+                          className="h-32 rounded-xl overflow-hidden border border-border-light bg-gray-100 relative group cursor-zoom-in"
+                          onClick={() => setLightboxImg(guide.id_cards[0])}
+                        >
+                          <img
+                            src={guide.id_cards[0]}
+                            className="w-full h-full object-cover"
+                            alt="ID Card"
+                          />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <IconEye className="w-6 h-6 text-white" />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-text-secondary uppercase flex items-center gap-1">
-                        <IconVideo className="w-3 h-3" /> Video giới thiệu
-                      </p>
-                      <a
-                        href={guide.video}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block p-3 rounded-xl border border-border-light bg-white hover:border-primary hover:text-primary transition-colors text-sm font-medium truncate text-center"
-                      >
-                        Xem video trên Youtube ↗
-                      </a>
-                    </div>
+                    )}
+                    {guide.intro_video?.url && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-text-secondary uppercase flex items-center gap-1">
+                          <IconVideo className="w-3 h-3" /> Video giới thiệu
+                        </p>
+                        <a
+                          href={guide.intro_video.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block p-3 rounded-xl border border-border-light bg-white hover:border-primary hover:text-primary transition-colors text-sm font-medium truncate text-center"
+                        >
+                          Xem video ↗
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}
                   <div className="lg:w-48 flex flex-col justify-center gap-3 border-t lg:border-t-0 lg:border-l border-border-light pt-6 lg:pt-0 lg:pl-8">
                     <button
-                      onClick={() => handleApprove(guide.id, true)}
-                      className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2"
+                      onClick={() => handleApproveGuide(guide)}
+                      disabled={reviewLoading}
+                      className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       <IconCheck className="w-5 h-5" /> Chấp thuận
                     </button>
                     <button
-                      onClick={() => handleApprove(guide.id, false)}
-                      className="w-full py-3 rounded-xl border border-red-100 text-red-600 bg-red-50 hover:bg-red-100 font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                      onClick={() => handleRejectGuide(guide)}
+                      disabled={reviewLoading}
+                      className="w-full py-3 rounded-xl border border-red-100 text-red-600 bg-red-50 hover:bg-red-100 font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       <IconX className="w-5 h-5" /> Từ chối
                     </button>
@@ -445,12 +624,44 @@ export default function AdminUsers() {
           </button>
           <img
             src={lightboxImg}
-            alt="Certificate Full"
+            alt="Full View"
             className="max-w-full max-h-[90vh] rounded-lg shadow-2xl border-4 border-white/20"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
       )}
+
+      {/* Lock/Unlock Confirm Modal */}
+      <ConfirmModal
+        isOpen={!!lockConfirm}
+        onClose={() => setLockConfirm(null)}
+        onConfirm={confirmToggleLock}
+        title={
+          lockConfirm?.status === "active"
+            ? "Khóa tài khoản"
+            : "Mở khóa tài khoản"
+        }
+        message={
+          lockConfirm?.status === "active"
+            ? `Bạn có chắc muốn khóa tài khoản "${lockConfirm?.name}"? Người dùng sẽ không thể đăng nhập.`
+            : `Bạn có chắc muốn mở khóa tài khoản "${lockConfirm?.name}"?`
+        }
+        confirmText={lockConfirm?.status === "active" ? "Khóa" : "Mở khóa"}
+        confirmVariant={lockConfirm?.status === "active" ? "danger" : "primary"}
+        isLoading={actionLoading}
+      />
+
+      {/* Reject Guide Confirm Modal */}
+      <ConfirmModal
+        isOpen={!!rejectConfirm}
+        onClose={() => setRejectConfirm(null)}
+        onConfirm={confirmReject}
+        title="Từ chối hồ sơ HDV"
+        message={`Bạn có chắc muốn từ chối hồ sơ của "${rejectConfirm?.user_id?.name}"?`}
+        confirmText="Từ chối"
+        confirmVariant="danger"
+        isLoading={reviewLoading}
+      />
     </div>
   );
 }

@@ -22,6 +22,7 @@ import {
 } from "../../../features/guides/hooks";
 import { formatCurrency } from "../../../lib/formatters";
 import Spinner from "../../../components/Loaders/Spinner";
+import { useToast } from "../../../components/Toast/useToast";
 
 // Inline Loader Icon
 const IconLoader = ({ className }) => (
@@ -42,6 +43,7 @@ const IconLoader = ({ className }) => (
 export default function GuideEditTour() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const [step, setStep] = useState(1);
   const [previewImage, setPreviewImage] = useState(null);
   const [searchLocation, setSearchLocation] = useState("");
@@ -153,27 +155,27 @@ export default function GuideEditTour() {
   const validateStep = () => {
     if (step === 1) {
       if (!formData.name.trim()) {
-        alert("Vui lòng nhập tên tour");
+        toast.warning("Thiếu thông tin", "Vui lòng nhập tên tour");
         return false;
       }
       if (!formData.duration_hours) {
-        alert("Vui lòng nhập thời lượng tour");
+        toast.warning("Thiếu thông tin", "Vui lòng nhập thời lượng tour");
         return false;
       }
       if (!formData.category_id) {
-        alert("Vui lòng chọn danh mục tour");
+        toast.warning("Thiếu thông tin", "Vui lòng chọn danh mục tour");
         return false;
       }
     }
     if (step === 2) {
       if (selectedPlaces.length === 0) {
-        alert("Vui lòng chọn ít nhất 1 địa điểm");
+        toast.warning("Thiếu thông tin", "Vui lòng chọn ít nhất 1 địa điểm");
         return false;
       }
     }
     if (step === 3) {
       if (!formData.price) {
-        alert("Vui lòng nhập giá tour");
+        toast.warning("Thiếu thông tin", "Vui lòng nhập giá tour");
         return false;
       }
     }
@@ -192,7 +194,10 @@ export default function GuideEditTour() {
     if (!validateStep()) return;
 
     if (tour?.type !== "request" || tour?.status !== "pending") {
-      alert("Chỉ có thể chỉnh sửa yêu cầu tour đang chờ duyệt");
+      toast.warning(
+        "Không thể chỉnh sửa",
+        "Chỉ có thể chỉnh sửa yêu cầu tour đang chờ duyệt"
+      );
       return;
     }
 
@@ -219,10 +224,10 @@ export default function GuideEditTour() {
                 day: i + 1,
                 title:
                   text
-                    .replace(/^[-\u2022]\s*/, "")
+                    .replace(/^[-•]\s*/, "")
                     .split(":")[0]
                     ?.trim() || `Diem ${i + 1}`,
-                details: text.replace(/^[-\u2022]\s*/, "").trim(),
+                details: text.replace(/^[-•]\s*/, "").trim(),
               }))
           : [],
         locations: selectedPlaces.map((p, i) => ({
@@ -233,7 +238,7 @@ export default function GuideEditTour() {
 
       console.log("Updating tour request:", payload);
       await updateTourRequest(id, payload);
-      alert("Đã cập nhật yêu cầu tour thành công!");
+      toast.success("Thành công!", "Đã cập nhật yêu cầu tour.");
       navigate("/dashboard/guide/my-tours");
     } catch (err) {
       console.error("Update tour error:", err);
@@ -241,7 +246,7 @@ export default function GuideEditTour() {
         err?.message ||
         err?.detail?.toString() ||
         "Không thể cập nhật tour. Vui lòng thử lại.";
-      alert(errorMsg);
+      toast.error("Lỗi cập nhật", errorMsg);
     }
   };
 
@@ -251,11 +256,14 @@ export default function GuideEditTour() {
 
     try {
       await deleteTourRequest(id);
-      alert("Đã xóa yêu cầu tour thành công!");
+      toast.success("Thành công!", "Đã xóa yêu cầu tour.");
       navigate("/dashboard/guide/my-tours");
     } catch (err) {
       console.error("Delete tour error:", err);
-      alert(err?.message || "Không thể xóa tour. Vui lòng thử lại.");
+      toast.error(
+        "Lỗi xóa",
+        err?.message || "Không thể xóa tour. Vui lòng thử lại."
+      );
     }
   };
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { IconCheck, IconClock } from "../../../icons/IconBox";
+import { IconCheck } from "../../../icons/IconBox";
 import { IconUser } from "../../../icons/IconUser";
 import {
   IconBell,
@@ -8,79 +8,73 @@ import {
   IconInfo,
   IconTrash,
 } from "../../../icons/IconCommon";
+import { useNotifications } from "../../../features/notifications/hooks";
+import Spinner from "../../../components/Loaders/Spinner";
+import { formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
 
-// --- MOCK DATA ---
-const notificationsData = [
-  {
-    id: 1,
-    type: "booking", // booking, payment, system, review
-    title: "Yêu cầu đặt tour mới",
-    message:
-      "Du khách Nguyễn Văn A đã đặt tour 'Bí mật Hoàng cung Huế'. Chờ xác nhận.",
-    time: "15 phút trước",
-    isRead: false,
-    link: "/dashboard/guide/booking/BK-901",
-  },
-  {
-    id: 2,
-    type: "payment",
-    title: "Tiền đã về ví",
-    message: "Bạn nhận được 1.620.000đ từ tour 'Thiền trà tại Chùa Từ Hiếu'.",
-    time: "2 giờ trước",
-    isRead: false,
-    link: "/dashboard/guide/earnings",
-  },
-  {
-    id: 3,
-    type: "review",
-    title: "Đánh giá mới 5 sao",
-    message:
-      "Sarah Jenkins đã viết nhận xét về tour của bạn: 'Amazing experience...'",
-    time: "1 ngày trước",
-    isRead: true,
-    link: "/dashboard/guide/reviews",
-  },
-  {
-    id: 4,
-    type: "system",
-    title: "Cập nhật chính sách",
-    message: "Hệ thống sẽ bảo trì vào lúc 02:00 AM ngày mai. Vui lòng lưu ý.",
-    time: "3 ngày trước",
-    isRead: true,
-    link: "#",
-  },
-  {
-    id: 5,
-    type: "booking",
-    title: "Tour sắp diễn ra",
-    message:
-      "Đừng quên tour 'Bí mật Hoàng cung' sẽ bắt đầu vào 08:00 sáng mai.",
-    time: "1 ngày trước",
-    isRead: true,
-    link: "/dashboard/guide/schedule",
-  },
-];
+// Helper icon star inline
+const IconStar = ({ className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </svg>
+);
 
 export default function GuideNotifications() {
-  const [notifications, setNotifications] = useState(notificationsData);
   const [filter, setFilter] = useState("all"); // all, unread
 
+  // Fetch notifications from API
+  const {
+    notifications,
+    isLoading,
+    error,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    refetch,
+  } = useNotifications({ limit: 50 });
+
+  // Filter notifications
   const filteredNotis = notifications.filter(
-    (n) => filter === "all" || (filter === "unread" && !n.isRead)
+    (n) => filter === "all" || (filter === "unread" && !n.is_read)
   );
 
-  const markAsRead = (id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+  // Format time helper
+  const formatTime = (dateString) => {
+    if (!dateString) return "";
+    try {
+      return formatDistanceToNow(new Date(dateString), {
+        addSuffix: true,
+        locale: vi,
+      });
+    } catch {
+      return "";
+    }
   };
 
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-  };
-
-  const deleteNoti = (id) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  // Get notification link based on type
+  const getNotificationLink = (noti) => {
+    switch (noti.type) {
+      case "booking":
+        return "/dashboard/guide/requests";
+      case "payment":
+        return "/dashboard/guide/earnings";
+      case "review":
+        return "/dashboard/guide/reviews";
+      case "tour":
+        return "/dashboard/guide/my-tours";
+      default:
+        return "#";
+    }
   };
 
   // Helper render icon
@@ -110,6 +104,12 @@ export default function GuideNotifications() {
             <IconInfo className="w-5 h-5" />
           </div>
         );
+      case "tour":
+        return (
+          <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+            <IconInfo className="w-5 h-5" />
+          </div>
+        );
       default:
         return (
           <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
@@ -119,21 +119,44 @@ export default function GuideNotifications() {
     }
   };
 
-  // Helper icon star inline
-  const IconStar = ({ className }) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  );
+  // Handle mark as read
+  const handleMarkAsRead = async (id) => {
+    await markAsRead(id);
+  };
+
+  // Handle mark all as read
+  const handleMarkAllRead = async () => {
+    await markAllAsRead();
+  };
+
+  // Handle delete notification
+  const handleDelete = async (id) => {
+    await deleteNotification(id);
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="py-20 text-center">
+        <p className="text-red-500 mb-4">{error}</p>
+        <button
+          onClick={refetch}
+          className="text-primary font-bold hover:underline"
+        >
+          Thử lại
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto pb-20 space-y-6">
@@ -156,7 +179,7 @@ export default function GuideNotifications() {
                 : "bg-white text-text-secondary hover:bg-bg-main"
             }`}
           >
-            Tất cả
+            Tất cả ({notifications.length})
           </button>
           <button
             onClick={() => setFilter("unread")}
@@ -166,35 +189,37 @@ export default function GuideNotifications() {
                 : "bg-white text-text-secondary hover:bg-bg-main"
             }`}
           >
-            Chưa đọc
+            Chưa đọc ({notifications.filter((n) => !n.is_read).length})
           </button>
         </div>
       </div>
 
       {/* Actions Bar */}
-      <div className="flex justify-end">
-        <button
-          onClick={markAllRead}
-          className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
-        >
-          <IconCheck className="w-4 h-4" /> Đánh dấu tất cả là đã đọc
-        </button>
-      </div>
+      {notifications.some((n) => !n.is_read) && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleMarkAllRead}
+            className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+          >
+            <IconCheck className="w-4 h-4" /> Đánh dấu tất cả là đã đọc
+          </button>
+        </div>
+      )}
 
       {/* List */}
       <div className="space-y-3">
         {filteredNotis.length > 0 ? (
           filteredNotis.map((noti) => (
             <div
-              key={noti.id}
+              key={noti._id}
               className={`
-                        relative p-4 rounded-2xl border transition-all hover:shadow-md flex gap-4 items-start group
-                        ${
-                          noti.isRead
-                            ? "bg-white border-border-light"
-                            : "bg-blue-50/50 border-blue-100"
-                        }
-                    `}
+                relative p-4 rounded-2xl border transition-all hover:shadow-md flex gap-4 items-start group
+                ${
+                  noti.is_read
+                    ? "bg-white border-border-light"
+                    : "bg-blue-50/50 border-blue-100"
+                }
+              `}
             >
               {/* Icon */}
               <div className="shrink-0">{getIcon(noti.type)}</div>
@@ -203,28 +228,36 @@ export default function GuideNotifications() {
               <div className="flex-1 min-w-0 pt-1">
                 <div className="flex justify-between items-start">
                   <h4
-                    className={`text-sm font-bold mb-1 ${
-                      noti.isRead ? "text-text-primary" : "text-blue-800"
+                    className={`text-sm font-bold mb-1 capitalize ${
+                      noti.is_read ? "text-text-primary" : "text-blue-800"
                     }`}
                   >
-                    {noti.title}
+                    {noti.type === "booking"
+                      ? "Đặt tour"
+                      : noti.type === "payment"
+                      ? "Thanh toán"
+                      : noti.type === "review"
+                      ? "Đánh giá"
+                      : noti.type === "tour"
+                      ? "Tour"
+                      : "Hệ thống"}
                   </h4>
                   <span className="text-[10px] text-text-secondary whitespace-nowrap ml-2">
-                    {noti.time}
+                    {formatTime(noti.createdAt)}
                   </span>
                 </div>
                 <p
                   className={`text-sm mb-2 line-clamp-2 ${
-                    noti.isRead ? "text-text-secondary" : "text-blue-900/80"
+                    noti.is_read ? "text-text-secondary" : "text-blue-900/80"
                   }`}
                 >
-                  {noti.message}
+                  {noti.content}
                 </p>
 
                 {/* Action Link */}
                 <Link
-                  to={noti.link}
-                  onClick={() => markAsRead(noti.id)}
+                  to={getNotificationLink(noti)}
+                  onClick={() => handleMarkAsRead(noti._id)}
                   className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1"
                 >
                   Xem chi tiết
@@ -232,7 +265,7 @@ export default function GuideNotifications() {
               </div>
 
               {/* Dot Unread */}
-              {!noti.isRead && (
+              {!noti.is_read && (
                 <div className="absolute top-4 right-4 w-2 h-2 bg-blue-500 rounded-full"></div>
               )}
 
@@ -240,7 +273,7 @@ export default function GuideNotifications() {
               <button
                 onClick={(e) => {
                   e.preventDefault();
-                  deleteNoti(noti.id);
+                  handleDelete(noti._id);
                 }}
                 className="absolute bottom-4 right-4 p-2 text-text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Xóa thông báo"
@@ -255,7 +288,9 @@ export default function GuideNotifications() {
               <IconBell className="w-8 h-8" />
             </div>
             <p className="text-text-secondary text-sm">
-              Không có thông báo nào.
+              {filter === "unread"
+                ? "Không có thông báo chưa đọc."
+                : "Không có thông báo nào."}
             </p>
           </div>
         )}

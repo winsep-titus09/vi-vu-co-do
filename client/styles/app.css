@@ -197,3 +197,117 @@ h6 {
 @utility chip-gray {
   @apply chip text-text-secondary bg-gray-100 border-gray-200;
 }
+
+/* =======================================
+   📝 QUILL EDITOR STYLES
+   ======================================= */
+.quill-editor {
+  .ql-toolbar {
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px 12px 0 0;
+    background: var(--color-bg-main);
+    padding: 12px;
+  }
+
+  .ql-container {
+    border: 1px solid var(--color-border-light);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    font-family: var(--font-body);
+    font-size: 16px;
+    min-height: 350px;
+  }
+
+  .ql-editor {
+    min-height: 350px;
+    padding: 20px;
+    line-height: 1.8;
+    color: var(--color-text-primary);
+  }
+
+  .ql-editor.ql-blank::before {
+    color: #9ca3af;
+    font-style: normal;
+  }
+
+  .ql-editor h1 {
+    font-family: var(--font-heading);
+    font-size: 2em;
+    font-weight: 700;
+    margin-bottom: 0.5em;
+  }
+
+  .ql-editor h2 {
+    font-family: var(--font-heading);
+    font-size: 1.5em;
+    font-weight: 700;
+    margin-bottom: 0.5em;
+  }
+
+  .ql-editor h3 {
+    font-family: var(--font-heading);
+    font-size: 1.25em;
+    font-weight: 600;
+    margin-bottom: 0.5em;
+  }
+
+  .ql-editor p {
+    margin-bottom: 1em;
+  }
+
+  .ql-editor blockquote {
+    border-left: 4px solid var(--color-primary);
+    padding-left: 16px;
+    margin: 1em 0;
+    color: var(--color-text-secondary);
+    font-style: italic;
+  }
+
+  .ql-editor ul,
+  .ql-editor ol {
+    padding-left: 1.5em;
+    margin-bottom: 1em;
+  }
+
+  .ql-editor img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin: 1em 0;
+  }
+
+  .ql-editor a {
+    color: var(--color-primary);
+    text-decoration: underline;
+  }
+
+  .ql-editor pre.ql-syntax {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    font-family: monospace;
+    font-size: 14px;
+  }
+
+  /* Toolbar button hover */
+  .ql-toolbar button:hover,
+  .ql-toolbar .ql-picker-label:hover {
+    color: var(--color-primary);
+  }
+
+  .ql-toolbar button.ql-active,
+  .ql-toolbar .ql-picker-label.ql-active {
+    color: var(--color-primary);
+  }
+
+  .ql-toolbar button:hover .ql-stroke,
+  .ql-toolbar button.ql-active .ql-stroke {
+    stroke: var(--color-primary);
+  }
+
+  .ql-toolbar button:hover .ql-fill,
+  .ql-toolbar button.ql-active .ql-fill {
+    fill: var(--color-primary);
+  }
+}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
 import { IconCheck, IconClock } from "../../../icons/IconBox";
 import { IconX } from "../../../icons/IconX";
 import {
@@ -8,37 +10,88 @@ import {
   IconEye,
   IconTrash,
 } from "../../../icons/IconCommon";
+import {
+  useMyArticle,
+  useArticleCategories,
+  useUpdateArticle,
+  useDeleteArticle,
+} from "../../../features/posts/hooks";
+import Spinner from "../../../components/Loaders/Spinner";
+import ConfirmModal from "../../../components/Modals/ConfirmModal";
+import { formatDate } from "../../../lib/formatters";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-// Mock data: Existing post (simulated API fetch)
-const existingPost = {
-  id: 1,
-  title: "5 quán bún bò Huế 'núp hẻm' chỉ thổ địa mới biết",
-  content:
-    "Huế không chỉ có bún bò Mệ Kéo hay O Cương Chú Điệp. Hãy cùng tôi len lỏi vào những con hẻm nhỏ để tìm ra hương vị chuẩn Huế xưa...\n\n1. Bún bò O Ty\nNằm sâu trong hẻm...",
-  image:
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
-  category: "Ẩm thực",
-  tags: "Bún bò, Ẩm thực Huế, Local food",
-  status: "published", // published, pending, draft
-  relatedTourId: "",
+// Quill modules configuration
+const quillModules = {
+  toolbar: [
+    [{ header: [1, 2, 3, false] }],
+    ["bold", "italic", "underline", "strike"],
+    [{ color: [] }, { background: [] }],
+    [{ list: "ordered" }, { list: "bullet" }],
+    [{ align: [] }],
+    ["blockquote", "code-block"],
+    ["link", "image"],
+    ["clean"],
+  ],
 };
 
+const quillFormats = [
+  "header",
+  "bold",
+  "italic",
+  "underline",
+  "strike",
+  "color",
+  "background",
+  "list",
+  "align",
+  "blockquote",
+  "code-block",
+  "link",
+  "image",
+];
+
 export default function EditPost() {
-  const { id: _id } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
 
+  // Fetch article data
+  const { article, isLoading, error: fetchError } = useMyArticle(id);
+  const { categories } = useArticleCategories();
+  const { updateArticle, isUpdating } = useUpdateArticle();
+  const { deleteArticle, isDeleting } = useDeleteArticle();
+
   // State Form
-  const [formData, setFormData] = useState(existingPost);
-  const [previewImage, setPreviewImage] = useState(existingPost.image);
-  const [isDirty, setIsDirty] = useState(false); // Đánh dấu có thay đổi chưa lưu
+  const [formData, setFormData] = useState({
+    title: "",
+    content_html: "",
+    cover_image: "",
+    categoryId: "",
+    status: "draft",
+  });
+  const [previewImage, setPreviewImage] = useState("");
+  const [isDirty, setIsDirty] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [saveMessage, setSaveMessage] = useState(null);
+
+  // Load article data when fetched
+  useEffect(() => {
+    if (article) {
+      setFormData({
+        title: article.title || "",
+        content_html: article.content_html || "",
+        cover_image: article.cover_image || "",
+        categoryId: article.categoryId?._id || article.categoryId || "",
+        status: article.status || "draft",
+      });
+      setPreviewImage(article.cover_image || "");
+    }
+  }, [article]);
 
   // Handle Change
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setIsDirty(true);
+    setSaveMessage(null);
   };
 
   const handleImageChange = (e) => {
@@ -47,29 +100,53 @@ export default function EditPost() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviewImage(reader.result);
-        setIsDirty(true);
+        handleChange("cover_image", reader.result);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSave = () => {
-    // Call API update
-    alert("Đã lưu thay đổi thành công!");
-    setIsDirty(false);
+  const handleSave = async () => {
+    const result = await updateArticle(id, formData);
+    if (result) {
+      setSaveMessage({
+        type: "success",
+        text: "Đã lưu thay đổi! Bài viết sẽ được duyệt lại.",
+      });
+      setIsDirty(false);
+    } else {
+      setSaveMessage({
+        type: "error",
+        text: "Lưu thất bại. Vui lòng thử lại.",
+      });
+    }
   };
 
-  const handleDelete = () => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) {
-      alert("Đã xóa bài viết!");
+  const handleDelete = async () => {
+    const success = await deleteArticle(id);
+    if (success) {
       navigate("/dashboard/guide/posts");
     }
+    setShowDeleteModal(false);
+  };
+
+  // Helper to get display status
+  const getDisplayStatus = () => {
+    if (!article) return "draft";
+    if (article.status === "draft") return "draft";
+    if (article.status === "active" && article.approval?.status === "approved")
+      return "active";
+    if (article.approval?.status === "rejected") return "rejected";
+    if (article.status === "pending" || article.approval?.status === "pending")
+      return "pending";
+    return article.status;
   };
 
   // Helper Badge trạng thái
   const renderStatus = () => {
-    switch (formData.status) {
-      case "published":
+    const status = getDisplayStatus();
+    switch (status) {
+      case "active":
         return (
           <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold flex items-center gap-1">
             <span className="w-2 h-2 bg-green-500 rounded-full"></span> Đã đăng
@@ -82,6 +159,12 @@ export default function EditPost() {
             duyệt
           </span>
         );
+      case "rejected":
+        return (
+          <span className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-xs font-bold flex items-center gap-1">
+            <span className="w-2 h-2 bg-red-500 rounded-full"></span> Bị từ chối
+          </span>
+        );
       default:
         return (
           <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold flex items-center gap-1">
@@ -91,50 +174,103 @@ export default function EditPost() {
     }
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (fetchError || !article) {
+    return (
+      <div className="py-20 text-center">
+        <p className="text-red-500 mb-4">
+          {fetchError || "Không tìm thấy bài viết"}
+        </p>
+        <Link
+          to="/dashboard/guide/posts"
+          className="text-primary font-bold hover:underline"
+        >
+          Quay lại danh sách
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto pb-20 space-y-8">
+      {/* Save Message */}
+      {saveMessage && (
+        <div
+          className={`p-4 rounded-xl text-sm font-medium ${
+            saveMessage.type === "success"
+              ? "bg-green-50 text-green-700 border border-green-200"
+              : "bg-red-50 text-red-700 border border-red-200"
+          }`}
+        >
+          {saveMessage.text}
+        </div>
+      )}
+
       {/* HEADER */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
+            <Link
+              to="/dashboard/guide/posts"
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <IconChevronLeft className="w-5 h-5 text-text-secondary" />
+            </Link>
             <h1 className="text-2xl font-heading font-bold text-text-primary">
               Chỉnh sửa bài viết
             </h1>
             {renderStatus()}
           </div>
-          <p className="text-text-secondary text-sm">
-            Cập nhật nội dung lần cuối: 20/05/2025
+          <p className="text-text-secondary text-sm ml-9">
+            Cập nhật lần cuối: {formatDate(article.updatedAt)}
           </p>
         </div>
 
         <div className="flex gap-3">
           <button
-            onClick={handleDelete}
-            className="px-4 py-2.5 rounded-xl border border-red-100 text-red-600 bg-red-50 hover:bg-red-100 font-bold text-sm transition-all flex items-center gap-2"
+            onClick={() => setShowDeleteModal(true)}
+            disabled={isDeleting}
+            className="px-4 py-2.5 rounded-xl border border-red-100 text-red-600 bg-red-50 hover:bg-red-100 font-bold text-sm transition-all flex items-center gap-2 disabled:opacity-50"
           >
             <IconTrash className="w-4 h-4" />{" "}
             <span className="hidden sm:inline">Xóa bài</span>
           </button>
-          <Link
-            to={`/blog/post-slug-demo`} // Link demo ra trang chi tiết
-            target="_blank"
-            className="px-5 py-2.5 rounded-xl border border-border-light font-bold text-sm text-text-secondary hover:bg-bg-main transition-all flex items-center gap-2"
-          >
-            <IconEye className="w-4 h-4" /> Xem trước
-          </Link>
+          {article.slug && (
+            <Link
+              to={`/blog/${article.slug}`}
+              target="_blank"
+              className="px-5 py-2.5 rounded-xl border border-border-light font-bold text-sm text-text-secondary hover:bg-bg-main transition-all flex items-center gap-2"
+            >
+              <IconEye className="w-4 h-4" /> Xem trước
+            </Link>
+          )}
           <button
             onClick={handleSave}
-            disabled={!isDirty}
+            disabled={!isDirty || isUpdating}
             className={`
                     px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg
                     ${
-                      isDirty
+                      isDirty && !isUpdating
                         ? "bg-primary text-white hover:bg-primary/90 shadow-primary/20"
                         : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
                     }
                 `}
           >
-            <IconCheck className="w-4 h-4" /> Lưu thay đổi
+            {isUpdating ? (
+              <Spinner size="sm" />
+            ) : (
+              <IconCheck className="w-4 h-4" />
+            )}
+            {isUpdating ? "Đang lưu..." : "Lưu thay đổi"}
           </button>
         </div>
       </div>
@@ -187,15 +323,17 @@ export default function EditPost() {
               />
             </div>
 
-            {/* Content */}
-            <div className="relative min-h-[400px]">
-              <textarea
-                rows="15"
-                className="w-full resize-none outline-none text-text-primary text-lg leading-relaxed placeholder:text-gray-300 bg-transparent"
-                placeholder="Nội dung bài viết..."
-                value={formData.content}
-                onChange={(e) => handleChange("content", e.target.value)}
-              ></textarea>
+            {/* Content - Rich Text Editor */}
+            <div className="min-h-[400px]">
+              <ReactQuill
+                theme="snow"
+                value={formData.content_html}
+                onChange={(value) => handleChange("content_html", value)}
+                modules={quillModules}
+                formats={quillFormats}
+                placeholder="Viết nội dung bài viết của bạn..."
+                className="quill-editor"
+              />
             </div>
           </div>
         </div>
@@ -218,11 +356,12 @@ export default function EditPost() {
                 onChange={(e) => handleChange("status", e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary outline-none text-sm cursor-pointer font-bold appearance-none"
               >
-                <option value="published">Công khai (Published)</option>
-                <option value="pending">Chờ duyệt (Pending)</option>
                 <option value="draft">Bản nháp (Draft)</option>
-                <option value="hidden">Đã ẩn (Hidden)</option>
+                <option value="pending">Gửi duyệt (Pending)</option>
               </select>
+              <p className="text-xs text-text-secondary">
+                Khi lưu, bài viết sẽ được gửi để admin duyệt lại.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -230,51 +369,42 @@ export default function EditPost() {
                 Danh mục
               </label>
               <select
-                value={formData.category}
-                onChange={(e) => handleChange("category", e.target.value)}
+                value={formData.categoryId}
+                onChange={(e) => handleChange("categoryId", e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary outline-none text-sm cursor-pointer appearance-none"
               >
-                <option>Kinh nghiệm du lịch</option>
-                <option>Ẩm thực</option>
-                <option>Văn hóa & Di sản</option>
-                <option>Câu chuyện HDV</option>
+                <option value="">-- Chọn danh mục --</option>
+                {categories.map((cat) => (
+                  <option key={cat._id} value={cat._id}>
+                    {cat.name}
+                  </option>
+                ))}
               </select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-text-secondary uppercase">
-                Tags
-              </label>
-              <input
-                type="text"
-                value={formData.tags}
-                onChange={(e) => handleChange("tags", e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary outline-none text-sm"
-              />
-            </div>
           </div>
 
-          {/* Related Tour */}
-          <div className="bg-secondary/5 p-6 rounded-3xl border border-secondary/20">
-            <h3 className="font-bold text-secondary-dark mb-2">
-              Gợi ý Tour liên quan
-            </h3>
-            <p className="text-xs text-text-secondary mb-4">
-              Hiển thị box đặt tour ở cuối bài viết này.
-            </p>
-
-            <select
-              value={formData.relatedTourId}
-              onChange={(e) => handleChange("relatedTourId", e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-secondary/30 bg-white focus:border-secondary outline-none text-sm cursor-pointer mb-2"
-            >
-              <option value="">-- Không chọn --</option>
-              <option value="1">Bí mật Hoàng cung Huế</option>
-              <option value="2">Food Tour đêm</option>
-            </select>
-          </div>
+          {/* Rejection Note */}
+          {article.approval?.status === "rejected" &&
+            article.approval?.notes && (
+              <div className="bg-red-50 p-6 rounded-3xl border border-red-200">
+                <h3 className="font-bold text-red-700 mb-2">Lý do từ chối</h3>
+                <p className="text-sm text-red-600">{article.approval.notes}</p>
+              </div>
+            )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Xác nhận xóa"
+        message={`Bạn có chắc muốn xóa bài viết "${article.title}"? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa"
+        cancelText="Hủy"
+        variant="danger"
+      />
     </div>
   );
 }

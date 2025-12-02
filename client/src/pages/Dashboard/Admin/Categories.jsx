@@ -1,4 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
+import { useToast } from "../../../components/Toast/useToast";
+import {
+  useCategories,
+  useCategoryActions,
+} from "../../../features/categories/hooks";
+import Spinner from "../../../components/Loaders/Spinner";
 import { IconCheck } from "../../../icons/IconBox";
 import { IconX } from "../../../icons/IconX";
 import { IconSearch } from "../../../icons/IconSearch";
@@ -10,15 +16,30 @@ import {
   IconFolder,
 } from "../../../icons/IconCommon";
 
-const initialCats = [
-  { id: 1, name: "Ẩm thực & Ăn uống", slug: "am-thuc", count: 12 },
-  { id: 2, name: "Lịch sử & Di sản", slug: "lich-su", count: 24 },
-  { id: 3, name: "Thiên nhiên", slug: "thien-nhien", count: 8 },
-  { id: 4, name: "Tâm linh", slug: "tam-linh", count: 5 },
-];
+// Helper: Generate Slug
+const createSlug = (text) =>
+  text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/ /g, "-")
+    .replace(/[^\w-]+/g, "");
 
 export default function AdminCategories() {
-  const [categories, setCategories] = useState(initialCats);
+  const toast = useToast();
+
+  // API hooks
+  const { categories, isLoading, error, refetch } = useCategories();
+  const {
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    isLoading: isActionLoading,
+  } = useCategoryActions();
+
+  // Local state
   const [newCat, setNewCat] = useState("");
   const [search, setSearch] = useState("");
 
@@ -26,50 +47,85 @@ export default function AdminCategories() {
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState("");
 
-  // Helper: Generate Slug
-  const createSlug = (text) =>
-    text
-      .toLowerCase()
-      .replace(/ /g, "-")
-      .replace(/[^\w-]+/g, "");
-
   // Logic: Add
-  const handleAdd = () => {
-    if (!newCat.trim()) return;
-    setCategories([
-      ...categories,
-      {
-        id: Date.now(),
-        name: newCat,
-        slug: createSlug(newCat),
-        count: 0,
-      },
-    ]);
-    setNewCat("");
+  const handleAdd = async () => {
+    if (!newCat.trim()) {
+      toast.warning("Thiếu thông tin", "Vui lòng nhập tên danh mục");
+      return;
+    }
+
+    const data = {
+      name: newCat.trim(),
+      slug: createSlug(newCat),
+    };
+
+    const result = await createCategory(data);
+    if (result.success) {
+      toast.success("Thành công!", "Đã thêm danh mục mới.");
+      setNewCat("");
+      refetch();
+    } else {
+      toast.error("Lỗi", result.error);
+    }
   };
 
   // Logic: Delete
-  const handleDelete = (id) => {
-    if (window.confirm("Bạn có chắc muốn xóa danh mục này?"))
-      setCategories(categories.filter((c) => c.id !== id));
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) return;
+
+    const result = await deleteCategory(id);
+    if (result.success) {
+      toast.success("Thành công!", "Đã xóa danh mục.");
+      refetch();
+    } else {
+      // If category is in use, ask to force delete
+      if (result.error?.includes("đang được dùng")) {
+        if (
+          window.confirm(
+            `${result.error}\n\nBạn có muốn gỡ liên kết và xóa không?`
+          )
+        ) {
+          const forceResult = await deleteCategory(id, true);
+          if (forceResult.success) {
+            toast.success("Thành công!", "Đã xóa danh mục và gỡ liên kết.");
+            refetch();
+          } else {
+            toast.error("Lỗi", forceResult.error);
+          }
+        }
+      } else {
+        toast.error("Lỗi", result.error);
+      }
+    }
   };
 
   // Logic: Start Edit
   const startEdit = (cat) => {
-    setEditingId(cat.id);
+    setEditingId(cat._id);
     setEditValue(cat.name);
   };
 
   // Logic: Save Edit
-  const saveEdit = (id) => {
-    if (!editValue.trim()) return;
-    setCategories(
-      categories.map((c) =>
-        c.id === id ? { ...c, name: editValue, slug: createSlug(editValue) } : c
-      )
-    );
-    setEditingId(null);
-    setEditValue("");
+  const saveEdit = async (id) => {
+    if (!editValue.trim()) {
+      toast.warning("Thiếu thông tin", "Tên danh mục không được để trống");
+      return;
+    }
+
+    const data = {
+      name: editValue.trim(),
+      slug: createSlug(editValue),
+    };
+
+    const result = await updateCategory(id, data);
+    if (result.success) {
+      toast.success("Thành công!", "Đã cập nhật danh mục.");
+      setEditingId(null);
+      setEditValue("");
+      refetch();
+    } else {
+      toast.error("Lỗi", result.error);
+    }
   };
 
   // Logic: Cancel Edit
@@ -78,17 +134,47 @@ export default function AdminCategories() {
     setEditValue("");
   };
 
-  // Filter
-  const filteredCats = categories.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.slug.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter categories based on search
+  const filteredCats = useMemo(() => {
+    if (!search.trim()) return categories;
+    const searchLower = search.toLowerCase();
+    return categories.filter(
+      (c) =>
+        c.name?.toLowerCase().includes(searchLower) ||
+        c.slug?.toLowerCase().includes(searchLower)
+    );
+  }, [categories, search]);
 
   // Handle Enter Key
   const handleKeyDown = (e, action) => {
     if (e.key === "Enter") action();
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+        <IconFolder className="w-16 h-16 text-red-300 mb-4" />
+        <p className="text-red-600 font-bold mb-2">Không thể tải danh mục</p>
+        <p className="text-text-secondary text-sm mb-4">{error}</p>
+        <button
+          onClick={refetch}
+          className="px-4 py-2 bg-primary text-white rounded-xl font-bold text-sm"
+        >
+          Thử lại
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl space-y-8 pb-20 mx-auto">
@@ -125,10 +211,11 @@ export default function AdminCategories() {
             value={newCat}
             onChange={(e) => setNewCat(e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, handleAdd)}
+            disabled={isActionLoading}
           />
           <button
             onClick={handleAdd}
-            disabled={!newCat.trim()}
+            disabled={!newCat.trim() || isActionLoading}
             className="px-6 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 shadow-lg shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
           >
             <IconPlus className="w-4 h-4" /> Thêm mới
@@ -140,18 +227,18 @@ export default function AdminCategories() {
           {filteredCats.length > 0 ? (
             filteredCats.map((cat) => (
               <div
-                key={cat.id}
+                key={cat._id}
                 className={`p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-colors ${
-                  editingId === cat.id ? "bg-blue-50/50" : "hover:bg-gray-50"
+                  editingId === cat._id ? "bg-blue-50/50" : "hover:bg-gray-50"
                 }`}
               >
                 {/* Left Side: Info or Edit Input */}
                 <div className="flex items-center gap-4 flex-1 w-full">
                   <div className="w-10 h-10 rounded-lg bg-primary/5 text-primary flex items-center justify-center font-bold text-sm shrink-0">
-                    {cat.name.charAt(0).toUpperCase()}
+                    {cat.name?.charAt(0).toUpperCase() || "?"}
                   </div>
 
-                  {editingId === cat.id ? (
+                  {editingId === cat._id ? (
                     // Edit mode
                     <div className="flex-1 flex gap-2">
                       <input
@@ -160,8 +247,9 @@ export default function AdminCategories() {
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         autoFocus
+                        disabled={isActionLoading}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") saveEdit(cat.id);
+                          if (e.key === "Enter") saveEdit(cat._id);
                           if (e.key === "Escape") cancelEdit();
                         }}
                       />
@@ -176,7 +264,17 @@ export default function AdminCategories() {
                         <span className="bg-gray-100 px-1.5 rounded text-[10px] font-mono">
                           /{cat.slug}
                         </span>
-                        <span>• {cat.count} mục</span>
+                        {cat.status && (
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              cat.status === "active"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {cat.status === "active" ? "Hoạt động" : "Ẩn"}
+                          </span>
+                        )}
                       </p>
                     </div>
                   )}
@@ -184,18 +282,20 @@ export default function AdminCategories() {
 
                 {/* Right Side: Actions */}
                 <div className="flex gap-2 self-end md:self-center">
-                  {editingId === cat.id ? (
+                  {editingId === cat._id ? (
                     <>
                       <button
-                        onClick={() => saveEdit(cat.id)}
-                        className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-all"
+                        onClick={() => saveEdit(cat._id)}
+                        disabled={isActionLoading}
+                        className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-all disabled:opacity-50"
                         title="Lưu"
                       >
                         <IconSave className="w-4 h-4" />
                       </button>
                       <button
                         onClick={cancelEdit}
-                        className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-all"
+                        disabled={isActionLoading}
+                        className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-all disabled:opacity-50"
                         title="Hủy"
                       >
                         <IconX className="w-4 h-4" />
@@ -205,14 +305,16 @@ export default function AdminCategories() {
                     <>
                       <button
                         onClick={() => startEdit(cat)}
-                        className="p-2 text-text-secondary hover:text-primary hover:bg-white rounded-lg border border-transparent hover:border-border-light transition-all"
+                        disabled={isActionLoading}
+                        className="p-2 text-text-secondary hover:text-primary hover:bg-white rounded-lg border border-transparent hover:border-border-light transition-all disabled:opacity-50"
                         title="Sửa"
                       >
                         <IconEdit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(cat.id)}
-                        className="p-2 text-text-secondary hover:text-red-600 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-100 transition-all"
+                        onClick={() => handleDelete(cat._id, cat.name)}
+                        disabled={isActionLoading}
+                        className="p-2 text-text-secondary hover:text-red-600 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-100 transition-all disabled:opacity-50"
                         title="Xóa"
                       >
                         <IconTrash className="w-4 h-4" />

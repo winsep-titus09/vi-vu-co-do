@@ -1,4 +1,4 @@
-import React from "react";
+import { useState, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -12,77 +12,141 @@ import {
 import { IconCheck, IconClock } from "../../../icons/IconBox";
 import {
   IconArrowUpRight,
-  IconBank,
+  IconArrowDownLeft,
   IconDownload,
-  IconFilter,
 } from "../../../icons/IconCommon";
-
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-const transactions = [
-  {
-    id: "TRX-001",
-    date: "20/05/2025",
-    tour: "Bí mật Hoàng cung Huế",
-    total: "1.800.000đ",
-    fee: "-180.000đ",
-    net: "+ 1.620.000đ",
-    status: "paid",
-  },
-  {
-    id: "TRX-002",
-    date: "18/05/2025",
-    tour: "Food Tour đêm",
-    total: "500.000đ",
-    fee: "-50.000đ",
-    net: "+ 450.000đ",
-    status: "paid",
-  },
-  {
-    id: "TRX-003",
-    date: "15/05/2025",
-    tour: "Rút tiền về VCB",
-    total: "-",
-    fee: "-",
-    net: "- 5.000.000đ",
-    status: "withdraw",
-  },
-  {
-    id: "TRX-004",
-    date: "12/05/2025",
-    tour: "Thiền trà Từ Hiếu",
-    total: "600.000đ",
-    fee: "-60.000đ",
-    net: "+ 540.000đ",
-    status: "pending",
-  },
-];
-
-// Mock data: Chart data for Recharts (unit: million VND)
-const chartData = [
-  { name: "Th12", value: 4.5 },
-  { name: "Th1", value: 6.0 },
-  { name: "Th2", value: 3.5 },
-  { name: "Th3", value: 8.0 },
-  { name: "Th4", value: 7.0 },
-  { name: "Th5", value: 8.5 }, // Tháng hiện tại
-];
+import {
+  useMonthlyEarnings,
+  useGuideDashboard,
+} from "../../../features/guides/hooks";
+import Spinner from "../../../components/Loaders/Spinner";
+import { formatCurrency } from "../../../lib/formatters";
 
 // Custom Tooltip cho biểu đồ
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white p-3 border border-border-light rounded-xl shadow-lg text-xs">
-        <p className="font-bold text-text-primary mb-1">{`Tháng ${label}`}</p>
-        <p className="text-primary font-medium">{`Thu nhập: ${payload[0].value}M`}</p>
+        <p className="font-bold text-text-primary mb-1">{label}</p>
+        <p className="text-primary font-medium">
+          {formatCurrency(payload[0].value)}
+        </p>
       </div>
     );
   }
   return null;
 };
 
+// Tên tháng tiếng Việt
+const MONTH_NAMES = [
+  "Th1",
+  "Th2",
+  "Th3",
+  "Th4",
+  "Th5",
+  "Th6",
+  "Th7",
+  "Th8",
+  "Th9",
+  "Th10",
+  "Th11",
+  "Th12",
+];
+
 export default function GuideEarnings() {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+
+  // Fetch data
+  const {
+    data: earningsData,
+    isLoading: earningsLoading,
+    error: earningsError,
+  } = useMonthlyEarnings(selectedYear);
+  const { data: dashboardData, isLoading: dashboardLoading } =
+    useGuideDashboard();
+
+  // Prepare chart data
+  const chartData = useMemo(() => {
+    if (!earningsData?.months) return [];
+
+    return earningsData.months.map((m, idx) => ({
+      name: MONTH_NAMES[idx],
+      value: m.total || 0,
+      month: m.month,
+      count: m.count || 0,
+    }));
+  }, [earningsData]);
+
+  // Get current month earnings
+  const currentMonthData = useMemo(() => {
+    if (!earningsData?.months) return { total: 0, count: 0 };
+    return (
+      earningsData.months.find((m) => m.month === currentMonth) || {
+        total: 0,
+        count: 0,
+      }
+    );
+  }, [earningsData, currentMonth]);
+
+  // Get previous month for comparison
+  const previousMonthData = useMemo(() => {
+    if (!earningsData?.months) return { total: 0, count: 0 };
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    return (
+      earningsData.months.find((m) => m.month === prevMonth) || {
+        total: 0,
+        count: 0,
+      }
+    );
+  }, [earningsData, currentMonth]);
+
+  // Calculate percentage change
+  const percentChange = useMemo(() => {
+    if (!previousMonthData.total || previousMonthData.total === 0) return 0;
+    return Math.round(
+      ((currentMonthData.total - previousMonthData.total) /
+        previousMonthData.total) *
+        100
+    );
+  }, [currentMonthData, previousMonthData]);
+
+  // Calculate average platform fee from tour data
+  // percentage = phí nền tảng (0.15 = 15%), HDV nhận (1 - percentage) = 85%
+  const averagePlatformFee = useMemo(() => {
+    if (!dashboardData?.items || dashboardData.items.length === 0) return 10; // default 10%
+    const validItems = dashboardData.items.filter(
+      (item) => typeof item.percentage === "number" && !isNaN(item.percentage)
+    );
+    if (validItems.length === 0) return 10;
+    const avgPercentage =
+      validItems.reduce((sum, item) => sum + item.percentage, 0) /
+      validItems.length;
+    return Math.round(avgPercentage * 100);
+  }, [dashboardData]);
+
+  // Total earnings from dashboard (guide share)
+  const totalGuideShare = dashboardData?.totalGuideShare || 0;
+
+  // Loading state
+  if (earningsLoading || dashboardLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (earningsError) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">
+        {earningsError}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-20">
       {/* HEADER */}
@@ -96,9 +160,17 @@ export default function GuideEarnings() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2.5 bg-white border border-border-light rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-bg-main transition-colors">
-            <IconFilter className="w-4 h-4" /> Lọc
-          </button>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="px-4 py-2.5 bg-white border border-border-light rounded-xl font-bold text-sm outline-none cursor-pointer"
+          >
+            {[currentYear, currentYear - 1, currentYear - 2].map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
           <button className="px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-primary/90 shadow-lg shadow-primary/20 transition-colors">
             <IconDownload className="w-4 h-4" /> Xuất báo cáo
           </button>
@@ -107,64 +179,85 @@ export default function GuideEarnings() {
 
       {/* 1. OVERVIEW CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Total Earnings */}
+        {/* Current Month Earnings */}
         <div className="bg-primary text-white p-6 rounded-3xl relative overflow-hidden shadow-lg shadow-primary/30 group">
           <div className="relative z-10">
             <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-1">
-              Tổng thu nhập (Tháng 5)
+              Thu nhập tháng {currentMonth}
             </p>
-            <h2 className="text-4xl font-heading font-bold">8.500.000đ</h2>
-            <div className="mt-4 flex items-center gap-2 text-xs bg-white/20 w-fit px-3 py-1.5 rounded-lg backdrop-blur-sm">
-              <IconArrowUpRight className="w-3 h-3" />
-              <span className="font-bold">+12%</span>
-              <span className="opacity-80">so với tháng trước</span>
-            </div>
+            <h2 className="text-3xl font-heading font-bold">
+              {formatCurrency(currentMonthData.total)}
+            </h2>
+            <p className="text-white/70 text-xs mt-1">
+              {currentMonthData.count} giao dịch
+            </p>
+            {percentChange !== 0 && (
+              <div
+                className={`mt-4 flex items-center gap-2 text-xs ${
+                  percentChange > 0 ? "bg-white/20" : "bg-red-500/30"
+                } w-fit px-3 py-1.5 rounded-lg backdrop-blur-sm`}
+              >
+                {percentChange > 0 ? (
+                  <IconArrowUpRight className="w-3 h-3" />
+                ) : (
+                  <IconArrowDownLeft className="w-3 h-3" />
+                )}
+                <span className="font-bold">
+                  {percentChange > 0 ? "+" : ""}
+                  {percentChange}%
+                </span>
+                <span className="opacity-80">so với tháng trước</span>
+              </div>
+            )}
           </div>
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform duration-700"></div>
         </div>
 
-        {/* Pending Balance */}
+        {/* Total Year Earnings */}
         <div className="bg-white p-6 rounded-3xl border border-border-light shadow-sm flex flex-col justify-between">
           <div>
             <p className="text-text-secondary text-xs font-bold uppercase tracking-wider mb-2">
-              Số dư khả dụng
+              Tổng thu nhập năm {selectedYear}
             </p>
             <div className="flex items-baseline gap-2">
               <h2 className="text-3xl font-bold text-text-primary">
-                3.500.000đ
+                {formatCurrency(earningsData?.totalYear || 0)}
               </h2>
-              <span className="text-xs text-text-secondary">VNĐ</span>
             </div>
-            <p className="text-xs text-orange-500 mt-2 flex items-center gap-1 font-medium">
-              <IconClock className="w-3 h-3" /> 1.250.000đ đang chờ duyệt
+            <p className="text-xs text-text-secondary mt-2">
+              Từ{" "}
+              {earningsData?.months?.reduce(
+                (sum, m) => sum + (m.count || 0),
+                0
+              ) || 0}{" "}
+              giao dịch
             </p>
           </div>
-          <button className="w-full mt-4 py-2 rounded-lg bg-bg-main text-primary font-bold text-xs hover:bg-primary hover:text-white transition-colors">
-            Yêu cầu rút tiền
-          </button>
         </div>
 
-        {/* Bank Account */}
+        {/* Dashboard Stats */}
         <div className="bg-white p-6 rounded-3xl border border-border-light shadow-sm flex flex-col justify-between">
           <div>
             <p className="text-text-secondary text-xs font-bold uppercase tracking-wider mb-2">
-              Tài khoản nhận tiền
+              Tổng thu nhập từ tour
             </p>
-            <div className="flex items-center gap-3 p-3 bg-bg-main/50 rounded-xl border border-border-light">
-              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm border border-border-light text-green-600">
-                <IconBank className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-text-primary">
-                  Vietcombank
-                </p>
-                <p className="text-xs text-text-secondary">**** 8899</p>
-              </div>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-3xl font-bold text-green-600">
+                {formatCurrency(totalGuideShare)}
+              </h2>
             </div>
+            <p className="text-xs text-text-secondary mt-2">
+              Doanh thu: {formatCurrency(dashboardData?.totalGross || 0)}
+            </p>
           </div>
-          <button className="text-xs font-bold text-primary hover:underline self-end mt-2 underline">
-            Quản lý tài khoản
-          </button>
+          <div className="mt-4 p-3 bg-bg-main/50 rounded-xl border border-border-light">
+            <p className="text-xs text-text-secondary">
+              <span className="font-bold text-text-primary">
+                {dashboardData?.items?.length || 0}
+              </span>{" "}
+              tour đang hoạt động
+            </p>
+          </div>
         </div>
       </div>
 
@@ -173,54 +266,62 @@ export default function GuideEarnings() {
         <div className="lg:col-span-2 bg-white p-6 md:p-8 rounded-3xl border border-border-light shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-bold text-text-primary">
-              Biểu đồ tăng trưởng
+              Biểu đồ thu nhập năm {selectedYear}
             </h3>
-            <select className="bg-bg-main px-3 py-1.5 rounded-lg text-xs font-bold border border-border-light outline-none cursor-pointer">
-              <option>6 tháng qua</option>
-              <option>Năm nay</option>
-            </select>
           </div>
 
           {/* Chart Container */}
           <div className="w-full h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 10, right: 0, left: -20, bottom: 0 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#f0f0f0"
-                />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#9ca3af", fontSize: 12 }}
-                  dy={10}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#9ca3af", fontSize: 12 }}
-                />
-                <Tooltip
-                  content={<CustomTooltip />}
-                  cursor={{ fill: "transparent" }}
-                />
-                <Bar dataKey="value" radius={[6, 6, 6, 6]} barSize={40}>
-                  {chartData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        index === chartData.length - 1 ? "#5b3d7c" : "#ede9f2"
-                      }
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 10, right: 0, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#f0f0f0"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#9ca3af", fontSize: 12 }}
+                    dy={10}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#9ca3af", fontSize: 12 }}
+                    tickFormatter={(value) =>
+                      `${(value / 1000000).toFixed(1)}M`
+                    }
+                  />
+                  <Tooltip
+                    content={<CustomTooltip />}
+                    cursor={{ fill: "transparent" }}
+                  />
+                  <Bar dataKey="value" radius={[6, 6, 6, 6]} barSize={40}>
+                    {chartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={
+                          entry.month === currentMonth &&
+                          selectedYear === currentYear
+                            ? "#5b3d7c"
+                            : "#ede9f2"
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-text-secondary">
+                Chưa có dữ liệu thu nhập
+              </div>
+            )}
           </div>
         </div>
 
@@ -232,7 +333,9 @@ export default function GuideEarnings() {
           <ul className="space-y-4 text-sm text-text-secondary">
             <li className="flex justify-between border-b border-secondary/10 pb-2">
               <span>Phí dịch vụ nền tảng</span>
-              <span className="font-bold text-text-primary">10%</span>
+              <span className="font-bold text-text-primary">
+                {averagePlatformFee}%
+              </span>
             </li>
             <li className="flex justify-between border-b border-secondary/10 pb-2">
               <span>Thuế thu nhập</span>
@@ -251,11 +354,11 @@ export default function GuideEarnings() {
         </div>
       </div>
 
-      {/* 4. TRANSACTION HISTORY */}
+      {/* 4. MONTHLY BREAKDOWN TABLE */}
       <div className="bg-white rounded-3xl border border-border-light overflow-hidden shadow-sm">
         <div className="p-6 border-b border-border-light">
           <h3 className="font-bold text-lg text-text-primary">
-            Lịch sử giao dịch
+            Chi tiết theo tháng - Năm {selectedYear}
           </h3>
         </div>
 
@@ -263,56 +366,59 @@ export default function GuideEarnings() {
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-bg-main/50 text-text-secondary font-bold text-xs uppercase">
               <tr>
-                <th className="p-4 pl-6">Mã GD</th>
-                <th className="p-4">Nội dung</th>
-                <th className="p-4">Ngày</th>
-                <th className="p-4 text-right">Tổng thu</th>
-                <th className="p-4 text-right text-red-500">Phí sàn</th>
-                <th className="p-4 text-right text-green-600">Thực nhận</th>
+                <th className="p-4 pl-6">Tháng</th>
+                <th className="p-4 text-right">Số giao dịch</th>
+                <th className="p-4 text-right">Thu nhập</th>
                 <th className="p-4 pr-6 text-center">Trạng thái</th>
               </tr>
             </thead>
             <tbody>
-              {transactions.map((tx) => (
+              {earningsData?.months?.map((monthData) => (
                 <tr
-                  key={tx.id}
-                  className="border-b border-border-light last:border-0 hover:bg-bg-main/20 transition-colors"
+                  key={monthData.month}
+                  className={`border-b border-border-light last:border-0 hover:bg-bg-main/20 transition-colors ${
+                    monthData.month === currentMonth &&
+                    selectedYear === currentYear
+                      ? "bg-primary/5"
+                      : ""
+                  }`}
                 >
-                  <td className="p-4 pl-6 font-bold text-text-secondary">
-                    {tx.id}
+                  <td className="p-4 pl-6 font-bold text-text-primary">
+                    Tháng {monthData.month}
+                    {monthData.month === currentMonth &&
+                      selectedYear === currentYear && (
+                        <span className="ml-2 text-xs text-primary">
+                          (Hiện tại)
+                        </span>
+                      )}
                   </td>
-                  <td className="p-4 font-bold text-text-primary">{tx.tour}</td>
-                  <td className="p-4 text-text-secondary">{tx.date}</td>
-
-                  {/* Cột tiền */}
-                  <td className="p-4 text-right font-medium">{tx.total}</td>
-                  <td className="p-4 text-right text-red-500 text-xs">
-                    {tx.fee}
+                  <td className="p-4 text-right text-text-secondary">
+                    {monthData.count || 0}
                   </td>
                   <td
-                    className={`p-4 text-right font-bold text-base ${
-                      tx.status === "withdraw"
-                        ? "text-text-primary"
-                        : "text-green-600"
+                    className={`p-4 text-right font-bold ${
+                      monthData.total > 0
+                        ? "text-green-600"
+                        : "text-text-secondary"
                     }`}
                   >
-                    {tx.net}
+                    {monthData.total > 0
+                      ? `+${formatCurrency(monthData.total)}`
+                      : formatCurrency(0)}
                   </td>
-
                   <td className="p-4 pr-6 text-center">
-                    {tx.status === "paid" && (
+                    {monthData.total > 0 ? (
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold gap-1">
-                        <IconCheck className="w-3 h-3" /> Thành công
+                        <IconCheck className="w-3 h-3" /> Đã thanh toán
                       </span>
-                    )}
-                    {tx.status === "pending" && (
+                    ) : monthData.month <= currentMonth ||
+                      selectedYear < currentYear ? (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold">
+                        Không có giao dịch
+                      </span>
+                    ) : (
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold gap-1">
-                        <IconClock className="w-3 h-3" /> Đang xử lý
-                      </span>
-                    )}
-                    {tx.status === "withdraw" && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold gap-1">
-                        Rút tiền
+                        <IconClock className="w-3 h-3" /> Chưa đến
                       </span>
                     )}
                   </td>
@@ -322,6 +428,75 @@ export default function GuideEarnings() {
           </table>
         </div>
       </div>
+
+      {/* 5. TOUR BREAKDOWN */}
+      {dashboardData?.items && dashboardData.items.length > 0 && (
+        <div className="bg-white rounded-3xl border border-border-light overflow-hidden shadow-sm">
+          <div className="p-6 border-b border-border-light">
+            <h3 className="font-bold text-lg text-text-primary">
+              Thu nhập theo tour
+            </h3>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-bg-main/50 text-text-secondary font-bold text-xs uppercase">
+                <tr>
+                  <th className="p-4 pl-6">Tour</th>
+                  <th className="p-4 text-right">Số booking</th>
+                  <th className="p-4 text-right">Doanh thu</th>
+                  <th className="p-4 text-right">Tỷ lệ</th>
+                  <th className="p-4 pr-6 text-right">Thực nhận</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboardData.items.map((tour) => (
+                  <tr
+                    key={tour.tourId}
+                    className="border-b border-border-light last:border-0 hover:bg-bg-main/20 transition-colors"
+                  >
+                    <td className="p-4 pl-6 font-bold text-text-primary max-w-[200px] truncate">
+                      {tour.name}
+                    </td>
+                    <td className="p-4 text-right text-text-secondary">
+                      {tour.bookingsCount}
+                    </td>
+                    <td className="p-4 text-right font-medium">
+                      {formatCurrency(tour.gross)}
+                    </td>
+                    <td className="p-4 text-right text-text-secondary">
+                      {Math.round(tour.percentage * 100)}%
+                    </td>
+                    <td className="p-4 pr-6 text-right font-bold text-green-600">
+                      +{formatCurrency(tour.guideShare)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-bg-main/30">
+                <tr>
+                  <td className="p-4 pl-6 font-bold text-text-primary">
+                    Tổng cộng
+                  </td>
+                  <td className="p-4 text-right font-bold">
+                    {dashboardData.items.reduce(
+                      (sum, t) => sum + t.bookingsCount,
+                      0
+                    )}
+                  </td>
+                  <td className="p-4 text-right font-bold">
+                    {formatCurrency(dashboardData.totalGross)}
+                  </td>
+                  <td className="p-4 text-right">-</td>
+                  <td className="p-4 pr-6 text-right font-bold text-green-600">
+                    +{formatCurrency(dashboardData.totalGuideShare)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

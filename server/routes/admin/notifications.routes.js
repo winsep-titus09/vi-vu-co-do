@@ -1,27 +1,49 @@
+/**
+ * server/routes/admin/notifications.routes.js
+ *
+ * Admin notifications routes: broadcast, history, stats, CRUD
+ */
 import express from "express";
-import { auth } from "../../middleware/auth.js";
-import { authorize } from "../../middleware/auth.js";
-import Notification from "../../models/Notification.js";
+import { auth, authorize } from "../../middleware/auth.js";
+import {
+  broadcastNotification,
+  getNotificationHistory,
+  getNotificationStats,
+  getAdminNotifications,
+  markNotificationAsRead,
+  markAllAsRead,
+} from "../../controllers/admin/notifications.controller.js";
 
 const router = express.Router();
 
-router.get("/", auth, authorize("admin"), async (req, res) => {
-    const { is_read } = req.query;
-    const filter = { audience: "admin" };
-    if (is_read === "true") filter.is_read = true;
-    if (is_read === "false") filter.is_read = false;
-    const docs = await Notification.find(filter).sort({ createdAt: -1 }).limit(200);
-    res.json(docs);
-});
+// All routes require admin auth
+router.use(auth, authorize("admin"));
 
-router.patch("/:id/read", auth, authorize("admin"), async (req, res) => {
-    const doc = await Notification.findOneAndUpdate(
-        { _id: req.params.id, audience: "admin" },
-        { $set: { is_read: true } },
-        { new: true }
-    );
-    if (!doc) return res.status(404).json({ message: "Không tìm thấy thông báo." });
-    res.json({ message: "Đã đánh dấu đã đọc.", notification: doc });
-});
+// ============================================================================
+// BROADCAST
+// ============================================================================
+// POST /api/admin/notifications/broadcast - Send broadcast to users
+router.post("/broadcast", broadcastNotification);
+
+// ============================================================================
+// HISTORY & STATS
+// ============================================================================
+// GET /api/admin/notifications/history - Get broadcast history
+router.get("/history", getNotificationHistory);
+
+// GET /api/admin/notifications/stats - Get notification statistics
+router.get("/stats", getNotificationStats);
+
+// ============================================================================
+// ADMIN NOTIFICATIONS
+// ============================================================================
+// GET /api/admin/notifications - Get admin notifications
+router.get("/", getAdminNotifications);
+
+// PATCH /api/admin/notifications/read-all - Mark all as read
+router.patch("/read-all", markAllAsRead);
+
+// PATCH /api/admin/notifications/:id/read - Mark single notification as read
+router.patch("/:id/read", markNotificationAsRead);
 
 export default router;

@@ -1,10 +1,20 @@
 import express from "express";
 import { auth, authorize } from "../../middleware/auth.js";
-import { listPendingTours, approveTour, rejectTour } from "../../controllers/admin/tours.controller.js";
-import { listToursRevenue, getTourRevenue } from "../../controllers/admin/revenue.controller.js"; // <-- thêm import
+import {
+  listAdminTours,
+  listPendingTours,
+  approveTour,
+  rejectTour,
+} from "../../controllers/admin/tours.controller.js";
+import {
+  listToursRevenue,
+  getTourRevenue,
+} from "../../controllers/admin/revenue.controller.js"; // <-- thêm import
 
 const router = express.Router();
 
+// List all tours with filters
+router.get("/", auth, authorize("admin"), listAdminTours);
 router.get("/pending", auth, authorize("admin"), listPendingTours);
 router.patch("/:id/approve", auth, authorize("admin"), approveTour);
 router.patch("/:id/reject", auth, authorize("admin"), rejectTour);

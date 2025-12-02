@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useToast } from "../../../components/Toast/useToast";
 import { IconCheck, IconClock } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconX } from "../../../icons/IconX";
@@ -157,9 +158,11 @@ export default function AdminFinance() {
     }
   };
 
+  const toast = useToast();
+
   const handlePayout = (id) => {
     if (window.confirm(`Xác nhận đã chuyển khoản cho yêu cầu #${id}?`)) {
-      alert("Đã cập nhật trạng thái thành công!");
+      toast.success("Thành công!", "Đã cập nhật trạng thái chuyển khoản.");
     }
   };
 

@@ -7,6 +7,7 @@ import {
   extractImageUrls,
 } from "../utils/html.js";
 import { notifyUser, notifyAdmins } from "../services/notify.js";
+import { toSlug } from "../utils/slug.js";
 
 /* Allowed tags/attrs for sanitizer */
 const DEFAULT_ALLOWED_TAGS = sanitizeHtml.defaults.allowedTags.concat([
@@ -203,6 +204,7 @@ export const listMyArticles = async (req, res) => {
 
     const [items, total] = await Promise.all([
       Article.find(filter)
+        .populate("categoryId", "name slug")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -213,6 +215,30 @@ export const listMyArticles = async (req, res) => {
     return res.json({ items, page, limit, total });
   } catch (err) {
     console.error("listMyArticles error:", err);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: err.message });
+  }
+};
+
+/** Guide: get single own article (any status) */
+export const getMyArticle = async (req, res) => {
+  try {
+    const user = req.user;
+    const { id } = req.params;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ message: "Invalid id" });
+
+    const doc = await Article.findOne({ _id: id, authorId: user._id })
+      .populate("categoryId", "name slug")
+      .lean();
+
+    if (!doc) return res.status(404).json({ message: "Article not found" });
+
+    return res.json(doc);
+  } catch (err) {
+    console.error("getMyArticle error:", err);
     return res
       .status(500)
       .json({ message: "Server error", error: err.message });
@@ -304,7 +330,8 @@ export const deleteArticle = async (req, res) => {
     if (!isAuthor && !isAdmin)
       return res.status(403).json({ message: "Không có quyền xóa bài" });
 
-    await doc.remove();
+    // Delete the article
+    await Article.findByIdAndDelete(id);
 
     // optional: notify author/admin (if deleted by admin)
     try {
@@ -431,10 +458,29 @@ export const adminListArticles = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip((pg - 1) * limit)
       .limit(Number(limit))
-      .populate("authorId", "name email")
+      .populate({
+        path: "authorId",
+        select: "name email role_id",
+        populate: { path: "role_id", select: "name" },
+      })
+      .populate("categoryId", "name slug")
       .lean();
 
-    return res.json({ items: docs, page: pg });
+    // Transform authorId to author for frontend compatibility
+    const items = docs.map((doc) => ({
+      ...doc,
+      author: doc.authorId
+        ? {
+            _id: doc.authorId._id,
+            name: doc.authorId.name,
+            email: doc.authorId.email,
+            role: doc.authorId.role_id?.name || null,
+          }
+        : null,
+      category: doc.categoryId || null,
+    }));
+
+    return res.json({ items, page: pg });
   } catch (err) {
     console.error("adminListArticles error:", err);
     return res
@@ -538,15 +584,120 @@ export const adminRejectArticle = async (req, res) => {
   }
 };
 
+/** Admin: create article/notification (auto-approved) */
+export const adminCreateArticle = async (req, res) => {
+  try {
+    const admin = req.user;
+    if (!admin) return res.status(401).json({ message: "Unauthorized" });
+
+    const body = req.body || {};
+    const rawHtml = String(body.content_html || "");
+    const content = sanitizeContent(rawHtml);
+    const excerptRaw = stripImageTags(content);
+    const excerpt = excerptText(excerptRaw, 300);
+    const images = extractImageUrls(content);
+
+    // Generate unique slug from title
+    const title = String(body.title || "").trim();
+    const baseSlug = body.slug ? String(body.slug).trim() : toSlug(title);
+    const uniqueSlug = baseSlug
+      ? `${baseSlug}-${Date.now()}`
+      : `article-${Date.now()}`;
+
+    const doc = await Article.create({
+      title,
+      slug: uniqueSlug,
+      summary: body.summary ? String(body.summary).trim() : undefined,
+      content_html: content,
+      excerpt,
+      cover_image: body.cover_image || images[0] || null,
+      images,
+      categoryId: body.categoryId || null,
+      authorId: admin._id,
+      createdBy: admin._id,
+      // Admin posts: set type, audience, and auto-approve
+      type: body.type || "system",
+      audience: body.audience || "all",
+      status: "active",
+      approval: {
+        status: "approved",
+        reviewed_by: admin._id,
+        reviewed_at: new Date(),
+        notes: "Auto-approved (admin)",
+      },
+      publishedAt: new Date(),
+    });
+
+    return res
+      .status(201)
+      .json({ message: "Đã đăng thông báo thành công", data: doc });
+  } catch (err) {
+    console.error("adminCreateArticle error:", err);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: err.message });
+  }
+};
+
+/** Admin: update any article */
+export const adminUpdateArticle = async (req, res) => {
+  try {
+    const admin = req.user;
+    const { id } = req.params;
+    if (!admin) return res.status(401).json({ message: "Unauthorized" });
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ message: "Invalid id" });
+
+    const doc = await Article.findById(id);
+    if (!doc) return res.status(404).json({ message: "Article not found" });
+
+    const body = req.body || {};
+    const rawHtml = String(body.content_html || doc.content_html || "");
+    const content = sanitizeContent(rawHtml);
+    const excerpt = excerptText(stripImageTags(content), 300);
+    const images = extractImageUrls(content);
+
+    // update fields
+    doc.title = body.title ? String(body.title).trim() : doc.title;
+    doc.slug = body.slug ? String(body.slug).trim() : doc.slug;
+    doc.summary = body.summary ? String(body.summary).trim() : doc.summary;
+    doc.content_html = content;
+    doc.excerpt = excerpt;
+    doc.cover_image =
+      body.cover_image !== undefined ? body.cover_image : doc.cover_image;
+    doc.images = images.length ? images : doc.images;
+
+    // Update optional fields for admin posts
+    if (body.type !== undefined) doc.type = body.type;
+    if (body.audience !== undefined) doc.audience = body.audience;
+    if (body.categoryId !== undefined) doc.categoryId = body.categoryId || null;
+
+    await doc.save();
+
+    return res.json({
+      message: "Cập nhật thành công",
+      data: doc,
+    });
+  } catch (err) {
+    console.error("adminUpdateArticle error:", err);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: err.message });
+  }
+};
+
 export default {
   listArticlesPublic,
   getArticlePublic,
   createArticle,
   listMyArticles,
+  getMyArticle,
   updateMyArticle,
   deleteArticle,
   deleteFeatureImage,
   adminListArticles,
   adminApproveArticle,
   adminRejectArticle,
+  adminCreateArticle,
+  adminUpdateArticle,
 };

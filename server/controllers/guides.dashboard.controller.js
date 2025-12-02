@@ -51,9 +51,10 @@ export async function guideDashboard(req, res) {
       const guideEntry =
         (t.guides || []).find((g) => String(g.guideId) === String(guideId)) ||
         {};
+      // percentage = phí nền tảng (0.15 = 15%), HDV nhận (1 - percentage) = 85%
       const percentage =
-        typeof guideEntry.percentage === "number" ? guideEntry.percentage : 0;
-      const guideShare = Math.round((entry.gross || 0) * percentage);
+        typeof guideEntry.percentage === "number" ? guideEntry.percentage : 0.1;
+      const guideShare = Math.round((entry.gross || 0) * (1 - percentage));
       return {
         tourId: t._id,
         name: t.name,
@@ -356,6 +357,87 @@ export async function deleteGuideTour(req, res) {
     return res.json({ message: "Đã xóa tour thành công" });
   } catch (err) {
     console.error("deleteGuideTour error:", err);
+    return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+  }
+}
+
+/**
+ * GET /api/guides/me/weekly-stats
+ * Tính hiệu quả tuần này của HDV
+ * - Tỷ lệ phản hồi: (approved + rejected) / total requests trong tuần
+ * - Tỷ lệ hoàn thành: completed tours / total confirmed tours trong tuần
+ */
+export async function getGuideWeeklyStats(req, res) {
+  try {
+    const guideId = req.user._id;
+
+    // Tính ngày đầu tuần (Thứ 2) và cuối tuần (Chủ nhật)
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = CN, 1 = T2, ...
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() + diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+    // 1. Tính tỷ lệ phản hồi
+    // Tổng yêu cầu nhận được trong tuần
+    const totalRequests = await Booking.countDocuments({
+      intended_guide_id: guideId,
+      createdAt: { $gte: startOfWeek, $lt: endOfWeek },
+    });
+
+    // Yêu cầu đã xử lý (confirmed, rejected, completed, paid)
+    const processedRequests = await Booking.countDocuments({
+      intended_guide_id: guideId,
+      createdAt: { $gte: startOfWeek, $lt: endOfWeek },
+      status: { $in: ["confirmed", "rejected", "completed", "paid"] },
+    });
+
+    const responseRate =
+      totalRequests > 0
+        ? Math.round((processedRequests / totalRequests) * 100)
+        : 100;
+
+    // 2. Tính tỷ lệ hoàn thành
+    // Tours đã confirmed trong tuần (sẽ diễn ra)
+    const confirmedTours = await Booking.countDocuments({
+      intended_guide_id: guideId,
+      status: { $in: ["confirmed", "completed", "paid"] },
+      start_date: { $gte: startOfWeek, $lt: endOfWeek },
+    });
+
+    // Tours đã hoàn thành trong tuần
+    const completedTours = await Booking.countDocuments({
+      intended_guide_id: guideId,
+      status: { $in: ["completed", "paid"] },
+      start_date: { $gte: startOfWeek, $lt: endOfWeek },
+    });
+
+    const completionRate =
+      confirmedTours > 0
+        ? Math.round((completedTours / confirmedTours) * 100)
+        : 100;
+
+    return res.json({
+      weekStart: startOfWeek.toISOString(),
+      weekEnd: endOfWeek.toISOString(),
+      response: {
+        processed: processedRequests,
+        total: totalRequests,
+        rate: responseRate,
+      },
+      completion: {
+        completed: completedTours,
+        total: confirmedTours,
+        rate: completionRate,
+      },
+    });
+  } catch (err) {
+    console.error("getGuideWeeklyStats error:", err);
     return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
   }
 }

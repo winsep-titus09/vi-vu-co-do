@@ -21,7 +21,12 @@ import {
   getGuideMonthlyEarnings,
   getGuideTours,
   deleteGuideTour,
+  getGuideWeeklyStats,
 } from "../controllers/guides.dashboard.controller.js";
+import {
+  getMyGuideReviews,
+  replyToReview,
+} from "../controllers/reviews.controller.js";
 import {
   getMyBusyDates,
   addBusyDates,
@@ -53,6 +58,8 @@ router.get("/bookings", auth, authorize("guide"), getGuideBookings);
 router.get("/busy-dates", auth, authorize("guide"), getMyBusyDates);
 router.post("/busy-dates", auth, authorize("guide"), addBusyDates);
 router.delete("/busy-dates", auth, authorize("guide"), removeBusyDates);
+// Fallback POST route for removing busy dates (some proxies don't support DELETE with body)
+router.post("/busy-dates/remove", auth, authorize("guide"), removeBusyDates);
 
 // Lấy calendar của HDV
 router.get("/calendar", auth, authorize("guide"), getGuideCalendar);
@@ -76,7 +83,17 @@ router.get(
   authorize("guide"),
   getGuideMonthlyEarnings
 );
+router.get("/me/weekly-stats", auth, authorize("guide"), getGuideWeeklyStats);
 router.get("/me/tours", auth, authorize("guide"), getGuideTours);
 router.delete("/me/tours/:id", auth, authorize("guide"), deleteGuideTour);
+
+// Guide reviews management
+router.get("/me/reviews", auth, authorize("guide"), getMyGuideReviews);
+router.post(
+  "/me/reviews/:reviewId/reply",
+  auth,
+  authorize("guide"),
+  replyToReview
+);
 
 export default router;

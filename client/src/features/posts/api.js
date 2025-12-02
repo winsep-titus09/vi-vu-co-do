@@ -12,12 +12,22 @@ export const listArticles = async (params = {}) => {
 };
 
 /**
- * Fetch single article by ID (public)
+ * Fetch single article by ID (public - only approved articles)
  * @param {string} id - Article ID
  * @returns {Promise<Object>} Article with populated author
  */
 export const getArticle = async (id) => {
   const data = await apiClient.get(`/articles/${id}`);
+  return data;
+};
+
+/**
+ * Fetch single article by ID for guide (own article, any status)
+ * @param {string} id - Article ID
+ * @returns {Promise<Object>} Article with populated category
+ */
+export const getMyArticle = async (id) => {
+  const data = await apiClient.get(`/articles/mine/${id}`);
   return data;
 };
 
@@ -40,11 +50,129 @@ export const getArticleCategoryBySlug = async (slug) => {
   return data;
 };
 
+/**
+ * Fetch guide's own articles
+ * @param {Object} params - { page, limit, status }
+ * @returns {Promise<{ items: Array, page: number, limit: number, total: number }>}
+ */
+export const getMyArticles = async (params = {}) => {
+  const data = await apiClient.get("/articles/mine", { params });
+  return data;
+};
+
+/**
+ * Delete an article
+ * @param {string} id - Article ID
+ */
+export const deleteArticle = async (id) => {
+  const data = await apiClient.delete(`/articles/${id}`);
+  return data;
+};
+
+/**
+ * Update an article
+ * @param {string} id - Article ID
+ * @param {Object} data - Article data to update
+ */
+export const updateArticle = async (id, articleData) => {
+  const data = await apiClient.put(`/articles/${id}`, articleData);
+  return data;
+};
+
+/**
+ * Create a new article
+ * @param {Object} articleData - { title, content_html, cover_image, categoryId, status }
+ * @returns {Promise<Object>} Created article
+ */
+export const createArticle = async (articleData) => {
+  const data = await apiClient.post("/articles", articleData);
+  return data;
+};
+
+// ============================================================================
+// ADMIN ARTICLE API
+// ============================================================================
+
+/**
+ * Admin: Fetch all articles with filter
+ * @param {Object} params - { page, limit, status (pending/approved/rejected), q }
+ * @returns {Promise<{ items: Array, total: number, page: number, limit: number }>}
+ */
+export const adminListArticles = async (params = {}) => {
+  const data = await apiClient.get("/articles/admin", { params });
+  return data;
+};
+
+/**
+ * Admin: Approve an article
+ * @param {string} id - Article ID
+ * @returns {Promise<Object>} Updated article
+ */
+export const adminApproveArticle = async (id) => {
+  const data = await apiClient.patch(`/articles/admin/${id}/approve`);
+  return data;
+};
+
+/**
+ * Admin: Reject an article
+ * @param {string} id - Article ID
+ * @param {string} reason - Rejection reason
+ * @returns {Promise<Object>} Updated article
+ */
+export const adminRejectArticle = async (id, reason = "") => {
+  const data = await apiClient.patch(`/articles/admin/${id}/reject`, {
+    reason,
+  });
+  return data;
+};
+
+/**
+ * Admin: Delete an article
+ * @param {string} id - Article ID
+ */
+export const adminDeleteArticle = async (id) => {
+  const data = await apiClient.delete(`/articles/${id}`);
+  return data;
+};
+
+/**
+ * Admin: Create a new article/notification (auto-approved)
+ * @param {Object} articleData - { title, content_html, type, audience }
+ * @returns {Promise<Object>} Created article
+ */
+export const adminCreateArticle = async (articleData) => {
+  const data = await apiClient.post("/articles/admin", articleData);
+  return data;
+};
+
+/**
+ * Admin: Update any article
+ * @param {string} id - Article ID
+ * @param {Object} articleData - Article data to update
+ * @returns {Promise<Object>} Updated article
+ */
+export const adminUpdateArticle = async (id, articleData) => {
+  const data = await apiClient.put(`/articles/admin/${id}`, articleData);
+  return data;
+};
+
 const postsApi = {
   listArticles,
   getArticle,
+  getMyArticle,
   listArticleCategories,
   getArticleCategoryBySlug,
+  getMyArticles,
+  deleteArticle,
+  updateArticle,
+  createArticle,
+  // Admin
+  adminListArticles,
+  adminApproveArticle,
+  adminRejectArticle,
+  adminDeleteArticle,
+  adminCreateArticle,
+  adminUpdateArticle,
 };
 
 export default postsApi;
