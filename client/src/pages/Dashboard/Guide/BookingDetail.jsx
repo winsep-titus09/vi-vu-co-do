@@ -171,17 +171,23 @@ export default function GuideBookingDetail() {
     status:
       bookingData.status === "waiting_guide"
         ? "pending"
-        : bookingData.status === "accepted" || bookingData.status === "paid"
+        : bookingData.status === "awaiting_payment" ||
+          bookingData.status === "paid" ||
+          bookingData.guide_decision?.status === "accepted"
         ? "confirmed"
         : bookingData.status === "completed"
         ? "completed"
-        : "cancelled",
+        : bookingData.status === "rejected" ||
+          bookingData.status === "canceled" ||
+          bookingData.guide_decision?.status === "rejected"
+        ? "cancelled"
+        : "pending",
     tour: {
       id: bookingData.tour_id?._id,
       name: bookingData.tour_id?.name || "Tour",
       image:
         bookingData.tour_id?.images?.[0] ||
-        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
+        "/images/placeholders/tour-placeholder.jpg",
       duration: bookingData.tour_id?.duration || "4 giờ",
       location: bookingData.tour_id?.location?.name || "Huế",
     },
@@ -197,14 +203,18 @@ export default function GuideBookingDetail() {
     },
     schedule: {
       date: startDate ? startDate.toLocaleDateString("vi-VN") : "Đang cập nhật",
-      time: startDate
-        ? startDate.toLocaleTimeString("vi-VN", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : bookingData.tour_id?.fixed_departure_time || "--:--",
+      time:
+        bookingData.start_time ||
+        bookingData.tour_id?.fixed_departure_time ||
+        "08:00",
       guests:
-        countedParticipants.length || bookingData.contact?.guest_count || 0,
+        bookingData.num_guests ||
+        countedParticipants.reduce(
+          (sum, p) => sum + (p.count_slot || p.quantity || 1),
+          0
+        ) ||
+        bookingData.contact?.guest_count ||
+        0,
       adults,
       children,
     },

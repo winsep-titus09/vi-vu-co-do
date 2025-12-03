@@ -29,8 +29,7 @@ const initialData = {
   email: "hoangnam@gmail.com",
   phone: "0905 123 456",
   address: "12 Lê Lợi, TP. Huế",
-  avatar:
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg",
+  avatar: "/images/placeholders/avatar-placeholder.jpg",
   stats: { toursCompleted: 5, reviewsWritten: 3 },
   // Wallet data
   wallet: {

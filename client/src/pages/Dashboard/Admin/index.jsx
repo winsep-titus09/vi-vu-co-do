@@ -1069,7 +1069,7 @@ export default function AdminDashboard() {
 
           <div className="mt-6 pt-4 border-t border-border-light grid grid-cols-2 gap-3">
             <Link
-              to="/dashboard/admin/tour-requests"
+              to="/dashboard/admin/tours"
               className="py-2.5 rounded-xl bg-primary/5 text-primary font-bold text-xs hover:bg-primary hover:text-white transition-colors flex items-center justify-center gap-2"
             >
               <IconFlag className="w-4 h-4" /> Duyệt tour

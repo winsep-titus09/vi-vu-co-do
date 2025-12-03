@@ -5,7 +5,14 @@
  */
 import Notification from "../../models/Notification.js";
 import User from "../../models/User.js";
+import Role from "../../models/Role.js";
 import { sendTemplateEmail } from "../../services/email.service.js";
+
+// Helper: Get role IDs by names
+async function getRoleIds(roleNames) {
+  const roles = await Role.find({ name: { $in: roleNames } }).select("_id");
+  return roles.map((r) => r._id);
+}
 
 // ============================================================================
 // BROADCAST NOTIFICATION
@@ -31,17 +38,23 @@ export const broadcastNotification = async (req, res) => {
     }
 
     // Build user filter based on audience
-    const userFilter = { is_deleted: { $ne: true } };
+    // Note: User model uses role_id (ObjectId), not role (string)
+    const userFilter = { status: { $ne: "banned" } };
+
+    let targetRoles = [];
     if (audience === "tourist") {
-      userFilter.role = "user";
+      targetRoles = ["tourist"];
     } else if (audience === "guide") {
-      userFilter.role = "guide";
+      targetRoles = ["guide"];
     } else {
-      // all users (user + guide)
-      userFilter.role = { $in: ["user", "guide"] };
+      // all users (tourist + guide, exclude admin)
+      targetRoles = ["tourist", "guide"];
     }
 
-    const users = await User.find(userFilter).select("_id email full_name");
+    const roleIds = await getRoleIds(targetRoles);
+    userFilter.role_id = { $in: roleIds };
+
+    const users = await User.find(userFilter).select("_id email name");
 
     if (users.length === 0) {
       return res
@@ -85,7 +98,7 @@ export const broadcastNotification = async (req, res) => {
             subject: title,
             templateKey: "broadcastNotification",
             data: {
-              name: user.full_name || "Người dùng",
+              name: user.name || "Người dùng",
               title,
               message,
               supportEmail:
@@ -126,7 +139,6 @@ export const broadcastNotification = async (req, res) => {
         totalRecipients: users.length,
         inAppSent: inAppCount,
         emailSent: emailCount,
-        errors: errors.length,
       },
     });
   } catch (error) {
@@ -203,31 +215,34 @@ export const getNotificationHistory = async (req, res) => {
  */
 export const getNotificationStats = async (req, res) => {
   try {
-    // Get user counts for audience display
-    const [
-      totalUsers,
-      touristCount,
-      guideCount,
-      broadcastCount,
-      lastBroadcast,
-    ] = await Promise.all([
-      User.countDocuments({
-        role: { $in: ["user", "guide"] },
-        is_deleted: { $ne: true },
-      }),
-      User.countDocuments({ role: "user", is_deleted: { $ne: true } }),
-      User.countDocuments({ role: "guide", is_deleted: { $ne: true } }),
-      Notification.countDocuments({
-        type: { $in: ["broadcast:sent", "broadcast"] },
-      }),
-      Notification.findOne({ type: { $in: ["broadcast:sent", "broadcast"] } })
-        .sort({ createdAt: -1 })
-        .select("createdAt meta.title"),
+    // Get role IDs first
+    const [touristRoleIds, guideRoleIds] = await Promise.all([
+      getRoleIds(["tourist"]),
+      getRoleIds(["guide"]),
     ]);
+
+    // Get user counts for audience display
+    const [touristCount, guideCount, broadcastCount, lastBroadcast] =
+      await Promise.all([
+        User.countDocuments({
+          role_id: { $in: touristRoleIds },
+          status: { $ne: "banned" },
+        }),
+        User.countDocuments({
+          role_id: { $in: guideRoleIds },
+          status: { $ne: "banned" },
+        }),
+        Notification.countDocuments({
+          type: { $in: ["broadcast:sent", "broadcast"] },
+        }),
+        Notification.findOne({ type: { $in: ["broadcast:sent", "broadcast"] } })
+          .sort({ createdAt: -1 })
+          .select("createdAt meta.title"),
+      ]);
 
     res.json({
       audienceCounts: {
-        all: totalUsers,
+        all: touristCount + guideCount,
         tourist: touristCount,
         guide: guideCount,
       },

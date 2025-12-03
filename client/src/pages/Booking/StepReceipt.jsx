@@ -1,46 +1,174 @@
-import React from "react";
-import { Link } from "react-router-dom";
-import { IconCalendar, IconMapPin } from "../../icons/IconBox";
+import React, { useState, useEffect } from "react";
+import { Link, useParams, useLocation } from "react-router-dom";
+import { bookingsApi } from "../../features/booking/api";
+import { paymentsApi } from "../../features/payments/api";
+import { IconCalendar, IconMapPin, IconClock } from "../../icons/IconBox";
 import {
   IconCheckCircle,
   IconDownload,
   IconHome,
+  IconLoader,
 } from "../../icons/IconCommon";
 
-// ============================================================================
-// MOCK DATA
-// ============================================================================
-const successData = {
-  id: "BK-2025-001",
-  tourName: "Bí mật Hoàng cung Huế & Trải nghiệm trà chiều",
-  image:
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  date: "20/05/2025",
-  time: "08:00 AM",
-  location: "Đại Nội Huế",
-  totalPaid: "1.700.000đ",
-  paymentMethod: "Ví MoMo",
-  email: "hoangnam@email.com",
+// Helper to convert MongoDB Decimal128 to number
+const toNumber = (val) => {
+  if (val?.$numberDecimal) return parseFloat(val.$numberDecimal);
+  return parseFloat(val) || 0;
 };
 
 export default function BookingSuccessPage() {
+  const { id } = useParams();
+  const location = useLocation();
+  const [booking, setBooking] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Data từ navigation state (từ trang payment)
+  const stateData = location.state;
+
+  // Fetch booking details
+  useEffect(() => {
+    const fetchBooking = async () => {
+      if (!id) return;
+      try {
+        setIsLoading(true);
+        const response = await bookingsApi.getBooking(id);
+        setBooking(response);
+      } catch (err) {
+        console.error("Fetch booking error:", err);
+        setError(err.message || "Không thể tải thông tin booking");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchBooking();
+  }, [id]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-bg-main flex items-center justify-center">
+        <IconLoader className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !booking) {
+    return (
+      <div className="min-h-screen bg-bg-main py-10 px-4 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-text-primary mb-4">
+            Không tìm thấy booking
+          </h1>
+          <p className="text-text-secondary mb-6">{error}</p>
+          <Link
+            to="/"
+            className="inline-block px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90"
+          >
+            Về trang chủ
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Extract booking data
+  const successData = {
+    id: booking._id,
+    tourName: booking.tour_id?.name || stateData?.tourName || "Tour",
+    image:
+      booking.tour_id?.cover_image_url ||
+      stateData?.tourImage ||
+      "/images/placeholders/tour-placeholder.jpg",
+    date: booking.start_date
+      ? new Date(booking.start_date).toLocaleDateString("vi-VN")
+      : stateData?.date || "",
+    time:
+      booking.start_time || booking.tour_id?.fixed_departure_time || "08:00",
+    location:
+      booking.tour_id?.locations?.[0]?.locationId?.name || "Đại Nội Huế",
+    totalPaid: `${toNumber(booking.total_price).toLocaleString("vi-VN")}đ`,
+    paymentMethod: stateData?.paymentMethod || "Thanh toán trực tuyến",
+    email: booking.contact?.email || stateData?.contact?.email || "",
+    status: booking.status,
+  };
+
+  // Xác định icon và message dựa trên status
+  const getStatusDisplay = () => {
+    switch (successData.status) {
+      case "paid":
+        return {
+          icon: <IconCheckCircle className="w-10 h-10" />,
+          iconBg: "bg-green-100 text-green-600",
+          title: "Thanh toán thành công!",
+          message: (
+            <>
+              Mã đặt chỗ{" "}
+              <span className="font-bold text-primary">
+                #{successData.id?.slice(-8)}
+              </span>{" "}
+              đã được xác nhận.
+              <br className="hidden md:block" /> Thông tin vé đã được gửi đến{" "}
+              <span className="font-bold">{successData.email}</span>.
+            </>
+          ),
+        };
+      case "awaiting_payment":
+        return {
+          icon: <IconClock className="w-10 h-10" />,
+          iconBg: "bg-blue-100 text-blue-600",
+          title: "Chờ thanh toán",
+          message: (
+            <>
+              Booking{" "}
+              <span className="font-bold text-primary">
+                #{successData.id?.slice(-8)}
+              </span>{" "}
+              đã được HDV xác nhận.
+              <br className="hidden md:block" /> Vui lòng thanh toán để hoàn tất
+              đặt tour.
+            </>
+          ),
+        };
+      case "waiting_guide":
+      default:
+        return {
+          icon: <IconClock className="w-10 h-10" />,
+          iconBg: "bg-yellow-100 text-yellow-600",
+          title: "Đặt tour thành công!",
+          message: (
+            <>
+              Booking{" "}
+              <span className="font-bold text-primary">
+                #{successData.id?.slice(-8)}
+              </span>{" "}
+              đang chờ HDV xác nhận.
+              <br className="hidden md:block" /> Bạn sẽ nhận được thông báo khi
+              có thể thanh toán.
+            </>
+          ),
+        };
+    }
+  };
+
+  const statusDisplay = getStatusDisplay();
+
   return (
     <div className="min-h-screen bg-bg-main py-10 px-4 flex items-center justify-center">
       <div className="w-full max-w-lg">
         {/* SUCCESS MESSAGE */}
         <div className="text-center mb-8 animate-fade-in-up">
-          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
-            <IconCheckCircle className="w-10 h-10" />
+          <div
+            className={`w-20 h-20 ${statusDisplay.iconBg} rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm`}
+          >
+            {statusDisplay.icon}
           </div>
           <h1 className="text-2xl md:text-3xl font-heading font-bold text-text-primary mb-2">
-            Thanh toán thành công!
+            {statusDisplay.title}
           </h1>
           <p className="text-text-secondary text-sm md:text-base">
-            Mã đặt chỗ{" "}
-            <span className="font-bold text-primary">#{successData.id}</span> đã
-            được xác nhận.
-            <br className="hidden md:block" /> Thông tin vé đã được gửi đến{" "}
-            <span className="font-bold">{successData.email}</span>.
+            {statusDisplay.message}
           </p>
         </div>
 
@@ -58,8 +186,22 @@ export default function BookingSuccessPage() {
                 className="w-24 h-24 rounded-2xl object-cover shadow-sm shrink-0"
               />
               <div>
-                <span className="inline-block px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full mb-2">
-                  Đã thanh toán
+                <span
+                  className={`inline-block px-3 py-1 text-xs font-bold rounded-full mb-2 ${
+                    successData.status === "paid"
+                      ? "bg-green-100 text-green-700"
+                      : successData.status === "waiting_guide"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : successData.status === "awaiting_payment"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {successData.status === "paid" && "Đã thanh toán"}
+                  {successData.status === "waiting_guide" && "Chờ HDV xác nhận"}
+                  {successData.status === "awaiting_payment" &&
+                    "Chờ thanh toán"}
+                  {!successData.status && "Đã đặt"}
                 </span>
                 <h2 className="text-lg font-bold text-text-primary line-clamp-2 leading-tight">
                   {successData.tourName}
@@ -127,6 +269,33 @@ export default function BookingSuccessPage() {
             </div>
           </div>
         </div>
+
+        {/* PAYMENT BUTTON for awaiting_payment status */}
+        {successData.status === "awaiting_payment" && (
+          <div className="mt-6">
+            <button
+              onClick={async () => {
+                try {
+                  const checkoutRes = await paymentsApi.createCheckout(
+                    booking._id,
+                    "wallet"
+                  );
+                  if (checkoutRes.payUrl) {
+                    window.location.href = checkoutRes.payUrl;
+                  }
+                } catch (err) {
+                  console.error("Checkout error:", err);
+                  alert(
+                    "Không thể kết nối cổng thanh toán. Vui lòng thử lại sau."
+                  );
+                }
+              }}
+              className="w-full py-4 rounded-xl bg-primary text-white font-bold text-base hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2"
+            >
+              Thanh toán ngay
+            </button>
+          </div>
+        )}
 
         {/* ACTION BUTTONS */}
         <div className="mt-8 space-y-3 md:space-y-0 md:flex md:gap-4">

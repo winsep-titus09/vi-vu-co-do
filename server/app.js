@@ -36,6 +36,7 @@ import adminRefundRoutes from "./routes/admin/refunds.routes.js";
 import adminRevueneRoutes from "./routes/admin/revenue.routes.js";
 import adminPayoutRoutes from "./routes/admin/payouts.routes.js";
 import adminDashboardRoutes from "./routes/admin/dashboard.routes.js";
+import adminFinanceRoutes from "./routes/admin/finance.routes.js";
 
 // Blog admin
 import adminArticleCategoryRoutes from "./routes/admin/articleCategories.routes.js";
@@ -48,6 +49,16 @@ import adminReviewsRoutes from "./routes/admin/reviews.routes.js";
 
 // Users admin
 import adminUsersRoutes from "./routes/admin/users.routes.js";
+
+// Tour Edit Requests
+import tourEditRequestRoutes from "./routes/tourEditRequests.routes.js";
+import adminTourEditRequestRoutes from "./routes/admin/tourEditRequests.routes.js";
+
+// Public routes
+import publicRoutes from "./routes/public.routes.js";
+
+// Upload routes
+import uploadRoutes from "./routes/upload.routes.js";
 
 const app = express();
 
@@ -101,6 +112,7 @@ app.use("/api/admin/payment-settings", adminPaymentSettingRoutes);
 app.use("/api/admin/refunds", adminRefundRoutes);
 app.use("/api/admin/revenues", adminRevueneRoutes);
 app.use("/api/admin/payouts", adminPayoutRoutes);
+app.use("/api/admin/finance", adminFinanceRoutes);
 app.use("/api/admin/dashboard", adminDashboardRoutes);
 
 // blog admin
@@ -114,6 +126,18 @@ app.use("/api/admin/reviews", adminReviewsRoutes);
 
 // Users admin
 app.use("/api/admin/users", adminUsersRoutes);
+
+// Tour Edit Requests admin
+app.use("/api/admin/tour-edit-requests", adminTourEditRequestRoutes);
+
+// Public routes (no auth required)
+app.use("/api/public", publicRoutes);
+
+// Upload routes (auth required)
+app.use("/api/upload", uploadRoutes);
+
+// Tour Edit Requests (guide)
+app.use("/api/tour-edit-requests", tourEditRequestRoutes);
 
 app.get("/health", (_, res) => res.json({ ok: true }));
 

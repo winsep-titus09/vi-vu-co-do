@@ -53,18 +53,34 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
-        // Sign up
+        // Sign up - luôn đăng ký với role tourist
+        // Nếu muốn làm HDV, sau đăng ký sẽ redirect đến trang apply
+        const wantsToBeGuide = role === "guide";
+
         const response = await authApi.signUp({
           fullName: formData.fullName,
           email: formData.email,
           password: formData.password,
-          role: role,
+          role: "tourist", // Luôn đăng ký tourist trước
         });
 
         // Store token and user data
         if (response.token) {
           localStorage.setItem("token", response.token);
           localStorage.setItem("user", JSON.stringify(response.user));
+        }
+
+        // Nếu muốn làm HDV, redirect đến trang settings để apply
+        if (wantsToBeGuide) {
+          navigate("/dashboard/tourist/settings", {
+            state: {
+              fromSignup: true,
+              showGuideApply: true,
+              message:
+                "Đăng ký thành công! Vui lòng điền thông tin để trở thành Hướng dẫn viên.",
+            },
+          });
+          return;
         }
       } else {
         // Sign in
@@ -457,7 +473,7 @@ export default function AuthPage() {
         >
           <div className="relative w-full h-full bg-primary text-white">
             <img
-              src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg"
+              src="/images/placeholders/auth-bg.jpg"
               className="absolute inset-0 w-full h-full object-cover opacity-50 mix-blend-overlay"
               alt="Hue"
             />

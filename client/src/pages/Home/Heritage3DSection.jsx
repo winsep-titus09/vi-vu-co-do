@@ -30,7 +30,7 @@ export default function Heritage3DSection() {
         <img
           src={
             featuredModel?.locationImage ||
-            "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/ngomon_3d_placeholder.jpg"
+            "/images/placeholders/3d-model-placeholder.jpg"
           }
           alt={featuredModel?.locationName || "Di sản 3D"}
           className="w-full h-full object-cover"
@@ -84,7 +84,7 @@ export default function Heritage3DSection() {
               <img
                 src={
                   featuredModel?.thumbnail ||
-                  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/model_3d_preview.png"
+                  "/images/placeholders/3d-model-preview.png"
                 }
                 alt={featuredModel?.name || "3D Model Preview"}
                 className="w-full h-full object-contain opacity-90 transition-transform duration-1000 group-hover:scale-110"

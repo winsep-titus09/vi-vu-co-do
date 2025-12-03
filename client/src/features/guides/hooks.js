@@ -576,7 +576,32 @@ export function useLocations(params = {}) {
 }
 
 /**
- * Hook to create tour request
+ * Hook to create tour directly (guide creates tour with pending approval)
+ */
+export function useCreateTour() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const createTour = async (data) => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      const response = await guidesApi.createTour(data);
+      return response;
+    } catch (err) {
+      console.error("Create tour error:", err);
+      setError(err.message || "Không thể tạo tour");
+      throw err;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return { createTour, isSubmitting, error };
+}
+
+/**
+ * Hook to create tour request - DEPRECATED, use useCreateTour
  */
 export function useCreateTourRequest() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -868,4 +893,73 @@ export function useUpdateGuideProfile() {
   };
 
   return { updateProfile, isUpdating, error };
+}
+
+// ========== GUIDE APPLICATION HOOKS (for tourists) ==========
+
+/**
+ * Hook to get current user's guide application status
+ */
+export function useMyGuideApplication() {
+  const [application, setApplication] = useState(null);
+  const [exists, setExists] = useState(false);
+  const [status, setStatus] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchApplication = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await guidesApi.getMyApplication();
+      setExists(response.exists || false);
+      setStatus(response.status || null);
+      setApplication(response.application || null);
+    } catch (err) {
+      console.error("Fetch guide application error:", err);
+      setError(err.message || "Không thể tải thông tin hồ sơ");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApplication();
+  }, []);
+
+  return {
+    application,
+    exists,
+    status,
+    isLoading,
+    error,
+    refetch: fetchApplication,
+  };
+}
+
+/**
+ * Hook to apply to become a guide
+ */
+export function useApplyToBeGuide() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const apply = async (applicationData) => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      const response = await guidesApi.applyToBeGuide(applicationData);
+      return { success: true, data: response };
+    } catch (err) {
+      console.error("Apply to be guide error:", err);
+      const errorMessage =
+        err.response?.data?.message || err.message || "Không thể gửi hồ sơ";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return { apply, isSubmitting, error };
 }

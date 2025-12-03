@@ -29,6 +29,35 @@ const UserSchema = new mongoose.Schema(
     // Reset password fields
     resetPasswordToken: { type: String },
     resetPasswordExpire: { type: Date },
+    // User preferences
+    preferences: {
+      notifications: {
+        booking: { type: Boolean, default: true },
+        promo: { type: Boolean, default: false },
+        system: { type: Boolean, default: true },
+      },
+      display: {
+        quality_3d: {
+          type: String,
+          enum: ["auto", "low", "high"],
+          default: "auto",
+        },
+        currency: { type: String, enum: ["vnd", "usd"], default: "vnd" },
+      },
+    },
+    // Account deletion request
+    delete_request: {
+      status: {
+        type: String,
+        enum: ["none", "pending", "approved", "rejected"],
+        default: "none",
+      },
+      reason: { type: String, default: "" },
+      requested_at: { type: Date },
+      reviewed_at: { type: Date },
+      reviewed_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      admin_notes: { type: String, default: "" },
+    },
   },
   { timestamps: true }
 );

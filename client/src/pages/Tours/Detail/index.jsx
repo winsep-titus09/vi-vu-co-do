@@ -12,6 +12,7 @@ import Breadcrumbs from "../../../components/Breadcrumbs/Breadcrumbs";
 import { toursApi } from "../../../features/tours/api";
 import { reviewsApi } from "../../../features/reviews/api";
 import { IconLoader } from "../../../icons/IconCommon";
+import { IconX } from "../../../icons/IconX";
 // Removed: import TourCard from "../../../components/Cards/TourCard"; // Không dùng TourCard trong gợi ý mới này
 
 // Import icons
@@ -36,18 +37,13 @@ const toNumber = (val) => {
 };
 
 // ============================================================================
-// CONSTANTS & MOCK DATA
+// CONSTANTS
 // ============================================================================
-const BASE_PRICE = 42;
-const CHILD_PRICE = 21;
-
-const guideOptions = [
-  { value: "random", label: "Ngẫu nhiên (Mặc định)" },
-  { value: "vi", label: "HDV Tiếng Việt" },
-  { value: "en", label: "HDV Tiếng Anh" },
-  { value: "female", label: "HDV Nữ" },
-  { value: "male", label: "HDV Nam" },
-];
+const defaultGuideOption = {
+  value: "random",
+  label: "Ngẫu nhiên (Mặc định)",
+  guide: null,
+};
 
 // Mock data: Tour amenities
 const tourAmenities = [
@@ -92,7 +88,7 @@ export default function TourDetailPage() {
   const [selectedDate, setSelectedDate] = useState();
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
-  const [selectedGuide, setSelectedGuide] = useState(guideOptions[0]);
+  const [selectedGuide, setSelectedGuide] = useState(defaultGuideOption);
   const [note, setNote] = useState("");
 
   // UI state
@@ -184,10 +180,15 @@ export default function TourDetailPage() {
     const bookingData = {
       tourId: tour?._id || "tour_hue_night_01",
       tourName: tour?.name || "Dạo bộ Phố Cổ về đêm",
+      tourImage: tour?.cover_image_url || tour?.gallery?.[0] || null,
       date: format(selectedDate, "yyyy-MM-dd"),
       guests: { adults, children },
       totalPrice,
       guidePreference: selectedGuide.value,
+      selectedGuideId:
+        selectedGuide.value !== "random" ? selectedGuide.value : null,
+      selectedGuideName:
+        selectedGuide.guide?.guideId?.name || selectedGuide.guide?.name || null,
       note: note.trim(),
     };
     navigate("/booking/review", { state: bookingData });
@@ -232,26 +233,66 @@ export default function TourDetailPage() {
     );
   }
 
-  // Extract data from tour
+  // Extract data from tour (đồng bộ với Tour model)
   const tourName = tour.name || "Dạo bộ Phố Cổ về đêm";
   const tourDescription = tour.description || "";
   const tourLocation =
-    tour.locations?.[0]?.locationId?.name ||
-    tour.location ||
-    "Phố cổ, trung tâm";
-  const tourDuration = `${tour.duration || 3.5} ${
-    tour.duration_unit === "days" ? "ngày" : "giờ"
-  }`;
-  const tourRating = toNumber(tour.average_rating || 0);
-  const tourReviewCount = tour.review_count || tour.reviews_count || 0;
-  const tourCategory = tour.category_id?.name || "Lịch sử";
+    tour.locations?.[0]?.locationId?.name || "Phố cổ, trung tâm";
+
+  // Format duration: ưu tiên duration_hours, fallback duration (days)
+  const formatTourDuration = () => {
+    if (tour.duration_hours && tour.duration_hours > 0) {
+      const hours = tour.duration_hours;
+      if (hours < 1) return `${Math.round(hours * 60)} phút`;
+      if (hours % 1 === 0) return `${hours} giờ`;
+      return `${hours.toFixed(1)} giờ`;
+    }
+    if (tour.duration) {
+      return `${tour.duration} ${
+        tour.duration_unit === "hours" ? "giờ" : "ngày"
+      }`;
+    }
+    return "3 giờ";
+  };
+  const tourDuration = formatTourDuration();
+
+  // Rating - từ reviews aggregate hoặc mặc định
+  const tourRating = toNumber(tour.average_rating || tour.avgRating || 0);
+  const tourReviewCount =
+    tour.review_count || tour.reviewCount || reviews.length || 0;
+
+  // Category
+  const tourCategory =
+    tour.category_id?.name || tour.categories?.[0]?.name || "Lịch sử";
+
+  // Cover image
   const tourImage =
     tour.cover_image_url ||
-    tour.image_url ||
-    tour.images?.[0] ||
     tour.gallery?.[0] ||
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg";
-  const mainGuide = tour.guides?.[0] || tour.guide_id;
+    "/images/placeholders/tour-placeholder.jpg";
+
+  // Main guide (người đầu tiên có isMain hoặc isPrimary)
+  const mainGuide =
+    tour.guides?.find((g) => g.isMain || g.isPrimary) ||
+    tour.guides?.[0] ||
+    tour.guide_id;
+
+  // Build guide options from tour.guides
+  const guideOptions = [
+    defaultGuideOption,
+    ...(tour.guides || []).map((g) => {
+      const guideData = g.guideId || g;
+      const guideName = guideData?.name || "HDV";
+      const isMain = g.isMain || g.isPrimary;
+      return {
+        value: guideData?._id || g._id,
+        label: `${guideName}${isMain ? " (Chính)" : ""}`,
+        guide: g,
+      };
+    }),
+  ];
+
+  // Itinerary
   const tourItinerary = tour.itinerary || [];
 
   return (
@@ -301,20 +342,48 @@ export default function TourDetailPage() {
           {/* 2. MEDIA GRID */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:h-[550px]">
             <div className="flex flex-col gap-3 w-full lg:h-full">
+              {/* Video Section */}
               <div className="relative w-full aspect-video lg:aspect-auto lg:flex-1 min-h-0 rounded-2xl overflow-hidden bg-black group cursor-pointer">
-                <img
-                  src={tourImage}
-                  alt={tourName}
-                  className="w-full h-full object-cover opacity-90 group-hover:opacity-75 transition-opacity duration-500"
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-14 h-14 flex items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/40 text-white shadow-xl transition-transform duration-300 group-hover:scale-110 pl-1">
-                    <IconPlay className="w-6 h-6 fill-current" />
-                  </div>
-                </div>
-                <div className="absolute bottom-3 left-3 bg-black/50 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] font-bold text-white uppercase tracking-wide border border-white/10">
-                  Video giới thiệu
-                </div>
+                {tour?.video_url ? (
+                  // Embed YouTube/Vimeo video
+                  <iframe
+                    src={
+                      tour.video_url.includes("youtube.com/watch")
+                        ? tour.video_url.replace("watch?v=", "embed/")
+                        : tour.video_url.includes("youtu.be")
+                        ? `https://www.youtube.com/embed/${tour.video_url
+                            .split("/")
+                            .pop()}`
+                        : tour.video_url.includes("vimeo.com")
+                        ? tour.video_url.replace(
+                            "vimeo.com",
+                            "player.vimeo.com/video"
+                          )
+                        : tour.video_url
+                    }
+                    title={tourName}
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  // Fallback to cover image with play button
+                  <>
+                    <img
+                      src={tourImage}
+                      alt={tourName}
+                      className="w-full h-full object-cover opacity-90 group-hover:opacity-75 transition-opacity duration-500"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-14 h-14 flex items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/40 text-white shadow-xl transition-transform duration-300 group-hover:scale-110 pl-1">
+                        <IconPlay className="w-6 h-6 fill-current" />
+                      </div>
+                    </div>
+                    <div className="absolute bottom-3 left-3 bg-black/50 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] font-bold text-white uppercase tracking-wide border border-white/10">
+                      {tour?.video_url ? "Video giới thiệu" : "Ảnh bìa tour"}
+                    </div>
+                  </>
+                )}
               </div>
               <div className="grid grid-cols-4 gap-2 h-16 sm:h-20 shrink-0">
                 {/* Gallery Thumbnails from API */}
@@ -352,7 +421,7 @@ export default function TourDetailPage() {
                 </div>
                 <div className="absolute inset-0 bg-gray-900">
                   <img
-                    src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/ngomon_3d_placeholder.jpg"
+                    src="/images/placeholders/3d-model-placeholder.jpg"
                     alt="3D Model"
                     className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-700"
                   />
@@ -393,7 +462,9 @@ export default function TourDetailPage() {
                       <div key={idx} className="relative pl-6 group">
                         <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-primary group-hover:bg-primary transition-colors"></div>
                         <span className="text-xs font-bold text-primary uppercase tracking-wide">
-                          Ngày {item.day || idx + 1}
+                          {item.time
+                            ? `${item.time}`
+                            : `Ngày ${item.day || idx + 1}`}
                         </span>
                         <h4 className="text-base font-bold text-text-primary mt-0.5">
                           {item.title || "Hoạt động"}
@@ -410,51 +481,140 @@ export default function TourDetailPage() {
                   </p>
                 )}
               </section>
+
+              {/* Điểm nổi bật */}
+              {tour.highlights?.length > 0 && (
+                <section className="space-y-4">
+                  <h2 className="text-2xl font-heading font-bold text-text-primary">
+                    Điểm nổi bật
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {tour.highlights.map((highlight, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-start gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                          <IconCheck className="w-3.5 h-3.5 text-primary" />
+                        </div>
+                        <span className="text-sm text-text-primary">
+                          {highlight}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Bao gồm / Không bao gồm */}
+              {(tour.includes?.length > 0 || tour.excludes?.length > 0) && (
+                <section className="space-y-4">
+                  <h2 className="text-2xl font-heading font-bold text-text-primary">
+                    Chi tiết dịch vụ
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Bao gồm */}
+                    {tour.includes?.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-bold text-green-600 uppercase flex items-center gap-1.5">
+                          <IconCheck className="w-4 h-4" /> Bao gồm
+                        </h3>
+                        <ul className="space-y-2">
+                          {tour.includes.map((item, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-start gap-2 text-sm text-text-secondary"
+                            >
+                              <IconCheck className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {/* Không bao gồm */}
+                    {tour.excludes?.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-bold text-red-500 uppercase flex items-center gap-1.5">
+                          <IconX className="w-4 h-4" /> Không bao gồm
+                        </h3>
+                        <ul className="space-y-2">
+                          {tour.excludes.map((item, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-start gap-2 text-sm text-text-secondary"
+                            >
+                              <IconX className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
             </div>
 
             {/* 4. SIDEBAR (Guide & Booking Form) */}
             <div className="md:col-span-5 space-y-6 h-fit md:sticky md:top-24">
-              <div className="rounded-3xl border border-border-light bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-text-primary font-heading">
-                    Hướng dẫn viên
-                  </h3>
-                  {mainGuide && (
-                    <Link
-                      to={`/guides/${mainGuide.guideId?._id || mainGuide._id}`}
-                      className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
-                    >
-                      Xem hồ sơ <IconArrowRight className="w-3 h-3" />
-                    </Link>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
-                    <img
-                      src={
-                        mainGuide?.guideId?.avatar_url ||
-                        mainGuide?.avatar_url ||
-                        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/guides/guide_female_1.jpg"
-                      }
-                      className="w-full h-full object-cover"
-                      alt="Guide"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-text-primary">
-                      {mainGuide?.guideId?.name ||
-                        mainGuide?.name ||
-                        "Minh Hương"}
-                    </p>
-                    <p className="text-[10px] text-text-secondary uppercase tracking-wide">
-                      Nhà sử học • EN / VI
-                    </p>
-                    <div className="flex items-center gap-1 text-[10px] text-[#BC4C00] font-bold mt-0.5">
-                      <IconStar className="w-3 h-3" /> 4.9
+              {(() => {
+                // Hiển thị HDV được chọn, nếu chọn "random" thì hiển thị mainGuide
+                const displayGuide =
+                  selectedGuide.value !== "random" && selectedGuide.guide
+                    ? selectedGuide.guide
+                    : mainGuide;
+
+                if (!displayGuide) return null;
+
+                const guideData = displayGuide.guideId || displayGuide;
+                const isMain = displayGuide.isMain || displayGuide.isPrimary;
+
+                return (
+                  <div className="rounded-3xl border border-border-light bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-bold text-text-primary font-heading">
+                        Hướng dẫn viên
+                        {selectedGuide.value !== "random" && (
+                          <span className="ml-2 text-[10px] font-normal text-primary">
+                            (Đã chọn)
+                          </span>
+                        )}
+                      </h3>
+                      <Link
+                        to={`/guides/${guideData?._id || displayGuide._id}`}
+                        className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
+                      >
+                        Xem hồ sơ <IconArrowRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
+                        <img
+                          src={
+                            guideData?.avatar_url ||
+                            "/images/placeholders/avatar.png"
+                          }
+                          className="w-full h-full object-cover"
+                          alt="Guide"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-text-primary">
+                          {guideData?.name || "Hướng dẫn viên"}
+                        </p>
+                        <p className="text-[10px] text-text-secondary uppercase tracking-wide">
+                          {isMain ? "HDV Chính" : "HDV"} • VI / EN
+                        </p>
+                        <div className="flex items-center gap-1 text-[10px] text-[#BC4C00] font-bold mt-0.5">
+                          <IconStar className="w-3 h-3" />{" "}
+                          {guideData?.rating?.toFixed(1) || "5.0"}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
 
               <div className="rounded-3xl border border-border-light bg-white p-5 shadow-lg shadow-black/5 space-y-5">
                 <div className="flex items-end justify-between">
@@ -462,7 +622,7 @@ export default function TourDetailPage() {
                     <p className="text-xs text-text-secondary">Giá từ</p>
                     <div className="flex items-baseline gap-1">
                       <span className="text-2xl font-heading font-bold text-primary">
-                        ${BASE_PRICE}
+                        {BASE_PRICE.toLocaleString("vi-VN")}₫
                       </span>
                       <span className="text-xs text-text-secondary">
                         / người
@@ -523,7 +683,7 @@ export default function TourDetailPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-text-secondary uppercase">
-                        Người lớn (${BASE_PRICE})
+                        Người lớn ({BASE_PRICE.toLocaleString("vi-VN")}₫)
                       </label>
                       <input
                         type="number"
@@ -537,7 +697,7 @@ export default function TourDetailPage() {
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-text-secondary uppercase">
-                        Trẻ em (${CHILD_PRICE})
+                        Trẻ em ({CHILD_PRICE.toLocaleString("vi-VN")}₫)
                       </label>
                       <input
                         type="number"
@@ -612,7 +772,7 @@ export default function TourDetailPage() {
                   <div className="flex justify-between text-sm font-medium text-text-primary mb-4">
                     <span>Tổng cộng</span>
                     <span className="font-bold text-lg text-primary">
-                      ${totalPrice}
+                      {totalPrice.toLocaleString("vi-VN")}₫
                     </span>
                   </div>
                   <button
@@ -634,7 +794,7 @@ export default function TourDetailPage() {
             {/* Left Column: Image with overlay */}
             <div className="relative rounded-3xl overflow-hidden bg-bg-main shadow-xl min-h-[300px] md:min-h-[400px]">
               <img
-                src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg" // Ảnh nền lớn
+                src="/images/placeholders/scenic-placeholder.jpg" // Ảnh nền lớn
                 alt="Scenic view"
                 className="absolute inset-0 w-full h-full object-cover"
               />
@@ -644,7 +804,7 @@ export default function TourDetailPage() {
               <div className="absolute top-6 right-6 bg-white/90 backdrop-blur-sm rounded-xl p-3 flex items-center space-x-3 shadow-lg border border-white/20">
                 <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0">
                   <img
-                    src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/guides/guide_female_1.jpg"
+                    src="/images/placeholders/avatar-placeholder.jpg"
                     alt="Marina Joseph"
                     className="w-full h-full object-cover"
                   />
@@ -666,7 +826,7 @@ export default function TourDetailPage() {
               {/* Smaller Image with Play Button (Bottom Left) */}
               <div className="absolute bottom-6 left-6 w-32 h-32 rounded-xl overflow-hidden shadow-2xl border-4 border-white group cursor-pointer">
                 <img
-                  src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/hoanghon.jpg" // Ảnh nhỏ
+                  src="/images/placeholders/video-thumbnail.jpg" // Ảnh nhỏ
                   alt="Video thumbnail"
                   className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity"
                 />

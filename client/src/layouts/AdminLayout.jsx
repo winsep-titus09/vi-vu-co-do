@@ -259,14 +259,6 @@ export default function AdminLayout() {
               />
             </div>
 
-            {/* Notification */}
-            <button className="p-2 text-slate-500 hover:text-primary relative transition-colors rounded-full hover:bg-slate-50">
-              <IconBell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white animate-pulse"></span>
-            </button>
-
-            <div className="w-px h-6 bg-slate-200 hidden md:block"></div>
-
             {/* User menu dropdown */}
             <div className="relative">
               <button

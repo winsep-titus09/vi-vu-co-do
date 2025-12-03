@@ -8,102 +8,8 @@ import IconChevronRight from "../../icons/IconChevronRight";
 import Spinner from "../../components/Loaders/Spinner";
 import { useFeaturedGuides } from "../../features/guides/hooks";
 
-// Mock data for filters (kept as static)
-const originalGuides = [
-  {
-    id: 1,
-    name: "Minh Hương",
-    specialty: "Nhà sử học & Văn hóa",
-    rating: 4.9,
-    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/1.jpg",
-    languages: ["VI", "EN"],
-    bio: "Xin chào, tôi là Hương. Với 5 năm nghiên cứu triều Nguyễn, tôi sẽ kể bạn nghe những bí mật hoàng cung chưa từng được tiết lộ.",
-    tags: ["history", "culture"],
-  },
-  {
-    id: 2,
-    name: "Trần Văn",
-    specialty: "Chuyên gia Ẩm thực",
-    rating: 5.0,
-    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/2.jpg",
-    languages: ["VI"],
-    bio: "Tôi sinh ra trong một gia đình làm bún bò truyền thống. Hãy cùng tôi len lỏi vào những con hẻm nhỏ để nếm vị Huế chuẩn nhất.",
-    tags: ["food"],
-  },
-  {
-    id: 3,
-    name: "Alex Nguyen",
-    specialty: "Nhiếp ảnh & Nghệ thuật",
-    rating: 4.8,
-    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/3.jpg",
-    languages: ["EN", "FR"],
-    bio: "Đam mê những góc máy lạ của Cố Đô. Tôi sẽ giúp bạn có những bức ảnh 'để đời' tại Lăng Tự Đức và Đại Nội.",
-    tags: ["art", "photo"],
-  },
-  {
-    id: 4,
-    name: "Lê Bình",
-    specialty: "Thiền & Tâm linh",
-    rating: 4.9,
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuatuhieu1.jpg",
-    languages: ["VI", "EN"],
-    bio: "Tìm về sự an yên tại các ngôi chùa cổ. Tôi sẽ hướng dẫn bạn các nghi thức thiền trà và nghe pháp thoại.",
-    tags: ["spiritual"],
-  },
-  {
-    id: 5,
-    name: "Phạm Lan",
-    specialty: "Làng nghề Truyền thống",
-    rating: 4.7,
-    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/4.jpg",
-    languages: ["VI", "KR"],
-    bio: "Tôi lớn lên tại làng hương Thủy Xuân. Tôi sẽ đưa bạn đi trải nghiệm tự tay làm nón bài thơ và làm hương trầm.",
-    tags: ["craft", "culture"],
-  },
-  {
-    id: 6,
-    name: "James Đặng",
-    specialty: "Khám phá & Mạo hiểm",
-    rating: 4.8,
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/hoanghon.jpg",
-    languages: ["VI", "EN", "DE"],
-    bio: "Chuyên các tour trekking Bạch Mã và chèo SUP phá Tam Giang. Dành cho những ai yêu thiên nhiên và vận động.",
-    tags: ["adventure", "nature"],
-  },
-  {
-    id: 7,
-    name: "Bảo Ngọc",
-    specialty: "Ẩm thực Chay & Sức khỏe",
-    rating: 4.9,
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/ngomon_3d_placeholder.jpg",
-    languages: ["VI", "EN"],
-    bio: "Huế là kinh đô của ẩm thực chay. Tôi sẽ giới thiệu cho bạn những quán chay thanh tịnh và ngon miệng nhất.",
-    tags: ["food", "spiritual"],
-  },
-  {
-    id: 8,
-    name: "Tuấn Kiệt",
-    specialty: "Kiến trúc Cung đình",
-    rating: 5.0,
-    image:
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-    languages: ["VI", "JP"],
-    bio: "Là kiến trúc sư, tôi sẽ giúp bạn hiểu sâu về kết cấu gỗ, ngói lưu ly và phong thủy trong các công trình triều Nguyễn.",
-    tags: ["history", "architecture"],
-  },
-];
-
-const guidesData = [
-  ...originalGuides,
-  ...originalGuides.map((g) => ({
-    ...g,
-    id: g.id + 8,
-    name: g.name + " (Copy)",
-  })),
-];
+// Default placeholder for guides without avatar
+const DEFAULT_AVATAR = "/images/placeholders/avatar-placeholder.jpg";
 
 const filters = [
   { id: "all", label: "Tất cả chuyên môn" },
@@ -128,13 +34,11 @@ export default function GuidesPage() {
   // Map API guides to display format
   const guidesData = useMemo(() => {
     return (apiGuides || []).map((guide) => ({
-      id: guide.user_id?._id || guide.user_id, // Use user_id for profile link
+      id: guide.user_id?._id || guide.user_id,
       name: guide.user_id?.name || "Guide",
       specialty: guide.introduction || "Hướng dẫn viên",
       rating: guide.rating || 5.0,
-      image:
-        guide.user_id?.avatar_url ||
-        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/1.jpg",
+      image: guide.user_id?.avatar_url || DEFAULT_AVATAR,
       languages: (guide.languages || []).map((l) => l.toUpperCase()),
       bio: guide.user_id?.bio || guide.experience || "Khám phá Huế cùng tôi!",
       tags: guide.expertise
@@ -345,7 +249,7 @@ export default function GuidesPage() {
         {/* 5. Recruitment CTA */}
         <div className="mt-16 rounded-3xl bg-[#2C3E50] p-8 md:p-16 text-center text-white relative overflow-hidden shadow-xl">
           <img
-            src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg"
+            src="/images/placeholders/cta-bg-placeholder.jpg"
             className="absolute inset-0 w-full h-full object-cover opacity-10 mix-blend-overlay pointer-events-none"
             alt="bg"
           />

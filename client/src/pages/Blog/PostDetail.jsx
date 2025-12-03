@@ -102,7 +102,7 @@ export default function PostDetail() {
     content: article.content_html || "<p>Nội dung đang được cập nhật...</p>",
     authorAvatar:
       article.authorId?.avatar_url ||
-      "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/guides/guide_female_1.jpg",
+      "/images/placeholders/avatar-placeholder.jpg",
     authorBio: article.authorId?.bio || "Hướng dẫn viên địa phương tại Huế",
   };
 

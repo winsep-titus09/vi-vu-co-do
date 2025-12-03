@@ -11,6 +11,7 @@ import {
   IconSettings,
   IconEdit,
   IconPlus,
+  IconFileText,
 } from "../icons/IconCommon";
 import { authApi } from "../features/auth/api";
 import {
@@ -123,6 +124,11 @@ export default function GuideLayout() {
       label: "Tour của tôi",
       path: "/dashboard/guide/my-tours",
       icon: IconMapPin,
+    },
+    {
+      label: "Yêu cầu chỉnh sửa",
+      path: "/dashboard/guide/edit-requests",
+      icon: IconFileText,
     },
     {
       label: "Tạo tour mới",

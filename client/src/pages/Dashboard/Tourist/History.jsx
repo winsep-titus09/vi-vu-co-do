@@ -50,6 +50,28 @@ export default function HistoryPage() {
   const bookings = useMemo(() => {
     if (!apiBookings) return [];
 
+    // Map booking status to display status
+    const mapStatus = (booking) => {
+      const status = booking.status;
+      const guideDecision = booking.guide_decision?.status;
+
+      if (status === "completed") return "completed";
+      if (
+        status === "canceled" ||
+        status === "cancelled" ||
+        status === "rejected"
+      )
+        return "cancelled";
+      if (
+        status === "paid" ||
+        status === "awaiting_payment" ||
+        guideDecision === "accepted"
+      )
+        return "confirmed";
+      if (status === "waiting_guide") return "pending";
+      return "pending";
+    };
+
     return apiBookings.map((b) => ({
       id: b._id,
       tourId: b.tour_id?._id,
@@ -66,8 +88,14 @@ export default function HistoryPage() {
         b.tour_id?.guide_id?.name ||
         "Chưa phân công",
       price: (b.total_price || 0).toLocaleString() + "đ",
-      guests: b.participants?.length || 1,
-      status: b.status || "pending",
+      guests:
+        b.num_guests ||
+        b.participants?.reduce(
+          (sum, p) => sum + (p.count_slot || p.quantity || 1),
+          0
+        ) ||
+        1,
+      status: mapStatus(b),
     }));
   }, [apiBookings]);
 

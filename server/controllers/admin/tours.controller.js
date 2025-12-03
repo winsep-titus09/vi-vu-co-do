@@ -94,12 +94,17 @@ export const approveTour = async (req, res) => {
     const tour = await Tour.findById(id);
     if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
 
+    // Set approval status to approved
     tour.approval = {
       status: "approved",
       reviewed_by: req.user._id,
       reviewed_at: new Date(),
       notes: null,
     };
+    // Ensure tour is active when approved
+    tour.status = "active";
+    tour.is_active = true;
+
     await tour.save();
 
     res.json({ message: "Đã duyệt tour.", tour });
@@ -131,6 +136,62 @@ export const rejectTour = async (req, res) => {
     res.json({ message: "Đã từ chối tour.", tour });
   } catch (err) {
     console.error("rejectTour error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
+};
+
+/** PATCH /api/admin/tours/:id/toggle-visibility - Ẩn/Hiện tour */
+export const toggleTourVisibility = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ message: "ID không hợp lệ." });
+
+    const tour = await Tour.findById(id);
+    if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
+
+    // Toggle is_active status
+    tour.is_active = !tour.is_active;
+    await tour.save();
+
+    const statusText = tour.is_active ? "hiển thị" : "ẩn";
+    res.json({
+      message: `Tour đã được ${statusText}.`,
+      tour,
+      is_active: tour.is_active,
+    });
+  } catch (err) {
+    console.error("toggleTourVisibility error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
+};
+
+/** DELETE /api/admin/tours/:id - Xóa tour vĩnh viễn */
+export const deleteTour = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ message: "ID không hợp lệ." });
+
+    const tour = await Tour.findById(id);
+    if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
+
+    // Check if tour has any bookings
+    const Booking = mongoose.model("Booking");
+    const bookingCount = await Booking.countDocuments({ tour_id: id });
+
+    if (bookingCount > 0) {
+      return res.status(400).json({
+        message: `Không thể xóa tour đã có ${bookingCount} lượt đặt. Hãy ẩn tour thay vì xóa.`,
+        hasBookings: true,
+        bookingCount,
+      });
+    }
+
+    await Tour.findByIdAndDelete(id);
+    res.json({ message: "Đã xóa tour thành công." });
+  } catch (err) {
+    console.error("deleteTour error:", err);
     res.status(500).json({ message: "Lỗi máy chủ." });
   }
 };

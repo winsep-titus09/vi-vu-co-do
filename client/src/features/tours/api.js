@@ -62,4 +62,37 @@ export const toursApi = {
     const response = await apiClient.delete(`/tours/${id}`);
     return response;
   },
+
+  // ============================================================================
+  // TOUR EDIT REQUESTS (FOR GUIDES)
+  // ============================================================================
+
+  // Create edit/delete request
+  createEditRequest: async (data) => {
+    const response = await apiClient.post("/tour-edit-requests", data);
+    return response;
+  },
+
+  // Get my edit requests (guide)
+  getMyEditRequests: async (params = {}) => {
+    const response = await apiClient.get("/tour-edit-requests/my", { params });
+    return {
+      items: Array.isArray(response?.requests) ? response.requests : [],
+      total: Number(response?.total || 0),
+      page: Number(response?.page || 1),
+      pageSize: Number(response?.pageSize || params.limit || 20),
+    };
+  },
+
+  // Get single edit request
+  getEditRequest: async (id) => {
+    const response = await apiClient.get(`/tour-edit-requests/${id}`);
+    return response;
+  },
+
+  // Cancel edit request
+  cancelEditRequest: async (id) => {
+    const response = await apiClient.delete(`/tour-edit-requests/${id}`);
+    return response;
+  },
 };

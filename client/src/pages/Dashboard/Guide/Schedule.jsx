@@ -313,19 +313,25 @@ export default function Schedule() {
                       <span
                         className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
                           booking.status === "confirmed" ||
-                          booking.status === "paid"
+                          booking.status === "paid" ||
+                          booking.guide_decision?.status === "accepted"
                             ? "bg-green-100 text-green-700"
                             : booking.status === "pending" ||
-                              booking.status === "awaiting_payment"
+                              booking.status === "awaiting_payment" ||
+                              booking.status === "waiting_guide" ||
+                              booking.guide_decision?.status === "pending"
                             ? "bg-yellow-100 text-yellow-700"
                             : "bg-gray-100 text-gray-700"
                         }`}
                       >
                         {booking.status === "confirmed" ||
-                        booking.status === "paid"
+                        booking.status === "paid" ||
+                        booking.guide_decision?.status === "accepted"
                           ? "Đã TT"
                           : booking.status === "pending" ||
-                            booking.status === "awaiting_payment"
+                            booking.status === "awaiting_payment" ||
+                            booking.status === "waiting_guide" ||
+                            booking.guide_decision?.status === "pending"
                           ? "Chờ TT"
                           : booking.status === "completed"
                           ? "Xong"
@@ -338,10 +344,13 @@ export default function Schedule() {
                   <div
                     className={`absolute top-0 left-0 w-0.5 h-full ${
                       booking.status === "confirmed" ||
-                      booking.status === "paid"
+                      booking.status === "paid" ||
+                      booking.guide_decision?.status === "accepted"
                         ? "bg-green-500"
                         : booking.status === "pending" ||
-                          booking.status === "awaiting_payment"
+                          booking.status === "awaiting_payment" ||
+                          booking.status === "waiting_guide" ||
+                          booking.guide_decision?.status === "pending"
                         ? "bg-yellow-500"
                         : "bg-gray-400"
                     }`}

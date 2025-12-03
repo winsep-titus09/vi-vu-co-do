@@ -193,18 +193,28 @@ export async function getGuideTours(req, res) {
       ]);
 
       // Map tours và requests to unified format
-      const mappedTours = tours.map((t) => ({
-        ...t,
-        type: "tour",
-        status: t.status === "active" ? "approved" : t.status || "approved",
-      }));
+      // Use approval.status for tour approval state
+      const mappedTours = tours.map((t) => {
+        const approvalStatus = t.approval?.status;
+        let displayStatus = "pending";
+        if (approvalStatus === "approved") displayStatus = "active";
+        else if (approvalStatus === "rejected") displayStatus = "rejected";
+        else if (approvalStatus === "pending") displayStatus = "pending";
+        else if (t.status === "active") displayStatus = "active"; // fallback
+
+        return {
+          ...t,
+          type: "tour",
+          displayStatus,
+        };
+      });
 
       const mappedRequests = requests
         .filter((r) => r.status !== "approved") // Đã approved sẽ có trong Tour
         .map((r) => ({
           ...r,
           type: "request",
-          status: r.status, // pending, rejected
+          displayStatus: r.status, // pending, rejected
         }));
 
       const all = [...mappedTours, ...mappedRequests].sort(
@@ -214,8 +224,11 @@ export async function getGuideTours(req, res) {
       total = all.length;
       items = all.slice((pg - 1) * lm, pg * lm);
     } else if (status === "approved") {
-      // Chỉ lấy Tour đã duyệt
-      const filter = { "guides.guideId": guideId };
+      // Chỉ lấy Tour đã duyệt (approval.status = approved)
+      const filter = {
+        "guides.guideId": guideId,
+        "approval.status": "approved",
+      };
       const [tours, cnt] = await Promise.all([
         Tour.find(filter)
           .populate("category_id", "name")
@@ -227,28 +240,84 @@ export async function getGuideTours(req, res) {
           .lean(),
         Tour.countDocuments(filter),
       ]);
-      items = tours.map((t) => ({ ...t, type: "tour", status: "approved" }));
+      items = tours.map((t) => ({
+        ...t,
+        type: "tour",
+        displayStatus: "active",
+      }));
       total = cnt;
-    } else if (status === "pending" || status === "rejected") {
-      // Chỉ lấy TourRequest với status tương ứng
-      const filter = { created_by: guideId, status };
-      const [requests, cnt] = await Promise.all([
-        TourRequest.find(filter)
+    } else if (status === "pending") {
+      // Lấy Tour chờ duyệt (approval.status = pending) VÀ TourRequest pending
+      const [pendingTours, pendingRequests] = await Promise.all([
+        Tour.find({
+          "guides.guideId": guideId,
+          "approval.status": "pending",
+        })
+          .populate("category_id", "name")
+          .populate("guides.guideId", "name avatar_url")
+          .populate("locations.locationId", "name slug")
+          .sort({ createdAt: -1 })
+          .lean(),
+        TourRequest.find({ created_by: guideId, status: "pending" })
           .populate("categories", "name")
           .populate("guides.guideId", "name avatar_url")
           .populate("locations.locationId", "name slug")
           .sort({ createdAt: -1 })
-          .skip((pg - 1) * lm)
-          .limit(lm)
           .lean(),
-        TourRequest.countDocuments(filter),
       ]);
-      items = requests.map((r) => ({
+
+      const mappedTours = pendingTours.map((t) => ({
+        ...t,
+        type: "tour",
+        displayStatus: "pending",
+      }));
+      const mappedRequests = pendingRequests.map((r) => ({
         ...r,
         type: "request",
-        status: r.status,
+        displayStatus: "pending",
       }));
-      total = cnt;
+
+      const all = [...mappedTours, ...mappedRequests].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+      total = all.length;
+      items = all.slice((pg - 1) * lm, pg * lm);
+    } else if (status === "rejected") {
+      // Lấy Tour bị từ chối (approval.status = rejected) VÀ TourRequest rejected
+      const [rejectedTours, rejectedRequests] = await Promise.all([
+        Tour.find({
+          "guides.guideId": guideId,
+          "approval.status": "rejected",
+        })
+          .populate("category_id", "name")
+          .populate("guides.guideId", "name avatar_url")
+          .populate("locations.locationId", "name slug")
+          .sort({ createdAt: -1 })
+          .lean(),
+        TourRequest.find({ created_by: guideId, status: "rejected" })
+          .populate("categories", "name")
+          .populate("guides.guideId", "name avatar_url")
+          .populate("locations.locationId", "name slug")
+          .sort({ createdAt: -1 })
+          .lean(),
+      ]);
+
+      const mappedTours = rejectedTours.map((t) => ({
+        ...t,
+        type: "tour",
+        displayStatus: "rejected",
+      }));
+      const mappedRequests = rejectedRequests.map((r) => ({
+        ...r,
+        type: "request",
+        displayStatus: "rejected",
+      }));
+
+      const all = [...mappedTours, ...mappedRequests].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+      total = all.length;
+      items = all.slice((pg - 1) * lm, pg * lm);
     } else if (status === "draft" || status === "hidden") {
       // Tour với status draft/hidden
       const filter = { "guides.guideId": guideId, status };
