@@ -13,6 +13,24 @@ import { IconUser } from "../../../icons/IconUser";
 import TicketModal from "../../../components/Modals/TicketModal";
 import { IconTicket } from "../../../icons/IconCommon";
 
+// Helper to map API status to display status
+const mapBookingStatus = (booking) => {
+  const status = booking.status;
+  const guideDecision = booking.guide_decision?.status;
+
+  if (status === "completed") return "completed";
+  if (status === "canceled" || status === "cancelled" || status === "rejected")
+    return "cancelled";
+  if (
+    status === "paid" ||
+    status === "awaiting_payment" ||
+    guideDecision === "accepted"
+  )
+    return "confirmed";
+  if (status === "waiting_guide") return "pending";
+  return "pending";
+};
+
 // Helper function badge (FC-TOURIST-03: Hiển thị trạng thái)
 const getStatusBadge = (status) => {
   switch (status) {
@@ -78,14 +96,20 @@ export default function TouristDashboard() {
       return { upcomingTrip: null, recentBookings: [] };
     }
 
+    // Map all bookings with display status
+    const mappedBookings = bookings.map((b) => ({
+      ...b,
+      displayStatus: mapBookingStatus(b),
+    }));
+
     // Find upcoming trip (confirmed or pending, future date)
-    const upcoming = bookings
-      .filter((b) => ["pending", "confirmed"].includes(b.status))
+    const upcoming = mappedBookings
+      .filter((b) => ["pending", "confirmed"].includes(b.displayStatus))
       .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))[0];
 
     // Get recent bookings (last 3)
-    const recent = bookings
-      .filter((b) => b.status !== "draft")
+    const recent = mappedBookings
+      .filter((b) => b.displayStatus !== "draft")
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 3);
 
@@ -100,8 +124,14 @@ export default function TouristDashboard() {
               upcoming.intended_guide_id?.name ||
               upcoming.tour_id?.guide_id?.name ||
               "Hướng dẫn viên",
-            guests: upcoming.participants?.length || 1,
-            status: upcoming.status,
+            guests:
+              upcoming.num_guests ||
+              upcoming.participants?.reduce(
+                (sum, p) => sum + (p.count_slot || p.quantity || 1),
+                0
+              ) ||
+              1,
+            status: upcoming.displayStatus,
             image:
               upcoming.tour_id?.cover_image_url ||
               "/images/placeholders/hero_slide_1.jpg",
@@ -112,7 +142,7 @@ export default function TouristDashboard() {
         name: b.tour_id?.name || "Chuyến tham quan",
         date: new Date(b.start_date).toLocaleDateString("vi-VN"),
         price: `${(b.total_price || 0).toLocaleString()}đ`,
-        status: b.status,
+        status: b.displayStatus,
       })),
     };
   }, [bookings]);

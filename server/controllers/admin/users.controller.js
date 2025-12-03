@@ -269,3 +269,142 @@ export const deleteUser = async (req, res) => {
     res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
   }
 };
+
+/**
+ * GET /api/admin/users/delete-requests
+ * List users with pending delete requests
+ */
+export const listDeleteRequests = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const filter = { "delete_request.status": "pending" };
+
+    const users = await User.find(filter)
+      .select("-password -resetPasswordToken -resetPasswordExpire")
+      .populate("role_id", "name")
+      .sort({ "delete_request.requested_at": -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await User.countDocuments(filter);
+
+    const formattedUsers = users.map((user) => ({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar_url,
+      phone: user.phone_number,
+      role: user.role_id?.name || "tourist",
+      status: user.status,
+      delete_request: user.delete_request,
+      createdAt: user.createdAt,
+    }));
+
+    res.json({
+      requests: formattedUsers,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+    });
+  } catch (err) {
+    console.error("listDeleteRequests error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+  }
+};
+
+/**
+ * POST /api/admin/users/:id/approve-delete
+ * Admin approves delete request and deletes user
+ */
+export const approveDeleteRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { admin_notes } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "ID không hợp lệ" });
+    }
+
+    const user = await User.findById(id).populate("role_id", "name");
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    if (user.delete_request?.status !== "pending") {
+      return res
+        .status(400)
+        .json({ message: "Người dùng không có yêu cầu xóa đang chờ duyệt" });
+    }
+
+    // Prevent deleting admins
+    if (user.role_id?.name === "admin") {
+      return res.status(400).json({ message: "Không thể xóa tài khoản admin" });
+    }
+
+    // Store user info before deletion for response
+    const userName = user.name;
+    const userEmail = user.email;
+
+    // Delete user (triggers middleware to clean up related data)
+    await User.findOneAndDelete({ _id: id });
+
+    res.json({
+      message: `Đã xóa tài khoản "${userName}" (${userEmail}) thành công`,
+    });
+  } catch (err) {
+    console.error("approveDeleteRequest error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+  }
+};
+
+/**
+ * POST /api/admin/users/:id/reject-delete
+ * Admin rejects delete request
+ */
+export const rejectDeleteRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { admin_notes } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "ID không hợp lệ" });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+
+    if (user.delete_request?.status !== "pending") {
+      return res
+        .status(400)
+        .json({ message: "Người dùng không có yêu cầu xóa đang chờ duyệt" });
+    }
+
+    user.delete_request = {
+      status: "rejected",
+      reason: user.delete_request.reason,
+      requested_at: user.delete_request.requested_at,
+      reviewed_at: new Date(),
+      reviewed_by: req.user._id,
+      admin_notes: admin_notes || "",
+    };
+    await user.save();
+
+    res.json({
+      message: `Đã từ chối yêu cầu xóa tài khoản của "${user.name}"`,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        delete_request: user.delete_request,
+      },
+    });
+  } catch (err) {
+    console.error("rejectDeleteRequest error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+  }
+};

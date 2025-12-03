@@ -64,6 +64,9 @@ const TouristInvoices = lazy(() =>
 // 2. Guide Dashboard Pages
 const GuideDashboard = lazy(() => import("../pages/Dashboard/Guide/index"));
 const GuideMyTours = lazy(() => import("../pages/Dashboard/Guide/MyTours"));
+const GuideMyEditRequests = lazy(() =>
+  import("../pages/Dashboard/Guide/MyEditRequests")
+);
 const GuideCreateTour = lazy(() =>
   import("../pages/Dashboard/Guide/CreateTour")
 );
@@ -363,6 +366,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <GuideMyTours />
+          </Suspense>
+        ),
+      },
+      {
+        path: "edit-requests",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <GuideMyEditRequests />
           </Suspense>
         ),
       },

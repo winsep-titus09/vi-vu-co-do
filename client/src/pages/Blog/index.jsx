@@ -15,12 +15,12 @@ import IconInstagram from "../../icons/IconInstagram.jsx";
 
 // Mock Gallery (static content - Instagram feed)
 const galleryImages = [
-  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/hoanghon.jpg",
-  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuatuhieu1.jpg",
-  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
-  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu2.jpg",
-  "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg",
+  "/images/placeholders/gallery-1.jpg",
+  "/images/placeholders/gallery-2.jpg",
+  "/images/placeholders/gallery-3.jpg",
+  "/images/placeholders/gallery-4.jpg",
+  "/images/placeholders/gallery-5.jpg",
+  "/images/placeholders/gallery-6.jpg",
 ];
 
 export default function BlogPage() {

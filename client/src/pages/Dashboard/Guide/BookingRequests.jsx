@@ -75,32 +75,84 @@ const IconFilter = ({ className }) => (
   </svg>
 );
 
-const tabs = [
-  { id: "all", label: "Tất cả" },
-  { id: "pending", label: "Chờ duyệt", count: 2 },
-  { id: "accepted", label: "Đã nhận", count: 1 },
-  { id: "rejected", label: "Đã từ chối" },
-];
-
 export default function BookingRequests() {
   const [activeTab, setActiveTab] = useState("pending");
   const [search, setSearch] = useState("");
   const toast = useToast();
 
+  // Fetch ALL bookings to calculate counts for tabs
+  const { bookings: allBookings, refetch: refetchAll } = useGuideBookings({
+    limit: 200,
+  });
+
+  // Helper to get display status from booking
+  const getDisplayStatusForCount = (booking) => {
+    const status = booking.status;
+    const guideDecision = booking.guide_decision?.status;
+    if (
+      guideDecision === "accepted" ||
+      status === "awaiting_payment" ||
+      status === "paid" ||
+      status === "completed"
+    ) {
+      return "accepted";
+    }
+    if (
+      guideDecision === "rejected" ||
+      status === "rejected" ||
+      status === "canceled"
+    ) {
+      return "rejected";
+    }
+    if (status === "waiting_guide" || guideDecision === "pending") {
+      return "pending";
+    }
+    return "pending";
+  };
+
+  // Calculate counts for tabs
+  const tabCounts = React.useMemo(() => {
+    if (!allBookings || allBookings.length === 0) {
+      return { pending: 0, accepted: 0, rejected: 0 };
+    }
+    return allBookings.reduce(
+      (acc, booking) => {
+        const displayStatus = getDisplayStatusForCount(booking);
+        acc[displayStatus] = (acc[displayStatus] || 0) + 1;
+        return acc;
+      },
+      { pending: 0, accepted: 0, rejected: 0 }
+    );
+  }, [allBookings]);
+
+  // Dynamic tabs with real counts
+  const tabs = [
+    { id: "all", label: "Tất cả", count: allBookings?.length || 0 },
+    { id: "pending", label: "Chờ duyệt", count: tabCounts.pending },
+    { id: "accepted", label: "Đã nhận", count: tabCounts.accepted },
+    { id: "rejected", label: "Đã từ chối", count: tabCounts.rejected },
+  ];
+
   // Determine status filter based on active tab
   const getStatusFilter = () => {
     if (activeTab === "all") return undefined;
     if (activeTab === "pending") return "waiting_guide";
-    if (activeTab === "accepted") return "accepted,paid";
-    if (activeTab === "rejected") return "rejected";
+    if (activeTab === "accepted") return "awaiting_payment,paid,completed";
+    if (activeTab === "rejected") return "rejected,canceled";
     return undefined;
   };
 
-  // Fetch bookings from API
+  // Fetch bookings from API for current tab
   const { bookings, isLoading, error, refetch } = useGuideBookings({
     status: getStatusFilter(),
     limit: 50,
   });
+
+  // Combined refetch
+  const handleRefetch = () => {
+    refetch();
+    refetchAll();
+  };
 
   // Filter by search
   const filteredRequests = bookings.filter((booking) => {
@@ -116,11 +168,29 @@ export default function BookingRequests() {
 
   // Map booking status to display status
   const getDisplayStatus = (booking) => {
-    if (booking.status === "waiting_guide") return "pending";
-    if (booking.status === "accepted" || booking.status === "paid")
+    const status = booking.status;
+    const guideDecision = booking.guide_decision?.status;
+
+    // Check guide decision first
+    if (
+      guideDecision === "accepted" ||
+      status === "awaiting_payment" ||
+      status === "paid" ||
+      status === "completed"
+    ) {
       return "accepted";
-    if (booking.status === "rejected") return "rejected";
-    if (booking.status === "completed") return "completed";
+    }
+    if (
+      guideDecision === "rejected" ||
+      status === "rejected" ||
+      status === "canceled"
+    ) {
+      return "rejected";
+    }
+    if (status === "waiting_guide" || guideDecision === "pending") {
+      return "pending";
+    }
+    if (status === "completed") return "completed";
     return "pending";
   };
 
@@ -129,7 +199,7 @@ export default function BookingRequests() {
     try {
       await guidesApi.approveBooking(bookingId);
       toast.success("Thành công!", "Đã chấp nhận yêu cầu đặt tour.");
-      refetch();
+      handleRefetch();
     } catch (error) {
       toast.error("Lỗi", error.message || "Không thể chấp nhận yêu cầu");
     }
@@ -142,10 +212,31 @@ export default function BookingRequests() {
     try {
       await guidesApi.rejectBooking(bookingId, note || "");
       toast.success("Thành công!", "Đã từ chối yêu cầu đặt tour.");
-      refetch();
+      handleRefetch();
     } catch (error) {
       toast.error("Lỗi", error.message || "Không thể từ chối yêu cầu");
     }
+  };
+
+  // Calculate total guests from participants
+  const calculateGuests = (booking) => {
+    if (booking.num_guests) return booking.num_guests;
+    if (booking.participants && Array.isArray(booking.participants)) {
+      return booking.participants.reduce(
+        (sum, p) => sum + (p.count_slot || p.quantity || 1),
+        0
+      );
+    }
+    return booking.contact?.guest_count || 1;
+  };
+
+  // Get booking time
+  const getBookingTime = (booking) => {
+    // Priority: start_time > tour fixed_departure_time > fallback
+    if (booking.start_time) return booking.start_time;
+    if (booking.tour_id?.fixed_departure_time)
+      return booking.tour_id.fixed_departure_time;
+    return "08:00";
   };
 
   const getStatusBadge = (status) => {
@@ -210,9 +301,9 @@ export default function BookingRequests() {
                     `}
             >
               {tab.label}
-              {tab.count > 0 && (
+              {tab.count > 0 && tab.id !== "all" && (
                 <span
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
+                  className={`min-w-5 h-5 px-1.5 rounded-full flex items-center justify-center text-[10px] ${
                     activeTab === tab.id
                       ? "bg-white text-primary"
                       : "bg-gray-200 text-text-secondary"
@@ -266,16 +357,8 @@ export default function BookingRequests() {
               date: startDate
                 ? startDate.toLocaleDateString("vi-VN")
                 : "Đang cập nhật",
-              time: startDate
-                ? startDate.toLocaleTimeString("vi-VN", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : booking.tour_id?.fixed_departure_time || "--:--",
-              guests:
-                booking.participants?.filter((p) => p.count_slot).length ||
-                booking.contact?.guest_count ||
-                0,
+              time: getBookingTime(booking),
+              guests: calculateGuests(booking),
               totalPrice: formatCurrency(booking.total_price),
               note: booking.contact?.note?.trim() || "",
               requestTime: createdAt ? formatTimeAgo(createdAt) : "--",

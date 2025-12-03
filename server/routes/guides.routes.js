@@ -3,6 +3,7 @@
 import express from "express";
 import { auth } from "../middleware/auth.js";
 import { authorize } from "../middleware/auth.js";
+import { upload } from "../services/uploader.js";
 import {
   applyGuide,
   getMyGuideApplication,
@@ -38,7 +39,17 @@ import {
 
 const router = express.Router();
 
-router.post("/apply", auth, authorize("tourist"), applyGuide);
+// Guide Application - hỗ trợ multipart/form-data với file upload
+router.post(
+  "/apply",
+  auth,
+  authorize("tourist"),
+  upload.fields([
+    { name: "id_cards", maxCount: 3 },
+    { name: "certificates", maxCount: 5 },
+  ]),
+  applyGuide
+);
 router.get("/apply/me", auth, getMyGuideApplication);
 
 router.get("/profile/me", auth, authorize("guide"), getMyGuideProfile);

@@ -280,7 +280,7 @@ export default function GuideProfileSettings() {
                 <img
                   src={
                     previewAvatar ||
-                    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/guides/guide_female_1.jpg"
+                    "/images/placeholders/avatar-placeholder.jpg"
                   }
                   className="w-full h-full object-cover rounded-full border-4 border-white shadow-md group-hover:opacity-90 transition-opacity"
                   alt="Avatar"

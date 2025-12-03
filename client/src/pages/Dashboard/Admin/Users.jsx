@@ -12,6 +12,7 @@ import {
   IconFileText,
   IconChevronLeft,
   IconChevronRight,
+  IconTrash,
 } from "../../../icons/IconCommon";
 import Spinner from "../../../components/Loaders/Spinner";
 import ConfirmModal from "../../../components/Modals/ConfirmModal";
@@ -20,6 +21,8 @@ import {
   useAdminUserActions,
   useAdminGuideApplications,
   useAdminGuideAppActions,
+  useAdminDeleteRequests,
+  useAdminDeleteRequestActions,
 } from "../../../features/users/hooks";
 
 // ============================================================================
@@ -82,6 +85,8 @@ export default function AdminUsers() {
   const [lightboxImg, setLightboxImg] = useState(null);
   const [lockConfirm, setLockConfirm] = useState(null);
   const [rejectConfirm, setRejectConfirm] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [rejectDeleteConfirm, setRejectDeleteConfirm] = useState(null);
 
   // Cache for instant tab switching
   const cacheRef = useRef({});
@@ -110,10 +115,22 @@ export default function AdminUsers() {
     refetch: refetchGuides,
   } = useAdminGuideApplications({ status: "pending" });
 
+  // Fetch pending delete requests
+  const {
+    requests: deleteRequests,
+    isLoading: deleteRequestsLoading,
+    refetch: refetchDeleteRequests,
+  } = useAdminDeleteRequests();
+
   // Actions
   const { updateStatus, isLoading: actionLoading } = useAdminUserActions();
   const { reviewApplication, isLoading: reviewLoading } =
     useAdminGuideAppActions();
+  const {
+    approveDelete,
+    rejectDelete,
+    isLoading: deleteActionLoading,
+  } = useAdminDeleteRequestActions();
 
   // Cache results
   const cacheKey = `${activeTab}-${page}-${debouncedSearch}`;
@@ -194,6 +211,46 @@ export default function AdminUsers() {
     }
   };
 
+  // Delete request handlers
+  const handleApproveDelete = (user) => {
+    setDeleteConfirm(user);
+  };
+
+  const confirmApproveDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await approveDelete(deleteConfirm._id);
+      toast.success(
+        "Đã xóa",
+        `Tài khoản ${deleteConfirm.name} đã được xóa thành công.`
+      );
+      setDeleteConfirm(null);
+      refetchDeleteRequests();
+      refetch();
+    } catch (err) {
+      toast.error("Lỗi", err.message || "Không thể xóa tài khoản");
+    }
+  };
+
+  const handleRejectDelete = (user) => {
+    setRejectDeleteConfirm(user);
+  };
+
+  const confirmRejectDelete = async () => {
+    if (!rejectDeleteConfirm) return;
+    try {
+      await rejectDelete(rejectDeleteConfirm._id);
+      toast.info(
+        "Đã từ chối",
+        `Yêu cầu xóa của ${rejectDeleteConfirm.name} đã bị từ chối.`
+      );
+      setRejectDeleteConfirm(null);
+      refetchDeleteRequests();
+    } catch (err) {
+      toast.error("Lỗi", err.message || "Không thể từ chối yêu cầu");
+    }
+  };
+
   // Loading state for initial load
   if (isLoading && users.length === 0 && activeTab !== "pending") {
     return (
@@ -213,24 +270,14 @@ export default function AdminUsers() {
           </h1>
           <p className="text-text-secondary text-sm mt-1">
             Kiểm soát tài khoản và xét duyệt đối tác.
-            {displayData.total > 0 && activeTab !== "pending" && (
-              <span className="ml-2 font-bold">
-                Tổng: {displayData.total} người dùng
-              </span>
-            )}
+            {displayData.total > 0 &&
+              activeTab !== "pending" &&
+              activeTab !== "delete-requests" && (
+                <span className="ml-2 font-bold">
+                  Tổng: {displayData.total} người dùng
+                </span>
+              )}
           </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              setActiveTab("pending");
-              setPage(1);
-            }}
-            className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-2"
-          >
-            <IconShieldCheck className="w-4 h-4" /> Duyệt HDV (
-            {pendingGuides.length})
-          </button>
         </div>
       </div>
 
@@ -248,7 +295,19 @@ export default function AdminUsers() {
             { id: "all", label: "Tất cả" },
             { id: "tourist", label: "Du khách" },
             { id: "guide", label: "Hướng dẫn viên" },
-            { id: "pending", label: "Chờ duyệt", icon: true },
+            {
+              id: "pending",
+              label: "Chờ duyệt HDV",
+              icon: true,
+              count: pendingGuides.length,
+            },
+            {
+              id: "delete-requests",
+              label: "Yêu cầu xóa",
+              icon: true,
+              count: deleteRequests.length,
+              danger: true,
+            },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -260,20 +319,26 @@ export default function AdminUsers() {
                 whitespace-nowrap px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2
                 ${
                   activeTab === tab.id
-                    ? "bg-primary text-white shadow-md"
+                    ? tab.danger
+                      ? "bg-red-500 text-white shadow-md"
+                      : "bg-primary text-white shadow-md"
                     : "text-text-secondary hover:bg-bg-main"
                 }
               `}
             >
               {tab.label}
-              {tab.icon && pendingGuides.length > 0 && (
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              {tab.icon && tab.count > 0 && (
+                <span
+                  className={`w-2 h-2 rounded-full animate-pulse ${
+                    tab.danger ? "bg-red-300" : "bg-red-500"
+                  }`}
+                ></span>
               )}
             </button>
           ))}
         </div>
 
-        {activeTab !== "pending" && (
+        {activeTab !== "pending" && activeTab !== "delete-requests" && (
           <div className="relative w-full md:w-72">
             <input
               type="text"
@@ -288,7 +353,7 @@ export default function AdminUsers() {
       </div>
 
       {/* --- VIEW 1: USER LIST TABLE --- */}
-      {activeTab !== "pending" && (
+      {activeTab !== "pending" && activeTab !== "delete-requests" && (
         <div className="bg-white rounded-3xl border border-border-light overflow-hidden shadow-sm animate-fade-in">
           {/* Empty state check */}
           {filteredUsers.length > 0 ? (
@@ -551,10 +616,14 @@ export default function AdminUsers() {
                         </p>
                         <div
                           className="h-32 rounded-xl overflow-hidden border border-border-light bg-gray-100 relative group cursor-zoom-in"
-                          onClick={() => setLightboxImg(guide.id_cards[0])}
+                          onClick={() =>
+                            setLightboxImg(
+                              guide.id_cards[0]?.url || guide.id_cards[0]
+                            )
+                          }
                         >
                           <img
-                            src={guide.id_cards[0]}
+                            src={guide.id_cards[0]?.url || guide.id_cards[0]}
                             className="w-full h-full object-cover"
                             alt="ID Card"
                           />
@@ -613,6 +682,128 @@ export default function AdminUsers() {
         </div>
       )}
 
+      {/* --- VIEW 3: DELETE REQUESTS --- */}
+      {activeTab === "delete-requests" && (
+        <div className="grid grid-cols-1 gap-6 animate-fade-in">
+          {deleteRequestsLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Spinner size="lg" />
+            </div>
+          ) : deleteRequests.length > 0 ? (
+            deleteRequests.map((user) => (
+              <div
+                key={user._id}
+                className="bg-white p-6 rounded-3xl border border-red-100 shadow-sm hover:shadow-md transition-all"
+              >
+                <div className="flex flex-col lg:flex-row gap-6">
+                  {/* User Info */}
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-start gap-4">
+                      {user.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user.name}
+                          className="w-14 h-14 rounded-full object-cover border-2 border-red-100"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl font-bold border-2 border-red-200">
+                          {user.name?.charAt(0) || "?"}
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <h3 className="text-lg font-heading font-bold text-text-primary">
+                          {user.name || "Ẩn danh"}
+                        </h3>
+                        <p className="text-sm text-text-secondary">
+                          {user.email} • {user.phone || "Chưa có SĐT"}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${
+                              user.role === "guide"
+                                ? "bg-purple-50 text-purple-700 border border-purple-100"
+                                : "bg-blue-50 text-blue-700 border border-blue-100"
+                            }`}
+                          >
+                            {user.role === "guide" ? "HDV" : "Du khách"}
+                          </span>
+                          <span className="text-xs text-orange-500 font-bold">
+                            Yêu cầu:{" "}
+                            {formatTimeAgo(user.delete_request?.requested_at)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Reason */}
+                    {user.delete_request?.reason && (
+                      <div className="bg-red-50 p-4 rounded-2xl border border-red-100 text-sm text-red-700">
+                        <p className="text-xs font-bold text-red-500 uppercase mb-1">
+                          Lý do xóa:
+                        </p>
+                        "{user.delete_request.reason}"
+                      </div>
+                    )}
+
+                    {/* User Stats */}
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-xs font-bold text-text-secondary uppercase">
+                          Ngày tham gia
+                        </p>
+                        <p className="font-bold text-text-primary">
+                          {formatDate(user.createdAt)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-text-secondary uppercase">
+                          Trạng thái TK
+                        </p>
+                        <p
+                          className={`font-bold ${
+                            user.status === "active"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {user.status === "active" ? "Hoạt động" : "Đã khóa"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="lg:w-48 flex flex-col justify-center gap-3 border-t lg:border-t-0 lg:border-l border-border-light pt-6 lg:pt-0 lg:pl-8">
+                    <button
+                      onClick={() => handleApproveDelete(user)}
+                      disabled={deleteActionLoading}
+                      className="w-full py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <IconTrash className="w-4 h-4" /> Xóa tài khoản
+                    </button>
+                    <button
+                      onClick={() => handleRejectDelete(user)}
+                      disabled={deleteActionLoading}
+                      className="w-full py-3 rounded-xl border border-gray-200 text-text-secondary bg-white hover:bg-gray-50 font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <IconX className="w-4 h-4" /> Từ chối
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-12 text-center bg-white rounded-3xl border border-border-light">
+              <IconCheck className="w-12 h-12 mx-auto mb-3 text-green-500 bg-green-100 p-2 rounded-full" />
+              <p className="text-text-primary font-bold">Tuyệt vời!</p>
+              <p className="text-text-secondary text-sm">
+                Không có yêu cầu xóa tài khoản nào đang chờ xử lý.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* --- LIGHTBOX MODAL --- */}
       {lightboxImg && (
         <div
@@ -661,6 +852,30 @@ export default function AdminUsers() {
         confirmText="Từ chối"
         confirmVariant="danger"
         isLoading={reviewLoading}
+      />
+
+      {/* Approve Delete Account Confirm Modal */}
+      <ConfirmModal
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={confirmApproveDelete}
+        title="Xác nhận xóa tài khoản"
+        message={`Bạn có chắc muốn XÓA VĨNH VIỄN tài khoản "${deleteConfirm?.name}" (${deleteConfirm?.email})? Hành động này không thể hoàn tác!`}
+        confirmText="Xóa vĩnh viễn"
+        confirmVariant="danger"
+        isLoading={deleteActionLoading}
+      />
+
+      {/* Reject Delete Request Confirm Modal */}
+      <ConfirmModal
+        isOpen={!!rejectDeleteConfirm}
+        onClose={() => setRejectDeleteConfirm(null)}
+        onConfirm={confirmRejectDelete}
+        title="Từ chối yêu cầu xóa"
+        message={`Bạn có chắc muốn từ chối yêu cầu xóa tài khoản của "${rejectDeleteConfirm?.name}"?`}
+        confirmText="Từ chối"
+        confirmVariant="primary"
+        isLoading={deleteActionLoading}
       />
     </div>
   );

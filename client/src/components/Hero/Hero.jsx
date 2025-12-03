@@ -1,6 +1,6 @@
 // src/components/Hero/Hero.jsx
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import IconArrowRight from "../../icons/IconArrowRight.jsx";
 import IconBookOpen from "../../icons/IconBookOpen.jsx";
@@ -8,11 +8,90 @@ import IconShieldCheck from "../../icons/IconShieldCheck.jsx";
 import { Icon3D, IconStar } from "../../icons/IconBox.jsx";
 import IconLang from "../../icons/IconLang.jsx";
 import IconArrowUpRight from "../../icons/IconArrowUpRight.jsx";
+import { toursApi } from "../../features/tours/api.js";
+import { formatCurrency } from "../../lib/formatters.js";
+
+// Helper to convert MongoDB Decimal128 to number
+const toNumber = (val) => {
+  if (val?.$numberDecimal) return parseFloat(val.$numberDecimal);
+  return parseFloat(val) || 0;
+};
+
+// Normalize tour data from API
+const normalizeTour = (tour) => ({
+  _id: tour._id,
+  slug: tour.slug,
+  title: tour.name || tour.title,
+  coverImage: tour.cover_image_url || tour.gallery?.[0] || tour.images?.[0],
+  images: tour.gallery || tour.images || [],
+  rating: toNumber(tour.average_rating || tour.rating || 0),
+  price: toNumber(tour.price || 0),
+  duration: tour.duration_hours || tour.duration || 0,
+  category: tour.category_id || tour.categories?.[0],
+  subtitle: tour.description?.substring(0, 80),
+  shortDescription: tour.description,
+  schedules: tour.schedules || [],
+  ...tour,
+});
 
 /**
  * Hero Section - Phong cách Heritage Trails
  */
 export default function Hero() {
+  const [featuredTour, setFeaturedTour] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFeaturedTour = async () => {
+      try {
+        setIsLoading(true);
+        const data = await toursApi.getFeaturedTours(1);
+        // Lấy tour đầu tiên từ danh sách
+        const tours = data?.items || data || [];
+        if (tours.length > 0) {
+          // Normalize tour data to match expected field names
+          setFeaturedTour(normalizeTour(tours[0]));
+        }
+      } catch (error) {
+        console.error("Error fetching featured tour:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFeaturedTour();
+  }, []);
+
+  // Format duration (in hours)
+  const formatDuration = (hours) => {
+    if (!hours) return "N/A";
+    const wholeHours = Math.floor(hours);
+    const mins = Math.round((hours - wholeHours) * 60);
+    if (wholeHours === 0) return `${mins} phút`;
+    if (mins === 0) return `${wholeHours} giờ`;
+    return `${wholeHours} giờ ${mins} phút`;
+  };
+
+  // Get next departure time
+  const getNextDeparture = () => {
+    if (!featuredTour?.schedules?.length) return "Liên hệ";
+    const now = new Date();
+    const todaySchedules = featuredTour.schedules
+      .filter((s) => {
+        const scheduleDate = new Date(s.date);
+        return (
+          scheduleDate.toDateString() === now.toDateString() &&
+          s.status === "open"
+        );
+      })
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    if (todaySchedules.length > 0) {
+      return `${todaySchedules[0].startTime} Hôm nay`;
+    }
+    return "Xem lịch";
+  };
+
   return (
     // CẬP NHẬT:
     // - 'pt-5': Padding top 20px cố định.
@@ -73,71 +152,171 @@ export default function Hero() {
         <div className="relative mt-8 lg:mt-0 w-full lg:max-w-[560px] lg:mx-auto">
           {/* Card Container */}
           <div className="rounded-[28px] border border-white/50 bg-white/60 backdrop-blur-md shadow-2xl p-5 space-y-5 relative z-10">
-            {/* Card Header */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary">
-                  Tour Tiêu Biểu
-                </p>
-                <h2 className="!text-2xl font-heading font-bold text-text-primary">
-                  Dạo bộ Đại Nội về đêm
-                </h2>
-              </div>
-              <span className="inline-flex items-center rounded-full bg-[#FEFAE0] text-[#BC4C00] text-xs font-bold px-2.5 py-1 border border-[#BC4C00]/10">
-                <IconStar className="w-3 h-3 mr-1" />
-                4.9
-              </span>
-            </div>
-
-            {/* Card Image (Visual 3D) */}
-            <div className="aspect-video rounded-xl bg-slate-100 overflow-hidden relative group">
-              <img
-                src="https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg"
-                alt="Đại Nội Huế"
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              {/* Overlay Gradient */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center pb-5 px-5 text-center">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-secondary mb-1">
-                    Trải nghiệm 3D
-                  </p>
-                  <p className="text-sm font-medium text-white">
-                    Ngọ Môn Quan – Tương tác thực tế ảo
-                  </p>
+            {isLoading ? (
+              // Loading skeleton
+              <div className="animate-pulse space-y-5">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <div className="h-3 w-20 bg-gray-200 rounded"></div>
+                    <div className="h-6 w-48 bg-gray-200 rounded"></div>
+                  </div>
+                  <div className="h-6 w-14 bg-gray-200 rounded-full"></div>
                 </div>
+                <div className="aspect-video bg-gray-200 rounded-xl"></div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-16 bg-gray-200 rounded-xl"></div>
+                  ))}
+                </div>
+                <div className="h-12 bg-gray-200 rounded-full"></div>
               </div>
-            </div>
+            ) : featuredTour ? (
+              <>
+                {/* Card Header */}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary">
+                      Tour Tiêu Biểu
+                    </p>
+                    <h2 className="!text-2xl font-heading font-bold text-text-primary line-clamp-1">
+                      {featuredTour.title}
+                    </h2>
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-[#FEFAE0] text-[#BC4C00] text-xs font-bold px-2.5 py-1 border border-[#BC4C00]/10 flex-shrink-0">
+                    <IconStar className="w-3 h-3 mr-1" />
+                    {featuredTour.rating?.toFixed(1) || "5.0"}
+                  </span>
+                </div>
 
-            {/* Stats Grid */}
-            <dl className="grid grid-cols-3 gap-2 text-xs">
-              <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
-                <dt className="text-text-secondary mb-1 text-[10px] uppercase">
-                  Thời lượng
-                </dt>
-                <dd className="font-bold text-text-primary">2.5 giờ</dd>
-              </div>
-              <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
-                <dt className="text-text-secondary mb-1 text-[10px] uppercase">
-                  Giá từ
-                </dt>
-                <dd className="font-bold text-text-primary">250k ₫</dd>
-              </div>
-              <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
-                <dt className="text-text-secondary mb-1 text-[10px] uppercase">
-                  Khởi hành
-                </dt>
-                <dd className="font-bold text-text-primary">18:00 Tối nay</dd>
-              </div>
-            </dl>
+                {/* Card Image */}
+                <div className="aspect-video rounded-xl bg-slate-100 overflow-hidden relative group">
+                  <img
+                    src={
+                      featuredTour.coverImage ||
+                      featuredTour.images?.[0] ||
+                      "/images/placeholders/tour-placeholder.jpg"
+                    }
+                    alt={featuredTour.title}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  {/* Overlay Gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center pb-5 px-5 text-center">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-secondary mb-1">
+                        {featuredTour.category?.name || "Trải nghiệm 3D"}
+                      </p>
+                      <p className="text-sm font-medium text-white line-clamp-1">
+                        {featuredTour.subtitle ||
+                          featuredTour.shortDescription ||
+                          "Khám phá di sản văn hóa Huế"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-            {/* CTA Button */}
-            <Link
-              to="/tours/dai-noi-dem"
-              className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-text-primary text-white text-sm font-bold px-4 py-3 hover:bg-primary transition-colors duration-300"
-            >
-              Xem chi tiết tour <IconArrowUpRight className="w-4 h-4" />
-            </Link>
+                {/* Stats Grid */}
+                <dl className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
+                    <dt className="text-text-secondary mb-1 text-[10px] uppercase">
+                      Thời lượng
+                    </dt>
+                    <dd className="font-bold text-text-primary">
+                      {formatDuration(featuredTour.duration)}
+                    </dd>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
+                    <dt className="text-text-secondary mb-1 text-[10px] uppercase">
+                      Giá từ
+                    </dt>
+                    <dd className="font-bold text-text-primary">
+                      {formatCurrency(featuredTour.price)}
+                    </dd>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
+                    <dt className="text-text-secondary mb-1 text-[10px] uppercase">
+                      Khởi hành
+                    </dt>
+                    <dd className="font-bold text-text-primary">
+                      {getNextDeparture()}
+                    </dd>
+                  </div>
+                </dl>
+
+                {/* CTA Button */}
+                <Link
+                  to={`/tours/${featuredTour.slug || featuredTour._id}`}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-text-primary text-white text-sm font-bold px-4 py-3 hover:bg-primary transition-colors duration-300"
+                >
+                  Xem chi tiết tour <IconArrowUpRight className="w-4 h-4" />
+                </Link>
+              </>
+            ) : (
+              // Fallback static content
+              <>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary">
+                      Tour Tiêu Biểu
+                    </p>
+                    <h2 className="!text-2xl font-heading font-bold text-text-primary">
+                      Dạo bộ Đại Nội về đêm
+                    </h2>
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-[#FEFAE0] text-[#BC4C00] text-xs font-bold px-2.5 py-1 border border-[#BC4C00]/10">
+                    <IconStar className="w-3 h-3 mr-1" />
+                    4.9
+                  </span>
+                </div>
+
+                <div className="aspect-video rounded-xl bg-slate-100 overflow-hidden relative group">
+                  <img
+                    src="/images/placeholders/tour-placeholder.jpg"
+                    alt="Đại Nội Huế"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center pb-5 px-5 text-center">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-secondary mb-1">
+                        Trải nghiệm 3D
+                      </p>
+                      <p className="text-sm font-medium text-white">
+                        Ngọ Môn Quan – Tương tác thực tế ảo
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <dl className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
+                    <dt className="text-text-secondary mb-1 text-[10px] uppercase">
+                      Thời lượng
+                    </dt>
+                    <dd className="font-bold text-text-primary">2.5 giờ</dd>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
+                    <dt className="text-text-secondary mb-1 text-[10px] uppercase">
+                      Giá từ
+                    </dt>
+                    <dd className="font-bold text-text-primary">250k ₫</dd>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
+                    <dt className="text-text-secondary mb-1 text-[10px] uppercase">
+                      Khởi hành
+                    </dt>
+                    <dd className="font-bold text-text-primary">
+                      18:00 Tối nay
+                    </dd>
+                  </div>
+                </dl>
+
+                <Link
+                  to="/tours"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-text-primary text-white text-sm font-bold px-4 py-3 hover:bg-primary transition-colors duration-300"
+                >
+                  Xem chi tiết tour <IconArrowUpRight className="w-4 h-4" />
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Decorative Elements (Background blobs) */}

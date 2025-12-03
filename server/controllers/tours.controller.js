@@ -196,19 +196,12 @@ export const getTour = async (req, res) => {
   }
 };
 
-/** POST /api/tours  (Admin trực tiếp) */
+/** POST /api/tours  (Admin hoặc Guide) */
 export const createTour = async (req, res) => {
   try {
     const roleName = await resolveRoleName(req.user);
     if (!["admin", "guide"].includes(roleName)) {
       return res.status(403).json({ message: "Bạn không có quyền tạo tour." });
-    }
-    // HDV không được tạo trực tiếp (theo flow hiện tại)
-    if (roleName === "guide") {
-      return res.status(403).json({
-        message:
-          "HDV không được tạo tour trực tiếp. Vui lòng gửi yêu cầu tại /api/tour-requests.",
-      });
     }
 
     // Không cho override approval từ body
@@ -306,25 +299,45 @@ export const createTour = async (req, res) => {
       category_id: data.category_id || null,
       categories,
       cover_image_url: data.cover_image_url || null,
+      video_url: data.video_url || null,
       gallery: data.gallery || [],
+      highlights: data.highlights || [],
+      includes: data.includes || [],
+      excludes: data.excludes || [],
       itinerary: data.itinerary || [],
       featured: !!data.featured,
-      status: data.status || "active",
+      status: "active",
 
       // trace
       created_by: req.user._id,
       created_by_role: roleName,
 
-      // phê duyệt: admin tạo -> approved
-      approval: {
-        status: "approved",
-        reviewed_by: req.user._id,
-        reviewed_at: new Date(),
-        notes: null,
-      },
+      // phê duyệt: admin tạo -> approved, guide tạo -> pending
+      approval:
+        roleName === "admin"
+          ? {
+              status: "approved",
+              reviewed_by: req.user._id,
+              reviewed_at: new Date(),
+              notes: null,
+            }
+          : {
+              status: "pending",
+              reviewed_by: null,
+              reviewed_at: null,
+              notes: null,
+            },
 
-      // quan hệ
-      guides: data.guides || [],
+      // Nếu guide tạo, đảm bảo guide là người dẫn chính
+      guides:
+        roleName === "guide"
+          ? [
+              { guideId: req.user._id, isMain: true, percentage: 0.15 },
+              ...(data.guides || []).filter(
+                (g) => g.guideId?.toString() !== req.user._id.toString()
+              ),
+            ]
+          : data.guides || [],
       locations: normalizedLocations,
 
       // ---- NGÀY LINH HOẠCH + GIỜ CỐ ĐỊNH ----

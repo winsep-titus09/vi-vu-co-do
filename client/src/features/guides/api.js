@@ -166,9 +166,15 @@ export const guidesApi = {
     return response;
   },
 
+  // Create tour directly (guide creates tour with pending approval)
+  createTour: async (data) => {
+    const response = await apiClient.post("/tours", data);
+    return response;
+  },
+
   // ========== TOUR REQUEST APIs ==========
 
-  // Create tour request (guide submits new tour proposal)
+  // Create tour request (guide submits new tour proposal) - DEPRECATED, use createTour
   createTourRequest: async (data) => {
     const response = await apiClient.post("/tour-requests", data);
     return response;
@@ -284,6 +290,78 @@ export const guidesApi = {
         reply,
       }
     );
+    return response;
+  },
+
+  // ========== GUIDE APPLICATION APIs (for tourists) ==========
+
+  /**
+   * Apply to become a guide - hỗ trợ cả file upload và JSON
+   * @param {Object} applicationData
+   * @param {string} applicationData.about - Giới thiệu bản thân
+   * @param {string[]} applicationData.languages - Ngôn ngữ
+   * @param {number} applicationData.experience_years - Số năm kinh nghiệm
+   * @param {File[]|Object[]} applicationData.id_cards - File ảnh CCCD hoặc [{url, name}]
+   * @param {File[]} applicationData.certificates - File chứng chỉ (optional)
+   * @param {Object} applicationData.bank_info - {bank_name, account_name, account_number}
+   */
+  applyToBeGuide: async (applicationData) => {
+    const {
+      id_cards = [],
+      certificates = [],
+      bank_info = {},
+      languages = [],
+      ...rest
+    } = applicationData;
+
+    // Kiểm tra xem có file upload không
+    const hasFileUpload =
+      id_cards.some((item) => item instanceof File) ||
+      certificates.some((item) => item instanceof File);
+
+    if (hasFileUpload) {
+      // Gửi FormData nếu có file
+      const formData = new FormData();
+
+      // Append text fields
+      formData.append("about", rest.about || "");
+      formData.append("experience_years", rest.experience_years || 0);
+      formData.append("languages", languages.join(", "));
+
+      // Append bank info
+      if (bank_info) {
+        formData.append("bank_name", bank_info.bank_name || "");
+        formData.append("account_name", bank_info.account_name || "");
+        formData.append("account_number", bank_info.account_number || "");
+      }
+
+      // Append files
+      id_cards.forEach((file) => {
+        if (file instanceof File) {
+          formData.append("id_cards", file);
+        }
+      });
+
+      certificates.forEach((file) => {
+        if (file instanceof File) {
+          formData.append("certificates", file);
+        }
+      });
+
+      const response = await apiClient.post("/guides/apply", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response;
+    } else {
+      // Gửi JSON nếu là link URL
+      const response = await apiClient.post("/guides/apply", applicationData);
+      return response;
+    }
+  },
+
+  // Get my guide application status
+  getMyApplication: async () => {
+    const response = await apiClient.get("/guides/apply/me");
     return response;
   },
 };

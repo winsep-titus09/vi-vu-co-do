@@ -5,6 +5,8 @@ import {
   listPendingTours,
   approveTour,
   rejectTour,
+  toggleTourVisibility,
+  deleteTour,
 } from "../../controllers/admin/tours.controller.js";
 import {
   listToursRevenue,
@@ -18,6 +20,13 @@ router.get("/", auth, authorize("admin"), listAdminTours);
 router.get("/pending", auth, authorize("admin"), listPendingTours);
 router.patch("/:id/approve", auth, authorize("admin"), approveTour);
 router.patch("/:id/reject", auth, authorize("admin"), rejectTour);
+router.patch(
+  "/:id/toggle-visibility",
+  auth,
+  authorize("admin"),
+  toggleTourVisibility
+);
+router.delete("/:id", auth, authorize("admin"), deleteTour);
 
 // NEW: danh sách tour + tổng doanh thu
 router.get("/revenues", auth, authorize("admin"), listToursRevenue);

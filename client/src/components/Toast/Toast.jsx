@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ToastContext } from "./useToast";
 
 // Icons
@@ -201,12 +201,17 @@ export function ToastProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const toast = {
-    success: (title, message) => addToast({ type: "success", title, message }),
-    error: (title, message) => addToast({ type: "error", title, message }),
-    info: (title, message) => addToast({ type: "info", title, message }),
-    warning: (title, message) => addToast({ type: "warning", title, message }),
-  };
+  const toast = useMemo(
+    () => ({
+      success: (title, message) =>
+        addToast({ type: "success", title, message }),
+      error: (title, message) => addToast({ type: "error", title, message }),
+      info: (title, message) => addToast({ type: "info", title, message }),
+      warning: (title, message) =>
+        addToast({ type: "warning", title, message }),
+    }),
+    [addToast]
+  );
 
   return (
     <ToastContext.Provider value={toast}>

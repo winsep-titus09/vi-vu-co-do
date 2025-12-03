@@ -64,10 +64,10 @@ export default function GuideProfile() {
       role: apiGuide.introduction || "",
       avatar:
         apiGuide.user_id?.avatar_url ||
-        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/1.jpg",
+        "/images/placeholders/avatar-placeholder.jpg",
       cover:
         apiGuide.user_id?.cover_image_url ||
-        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
+        "/images/placeholders/cover-placeholder.jpg",
       rating: apiGuide.rating || 5.0,
       reviews: apiGuide.reviewCount || 0,
       experience: parseInt(apiGuide.experience) || 5,
@@ -83,8 +83,7 @@ export default function GuideProfile() {
       cert: apiGuide.certificates?.[0]?.name || "",
       bio: apiGuide.user_id?.bio || apiGuide.experience || "",
       videoIntro:
-        apiGuide.bio_video_url ||
-        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/hoanghon.jpg",
+        apiGuide.bio_video_url || "/images/placeholders/video-thumbnail.jpg",
     };
   }, [apiGuide]);
 

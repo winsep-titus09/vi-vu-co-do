@@ -376,6 +376,150 @@ export function useRejectTour() {
   return { reject, isLoading, error };
 }
 
+export function useToggleTourVisibility() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const toggle = useCallback(async (id) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const result = await adminApi.toggleTourVisibility(id);
+      return result;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { toggle, isLoading, error };
+}
+
+export function useDeleteTour() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const deleteTour = useCallback(async (id) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const result = await adminApi.deleteTour(id);
+      return result;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { deleteTour, isLoading, error };
+}
+
+// ============================================================================
+// ADMIN TOUR EDIT REQUESTS HOOKS
+// ============================================================================
+
+export function useAdminTourEditRequests(params = {}) {
+  const [state, setState] = useState({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: params.limit || 20,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadToken, refetch] = useReloadTrigger();
+  const paramsKey = useMemo(() => JSON.stringify(params || {}), [params]);
+
+  useEffect(
+    () => {
+      let ignore = false;
+      async function fetchData() {
+        try {
+          setIsLoading(true);
+          setError(null);
+          const data = await adminApi.getTourEditRequests(params);
+          if (!ignore) setState(data);
+        } catch (err) {
+          if (!ignore) {
+            setError(getErrorMessage(err));
+            setState({
+              items: [],
+              total: 0,
+              page: 1,
+              pageSize: params.limit || 20,
+            });
+          }
+        } finally {
+          if (!ignore) setIsLoading(false);
+        }
+      }
+
+      fetchData();
+      return () => {
+        ignore = true;
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [paramsKey, reloadToken]
+  );
+
+  return {
+    requests: state.items,
+    total: state.total,
+    page: state.page,
+    pageSize: state.pageSize,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+export function useApproveTourEditRequest() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const approve = useCallback(async (id, data = {}) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const result = await adminApi.approveTourEditRequest(id, data);
+      return result;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { approve, isLoading, error };
+}
+
+export function useRejectTourEditRequest() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const reject = useCallback(async (id, notes = "") => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const result = await adminApi.rejectTourEditRequest(id, notes);
+      return result;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { reject, isLoading, error };
+}
+
 // ============================================================================
 // ADMIN LOCATIONS (PLACES) HOOKS
 // ============================================================================
@@ -511,4 +655,213 @@ export function useDeleteLocation() {
   }, []);
 
   return { remove, isLoading, error };
+}
+
+// ============================================================================
+// FINANCE HOOKS
+// ============================================================================
+
+export function useFinanceStats(params = {}) {
+  const [stats, setStats] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadToken, refetch] = useReloadTrigger();
+  const paramsKey = useMemo(() => JSON.stringify(params || {}), [params]);
+
+  useEffect(
+    () => {
+      let ignore = false;
+      async function fetchData() {
+        try {
+          setIsLoading(true);
+          setError(null);
+          const data = await adminApi.getFinanceStats(params);
+          if (!ignore) setStats(data);
+        } catch (err) {
+          if (!ignore) {
+            setError(getErrorMessage(err));
+            setStats(null);
+          }
+        } finally {
+          if (!ignore) setIsLoading(false);
+        }
+      }
+
+      fetchData();
+      return () => {
+        ignore = true;
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [paramsKey, reloadToken]
+  );
+
+  return { stats, isLoading, error, refetch };
+}
+
+export function useFinanceTransactions(params = {}) {
+  const [state, setState] = useState({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: params.limit || 20,
+    totalPages: 1,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadToken, refetch] = useReloadTrigger();
+  const paramsKey = useMemo(() => JSON.stringify(params || {}), [params]);
+
+  useEffect(
+    () => {
+      let ignore = false;
+      async function fetchData() {
+        try {
+          setIsLoading(true);
+          setError(null);
+          const response = await adminApi.getFinanceTransactions(params);
+          if (!ignore) setState(response);
+        } catch (err) {
+          if (!ignore) {
+            setError(getErrorMessage(err));
+            setState((prev) => ({ ...prev, items: [] }));
+          }
+        } finally {
+          if (!ignore) setIsLoading(false);
+        }
+      }
+
+      fetchData();
+      return () => {
+        ignore = true;
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [paramsKey, reloadToken]
+  );
+
+  return { ...state, isLoading, error, refetch };
+}
+
+export function useFinancePayouts(params = {}) {
+  const [state, setState] = useState({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: params.limit || 20,
+    totalPages: 1,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadToken, refetch] = useReloadTrigger();
+  const paramsKey = useMemo(() => JSON.stringify(params || {}), [params]);
+
+  useEffect(
+    () => {
+      let ignore = false;
+      async function fetchData() {
+        try {
+          setIsLoading(true);
+          setError(null);
+          const response = await adminApi.getFinancePayouts(params);
+          if (!ignore) setState(response);
+        } catch (err) {
+          if (!ignore) {
+            setError(getErrorMessage(err));
+            setState((prev) => ({ ...prev, items: [] }));
+          }
+        } finally {
+          if (!ignore) setIsLoading(false);
+        }
+      }
+
+      fetchData();
+      return () => {
+        ignore = true;
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [paramsKey, reloadToken]
+  );
+
+  return { ...state, isLoading, error, refetch };
+}
+
+export function useConfirmPayout() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const confirm = useCallback(async (id, data = {}) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const result = await adminApi.confirmPayout(id, data);
+      return result;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { confirm, isLoading, error };
+}
+
+// ============================================================================
+// PAYMENT SETTINGS HOOKS
+// ============================================================================
+
+export function usePaymentSettings() {
+  const [settings, setSettings] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadToken, refetch] = useReloadTrigger();
+
+  useEffect(() => {
+    let ignore = false;
+    async function fetchData() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await adminApi.getPaymentSettings();
+        if (!ignore) setSettings(data);
+      } catch (err) {
+        if (!ignore) {
+          setError(getErrorMessage(err));
+          setSettings([]);
+        }
+      } finally {
+        if (!ignore) setIsLoading(false);
+      }
+    }
+
+    fetchData();
+    return () => {
+      ignore = true;
+    };
+  }, [reloadToken]);
+
+  return { settings, isLoading, error, refetch };
+}
+
+export function useUpdatePaymentSetting() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const update = useCallback(async (gateway, data) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const result = await adminApi.updatePaymentSetting(gateway, data);
+      return result;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { update, isLoading, error };
 }

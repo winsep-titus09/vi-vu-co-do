@@ -68,7 +68,22 @@ export default function GuideMyTours() {
   };
 
   // Map API status to display status
-  const getDisplayStatus = (status) => {
+  const getDisplayStatus = (tour) => {
+    // Server returns displayStatus directly
+    if (tour.displayStatus) return tour.displayStatus;
+
+    // Fallback: Check approval status
+    const approvalStatus = tour.approval?.status;
+    if (approvalStatus === "pending") return "pending";
+    if (approvalStatus === "rejected") return "rejected";
+    if (approvalStatus === "approved") {
+      // If approved, check if tour is active
+      if (tour.status === "inactive" || tour.is_active === false)
+        return "hidden";
+      return "active";
+    }
+    // Fallback for legacy data
+    const status = tour.status;
     if (status === "approved" || status === "active") return "active";
     if (status === "pending") return "pending";
     if (status === "rejected") return "rejected";
@@ -207,11 +222,11 @@ export default function GuideMyTours() {
                 tour.cover_image_url ||
                 tour.images?.[0] ||
                 tour.gallery?.[0] ||
-                "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
+                "/images/placeholders/tour-placeholder.jpg",
               price: formatCurrency(tour.price || tour.base_price || 0),
               duration: durationText,
               location: locationName,
-              status: getDisplayStatus(tour.status),
+              status: getDisplayStatus(tour),
               stats: {
                 bookings: tour.booking_count || 0,
                 rating: tour.average_rating || 0,

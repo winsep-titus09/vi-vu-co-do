@@ -114,7 +114,7 @@ export default function AdminPlaces() {
   // Get image URL
   const getImageUrl = (place) => {
     if (place.images?.length > 0) return place.images[0];
-    return "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_4.jpg";
+    return "/images/placeholders/place-placeholder.jpg";
   };
 
   // Check if place has 3D model

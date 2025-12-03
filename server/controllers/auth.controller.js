@@ -5,11 +5,11 @@ import User from "../models/User.js";
 import Role from "../models/Role.js";
 import BlacklistedToken from "../models/BlacklistedToken.js";
 import { sendEmailRaw } from "../services/email.service.js";
-import { generateRandomPassword } from '../utils/password.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { createTransporter } from '../config/email.js';
+import { generateRandomPassword } from "../utils/password.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { createTransporter } from "../config/email.js";
 
 // Thay thế __dirname cho ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +36,12 @@ export const register = async (req, res) => {
 
     // chuẩn hóa role (tránh lỗi chữ hoa, khoảng trắng)
     role = String(role).trim().toLowerCase();
+
+    // CHỈ CHO PHÉP ĐĂNG KÝ VỚI ROLE TOURIST
+    // Để trở thành guide hoặc admin, user phải đăng ký tourist trước rồi apply
+    if (role !== "tourist") {
+      role = "tourist"; // Force to tourist, guide phải apply riêng
+    }
 
     // kiểm tra email trùng
     const existing = await User.findOne({ email });
@@ -194,7 +200,7 @@ export const forgotPassword = async (req, res) => {
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng nhập địa chỉ email'
+        message: "Vui lòng nhập địa chỉ email",
       });
     }
 
@@ -203,7 +209,7 @@ export const forgotPassword = async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: 'Địa chỉ email không hợp lệ'
+        message: "Địa chỉ email không hợp lệ",
       });
     }
 
@@ -214,7 +220,7 @@ export const forgotPassword = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy tài khoản với địa chỉ email này'
+        message: "Không tìm thấy tài khoản với địa chỉ email này",
       });
     }
 
@@ -230,12 +236,18 @@ export const forgotPassword = async (req, res) => {
     await user.save();
 
     // Đọc template email
-    const templatePath = path.join(__dirname, '../templates/email/forgot-password.html');
-    let emailTemplate = fs.readFileSync(templatePath, 'utf8');
+    const templatePath = path.join(
+      __dirname,
+      "../templates/email/forgot-password.html"
+    );
+    let emailTemplate = fs.readFileSync(templatePath, "utf8");
 
     // Thay thế các placeholder trong template
-    emailTemplate = emailTemplate.replace('{{userName}}', user.name || user.email);
-    emailTemplate = emailTemplate.replace('{{newPassword}}', newPassword);
+    emailTemplate = emailTemplate.replace(
+      "{{userName}}",
+      user.name || user.email
+    );
+    emailTemplate = emailTemplate.replace("{{newPassword}}", newPassword);
 
     // Tạo transporter và gửi email
     const transporter = createTransporter();
@@ -243,21 +255,21 @@ export const forgotPassword = async (req, res) => {
     await transporter.sendMail({
       from: `"Vi Vu Cố Đô" <${process.env.SMTP_USER}>`,
       to: user.email,
-      subject: '🔐 Mật khẩu mới - Vi Vu Cố Đô',
-      html: emailTemplate
+      subject: "🔐 Mật khẩu mới - Vi Vu Cố Đô",
+      html: emailTemplate,
     });
 
     // Trả về response thành công
     res.status(200).json({
       success: true,
-      message: 'Mật khẩu mới đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.'
+      message:
+        "Mật khẩu mới đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.",
     });
-
   } catch (error) {
-    console.error('Forgot password error:', error);
+    console.error("Forgot password error:", error);
     res.status(500).json({
       success: false,
-      message: 'Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau.'
+      message: "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau.",
     });
   }
 };

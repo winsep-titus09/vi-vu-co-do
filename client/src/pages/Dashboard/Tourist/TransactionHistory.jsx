@@ -23,25 +23,60 @@ export default function TouristTransactionHistory() {
   const transactions = useMemo(() => {
     if (!bookings) return [];
 
+    // Map booking status to transaction-friendly status
+    const getTransactionStatus = (booking) => {
+      const status = booking.status;
+      const guideStatus = booking.guide_decision?.status;
+
+      // Check cancelled/rejected first
+      if (
+        status === "canceled" ||
+        status === "cancelled" ||
+        guideStatus === "rejected"
+      )
+        return "cancelled";
+
+      // Check confirmed states
+      if (
+        status === "paid" ||
+        status === "completed" ||
+        status === "awaiting_payment" ||
+        guideStatus === "accepted"
+      )
+        return "confirmed";
+
+      return status;
+    };
+
     return bookings
-      .filter((b) => b.status === "confirmed" || b.status === "cancelled")
-      .map((b) => ({
-        id: b._id?.slice(-8).toUpperCase() || "N/A",
-        date: new Date(b.booking_date).toLocaleDateString("vi-VN"),
-        desc: `Thanh toán tour '${b.tourId?.title || "Tour"}'`,
-        amount:
-          b.status === "cancelled"
+      .filter((b) => {
+        const mappedStatus = getTransactionStatus(b);
+        return mappedStatus === "confirmed" || mappedStatus === "cancelled";
+      })
+      .map((b) => {
+        const mappedStatus = getTransactionStatus(b);
+        const isCancelled = mappedStatus === "cancelled";
+        return {
+          id: b._id?.slice(-8).toUpperCase() || "N/A",
+          date: new Date(b.booking_date || b.createdAt).toLocaleDateString(
+            "vi-VN"
+          ),
+          desc: `Thanh toán tour '${
+            b.tour_id?.name || b.tourId?.title || "Tour"
+          }'`,
+          amount: isCancelled
             ? "+ " + (b.total_price || 0).toLocaleString() + "đ"
             : "- " + (b.total_price || 0).toLocaleString() + "đ",
-        method: b.payment_method || "Chưa thanh toán",
-        status:
-          b.status === "cancelled"
+          method:
+            b.payment_session?.gateway || b.payment_method || "Chưa thanh toán",
+          status: isCancelled
             ? "refunded"
-            : b.payment_status === "paid"
+            : b.status === "paid" || b.payment_status === "paid"
             ? "success"
             : "pending",
-        type: b.status === "cancelled" ? "refund" : "payment",
-      }))
+          type: isCancelled ? "refund" : "payment",
+        };
+      })
       .sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [bookings]);
 

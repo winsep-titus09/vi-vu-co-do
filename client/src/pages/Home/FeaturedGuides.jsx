@@ -22,7 +22,7 @@ export default function FeaturedGuides() {
       bio: guide.bio || "Khám phá Huế cùng tôi!",
       image:
         guide.user_id?.avatar_url ||
-        "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/chandung/1.jpg",
+        "/images/placeholders/avatar-placeholder.jpg",
     }));
   }, [apiGuides]);
   return (

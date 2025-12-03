@@ -1,14 +1,18 @@
 // src/pages/Booking/StepPayment.jsx
 
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { IconCheck } from "../../icons/IconBox";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { bookingsApi } from "../../features/booking/api";
+import { paymentsApi } from "../../features/payments/api";
+import { useToast } from "../../components/Toast/useToast";
+import { IconCheck, IconClock } from "../../icons/IconBox";
 import IconChevronLeft from "../../icons/IconChevronLeft";
 import {
   IconLock,
   IconArrowRight,
   IconShield,
   IconTicket,
+  IconLoader,
 } from "../../icons/IconCommon";
 
 // ============================================================================
@@ -32,24 +36,8 @@ const LogoVNPay = ({ className }) => (
 );
 
 // ============================================================================
-// MOCK DATA
+// PAYMENT METHODS
 // ============================================================================
-// Mock data: Booking summary
-const bookingSummary = {
-  tourName: "Bí mật Hoàng cung Huế & Trải nghiệm trà chiều",
-  image:
-    "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/dainoi5.jpg",
-  date: "20/05/2025",
-  time: "08:00 - 12:00",
-  guests: { adults: 2, children: 0 },
-  price: {
-    adult: 1800000,
-    child: 0,
-    discount: 100000,
-    total: 1700000,
-  },
-};
-
 const paymentMethods = [
   { id: "momo", name: "Ví MoMo", desc: "Quét mã QR cực nhanh", icon: LogoMomo },
   {
@@ -77,19 +65,140 @@ const paymentMethods = [
 
 export default function BookingStepPayment() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const toast = useToast();
+
   const [selectedMethod, setSelectedMethod] = useState("momo");
   const [isProcessing, setIsProcessing] = useState(false);
   const [promoCode, setPromoCode] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  const handlePayment = () => {
-    if (!agreedToTerms) return;
+  // Lấy booking data từ location state
+  const bookingData = location.state;
+
+  // Redirect nếu không có booking data
+  useEffect(() => {
+    if (!location.state) {
+      navigate("/tours");
+    }
+  }, [navigate, location.state]);
+
+  if (!bookingData) {
+    return null;
+  }
+
+  // Extract data from bookingData
+  const {
+    tourId,
+    tourName = "Tour",
+    tourImage,
+    date,
+    guests = { adults: 1, children: 0 },
+    totalPrice = 0,
+    selectedGuideId,
+    contact = {},
+  } = bookingData;
+
+  const handlePayment = async () => {
+    if (!agreedToTerms) {
+      toast.warning("Điều khoản", "Vui lòng đồng ý với điều khoản sử dụng!");
+      return;
+    }
+
     setIsProcessing(true);
-    setTimeout(() => {
+
+    try {
+      // Chuẩn bị data cho API
+      const bookingPayload = {
+        tour_id: tourId,
+        start_date: date,
+        adults: guests.adults,
+        children: guests.children,
+        guide_id: selectedGuideId || undefined,
+        contact: {
+          full_name: contact.full_name,
+          email: contact.email,
+          phone: contact.phone,
+          note: contact.note || "",
+        },
+      };
+
+      // Gọi API tạo booking
+      const response = await bookingsApi.createBooking(bookingPayload);
+      const booking = response.booking || response;
+
+      // Kiểm tra status booking
+      if (booking.status === "awaiting_payment") {
+        // HDV đã pre-approve (guide đã lock ngày này)
+        // Gọi API tạo phiên thanh toán
+        toast.info("Đang chuyển đến cổng thanh toán...");
+
+        try {
+          // Map payment method
+          let paymentMethod = "wallet"; // momo default
+          if (selectedMethod === "vnpay") paymentMethod = "atm";
+          if (selectedMethod === "card") paymentMethod = "credit";
+
+          const checkoutRes = await paymentsApi.createCheckout(
+            booking._id,
+            paymentMethod
+          );
+
+          if (checkoutRes.payUrl) {
+            // Redirect đến MoMo/VNPay
+            window.location.href = checkoutRes.payUrl;
+            return;
+          } else {
+            throw new Error("Không nhận được link thanh toán");
+          }
+        } catch (checkoutError) {
+          console.error("Checkout error:", checkoutError);
+          // Fallback: chuyển đến trang receipt để xem trạng thái
+          toast.warning(
+            "Lưu ý",
+            "Không thể kết nối cổng thanh toán. Vui lòng thanh toán sau trong mục 'Chuyến đi của tôi'."
+          );
+          navigate(`/booking/receipt/${booking._id}`, {
+            state: {
+              bookingId: booking._id,
+              tourName,
+              tourImage,
+              date,
+              totalPrice,
+              contact,
+              status: booking.status,
+            },
+          });
+        }
+      } else {
+        // Status = waiting_guide: Chờ HDV xác nhận trước khi thanh toán
+        toast.success(
+          "Đặt tour thành công!",
+          "Đang chờ hướng dẫn viên xác nhận. Bạn sẽ nhận được thông báo khi có thể thanh toán."
+        );
+
+        // Navigate to receipt page with booking status
+        navigate(`/booking/receipt/${booking._id}`, {
+          state: {
+            bookingId: booking._id,
+            tourName,
+            tourImage,
+            date,
+            totalPrice,
+            contact,
+            status: booking.status,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Create booking error:", error);
+      toast.error(
+        "Đặt tour thất bại",
+        error.message || "Có lỗi xảy ra, vui lòng thử lại!"
+      );
+    } finally {
       setIsProcessing(false);
-      // Navigate to receipt page with booking ID
-      navigate("/booking/receipt/BK-2025-001");
-    }, 2000);
+    }
   };
 
   return (
@@ -127,12 +236,12 @@ export default function BookingStepPayment() {
 
         {/* Header Steps */}
         <div className="mb-8">
-          <Link
-            to="/tours/1"
+          <button
+            onClick={() => navigate(-1)}
             className="text-sm font-bold text-text-secondary hover:text-primary flex items-center gap-1 mb-2"
           >
             <IconChevronLeft className="w-4 h-4" /> Quay lại
-          </Link>
+          </button>
           <h1 className="text-2xl md:text-3xl font-heading font-bold text-text-primary">
             Thanh toán an toàn
           </h1>
@@ -195,20 +304,24 @@ export default function BookingStepPayment() {
                 <h3 className="text-lg font-bold text-text-primary">
                   Thông tin liên hệ
                 </h3>
-                <button className="text-sm font-bold text-primary hover:underline">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="text-sm font-bold text-primary hover:underline"
+                >
                   Sửa
                 </button>
               </div>
               <div className="flex items-center gap-4 p-4 bg-bg-main/50 rounded-xl border border-border-light">
                 <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-text-secondary font-bold">
-                  HN
+                  {contact.full_name?.charAt(0)?.toUpperCase() || "U"}
                 </div>
                 <div>
                   <p className="text-sm font-bold text-text-primary">
-                    Hoàng Nam (0905 123 456)
+                    {contact.full_name || "Khách hàng"} (
+                    {contact.phone || "Chưa có SĐT"})
                   </p>
                   <p className="text-xs text-text-secondary">
-                    hoangnam@email.com
+                    {contact.email || "Chưa có email"}
                   </p>
                 </div>
               </div>
@@ -239,19 +352,20 @@ export default function BookingStepPayment() {
               {/* Tour Info */}
               <div className="flex gap-4 mb-6 pb-6 border-b border-border-light">
                 <img
-                  src={bookingSummary.image}
+                  src={tourImage || "/images/placeholders/tour-placeholder.jpg"}
                   className="w-20 h-20 rounded-xl object-cover shrink-0"
                   alt="Tour"
                 />
                 <div>
                   <h4 className="font-bold text-text-primary line-clamp-2 mb-1 text-sm">
-                    {bookingSummary.tourName}
+                    {tourName}
                   </h4>
                   <p className="text-xs text-text-secondary mb-1">
-                    {bookingSummary.date} • {bookingSummary.time}
+                    {new Date(date).toLocaleDateString("vi-VN")}
                   </p>
                   <span className="inline-block px-2 py-0.5 rounded-md bg-bg-main text-text-secondary text-[10px] font-bold border border-border-light">
-                    {bookingSummary.guests.adults} Người lớn
+                    {guests.adults} Người lớn
+                    {guests.children > 0 ? `, ${guests.children} Trẻ em` : ""}
                   </span>
                 </div>
               </div>
@@ -281,24 +395,28 @@ export default function BookingStepPayment() {
               {/* Price Breakdown */}
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-sm">
-                  <span className="text-text-secondary">Giá tour (x2)</span>
-                  <span className="font-medium text-text-primary">
-                    1.800.000đ
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">
-                    Giảm giá (Voucher)
+                    Giá tour (x{guests.adults + guests.children})
                   </span>
-                  <span className="font-medium text-green-600">- 100.000đ</span>
+                  <span className="font-medium text-text-primary">
+                    {totalPrice.toLocaleString("vi-VN")}đ
+                  </span>
                 </div>
+                {promoCode && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-text-secondary">
+                      Giảm giá (Voucher)
+                    </span>
+                    <span className="font-medium text-green-600">- 0đ</span>
+                  </div>
+                )}
                 <div className="pt-3 border-t border-border-light flex justify-between items-end">
                   <span className="font-bold text-text-primary mb-1">
                     Tổng thanh toán
                   </span>
                   <div className="text-right">
                     <span className="block text-2xl font-heading font-bold text-primary">
-                      1.700.000đ
+                      {totalPrice.toLocaleString("vi-VN")}đ
                     </span>
                     <span className="text-[10px] text-text-secondary">
                       (Đã bao gồm thuế & phí)
@@ -347,8 +465,17 @@ export default function BookingStepPayment() {
                     }
                 `}
               >
-                {isProcessing ? "Đang xử lý..." : "Thanh toán ngay"}
-                {!isProcessing && <IconArrowRight className="w-5 h-5" />}
+                {isProcessing ? (
+                  <>
+                    <IconLoader className="w-5 h-5 animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    Thanh toán ngay
+                    <IconArrowRight className="w-5 h-5" />
+                  </>
+                )}
               </button>
 
               <div className="mt-4 flex justify-center items-center gap-2 text-[10px] text-text-secondary opacity-70">

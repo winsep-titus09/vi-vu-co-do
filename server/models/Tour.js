@@ -4,9 +4,12 @@ const { Decimal128, ObjectId } = mongoose.Schema.Types;
 
 const ItineraryItemSchema = new mongoose.Schema(
   {
-    day: { type: Number, required: true }, // 1..duration
+    day: { type: Number, default: 1 },
+    order: { type: Number, default: 0 },
+    time: { type: String, trim: true }, // e.g., "08:00", "09:30"
     title: { type: String, trim: true },
     details: { type: String, trim: true },
+    locationId: { type: ObjectId, ref: "Location", default: null },
   },
   { _id: false }
 );
@@ -85,7 +88,14 @@ const TourSchema = new mongoose.Schema(
     ],
     guide_id: { type: mongoose.Types.ObjectId, ref: "User" },
     cover_image_url: String,
+    video_url: String, // Video giới thiệu tour (YouTube/Vimeo/direct URL)
     gallery: [{ type: String }],
+
+    // Thông tin bổ sung cho tour
+    highlights: [{ type: String }], // Điểm nổi bật
+    includes: [{ type: String }], // Bao gồm
+    excludes: [{ type: String }], // Không bao gồm
+
     itinerary: [{ day: Number, title: String, details: String }],
     category_id: {
       type: mongoose.Types.ObjectId,

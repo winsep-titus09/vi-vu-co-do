@@ -3,25 +3,55 @@ import { useNavigate, useLocation } from "react-router-dom";
 import IconArrowRight from "../../icons/IconArrowRight";
 import IconChevronLeft from "../../icons/IconChevronLeft";
 
-// Mock data phòng trường hợp user vào thẳng link này mà không qua bước chọn
-const MOCK_DATA = {
-  tourName: "Bí mật Hoàng cung Huế & Trải nghiệm trà chiều",
-  date: "2025-05-20",
-  guests: { adults: 2, children: 0 },
-  guide: { name: "Minh Hương" },
-  totalPrice: 1800000,
+// Helper to get user from localStorage
+const getStoredUser = () => {
+  try {
+    const userData = localStorage.getItem("user");
+    return userData ? JSON.parse(userData) : null;
+  } catch {
+    return null;
+  }
 };
 
 export default function BookingStepReview() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [note, setNote] = useState("");
+  const [user] = useState(getStoredUser);
 
-  // Lấy dữ liệu từ state (được gửi từ trang trước), nếu không có thì dùng Mock để test UI
-  const bookingData = location.state || MOCK_DATA;
+  // Lấy dữ liệu từ state (được gửi từ trang trước)
+  const bookingData = location.state;
 
-  // Nếu muốn chặn truy cập trực tiếp (uncomment dòng dưới khi chạy thật)
-  // useEffect(() => { if (!location.state) navigate("/"); }, [navigate, location.state]);
+  // Khởi tạo note từ bookingData
+  const [note, setNote] = useState(bookingData?.note || "");
+
+  // Form state for contact info
+  const [contactInfo, setContactInfo] = useState({
+    full_name: user?.name || "",
+    phone: user?.phone || "",
+    email: user?.email || "",
+  });
+
+  // Chặn truy cập trực tiếp nếu không có booking data
+  useEffect(() => {
+    if (!location.state) {
+      navigate("/tours");
+    }
+  }, [navigate, location.state]);
+
+  // Update contact info when user data loads
+  useEffect(() => {
+    if (user) {
+      setContactInfo((prev) => ({
+        full_name: prev.full_name || user.name || "",
+        phone: prev.phone || user.phone || "",
+        email: prev.email || user.email || "",
+      }));
+    }
+  }, [user]);
+
+  if (!bookingData) {
+    return null; // Will redirect via useEffect
+  }
 
   return (
     <div className="min-h-screen bg-bg-main py-8 md:py-12">
@@ -103,7 +133,7 @@ export default function BookingStepReview() {
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Hướng dẫn viên</span>
                   <span className="font-bold">
-                    {bookingData.guide?.name || "Ngẫu nhiên"}
+                    {bookingData.selectedGuideName || "Ngẫu nhiên"}
                   </span>
                 </div>
               </div>
@@ -113,9 +143,20 @@ export default function BookingStepReview() {
             <div className="bg-white p-6 rounded-3xl border border-border-light shadow-sm">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold">Thông tin liên hệ</h3>
-                <button className="text-sm text-primary font-bold hover:underline">
-                  Tự động điền
-                </button>
+                {user && (
+                  <button
+                    onClick={() =>
+                      setContactInfo({
+                        full_name: user.name || "",
+                        phone: user.phone || "",
+                        email: user.email || "",
+                      })
+                    }
+                    className="text-sm text-primary font-bold hover:underline"
+                  >
+                    Tự động điền
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -125,7 +166,14 @@ export default function BookingStepReview() {
                   <input
                     type="text"
                     className="w-full p-3 rounded-xl border border-border-light bg-gray-50 focus:bg-white focus:border-primary outline-none text-sm font-bold transition-all"
-                    defaultValue="Hoàng Nam"
+                    value={contactInfo.full_name}
+                    onChange={(e) =>
+                      setContactInfo((prev) => ({
+                        ...prev,
+                        full_name: e.target.value,
+                      }))
+                    }
+                    placeholder="Nhập họ tên"
                   />
                 </div>
                 <div className="space-y-1">
@@ -135,7 +183,14 @@ export default function BookingStepReview() {
                   <input
                     type="tel"
                     className="w-full p-3 rounded-xl border border-border-light bg-gray-50 focus:bg-white focus:border-primary outline-none text-sm font-bold transition-all"
-                    defaultValue="0905 123 456"
+                    value={contactInfo.phone}
+                    onChange={(e) =>
+                      setContactInfo((prev) => ({
+                        ...prev,
+                        phone: e.target.value,
+                      }))
+                    }
+                    placeholder="0905 xxx xxx"
                   />
                 </div>
                 <div className="md:col-span-2 space-y-1">
@@ -146,7 +201,14 @@ export default function BookingStepReview() {
                   <input
                     type="email"
                     className="w-full p-3 rounded-xl border border-border-light bg-gray-50 focus:bg-white focus:border-primary outline-none text-sm font-bold transition-all"
-                    defaultValue="hoangnam@email.com"
+                    value={contactInfo.email}
+                    onChange={(e) =>
+                      setContactInfo((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
+                    }
+                    placeholder="email@example.com"
                   />
                 </div>
               </div>
@@ -180,11 +242,30 @@ export default function BookingStepReview() {
               </div>
 
               <button
-                onClick={() =>
+                onClick={() => {
+                  // Validate required fields
+                  if (!contactInfo.full_name.trim()) {
+                    alert("Vui lòng nhập họ tên");
+                    return;
+                  }
+                  if (!contactInfo.phone.trim()) {
+                    alert("Vui lòng nhập số điện thoại");
+                    return;
+                  }
+                  if (!contactInfo.email.trim()) {
+                    alert("Vui lòng nhập email");
+                    return;
+                  }
                   navigate("/booking/payment", {
-                    state: { ...bookingData, note },
-                  })
-                }
+                    state: {
+                      ...bookingData,
+                      contact: {
+                        ...contactInfo,
+                        note: note.trim(),
+                      },
+                    },
+                  });
+                }}
                 className="w-full py-4 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-95"
               >
                 Tiến hành Thanh toán <IconArrowRight className="w-5 h-5" />

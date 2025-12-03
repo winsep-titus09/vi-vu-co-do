@@ -129,9 +129,7 @@ export default function PlaceDetail() {
         images:
           location.images?.length > 0
             ? location.images
-            : [
-                "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg",
-              ],
+            : ["/images/placeholders/place-placeholder.jpg"],
         info: {
           openTime: location.opening_hours || "Liên hệ",
           ticket: formatTicketPrice(
@@ -627,7 +625,7 @@ export default function PlaceDetail() {
                                 tour.cover_image_url ||
                                 tour.image_url ||
                                 tour.images?.[0] ||
-                                "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/placeholders/hero_slide_3.jpg"
+                                "/images/placeholders/tour-placeholder.jpg"
                               }
                               className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                               alt={tour.name}
