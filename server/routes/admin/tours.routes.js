@@ -7,6 +7,7 @@ import {
   rejectTour,
   toggleTourVisibility,
   deleteTour,
+  toggleFeatured,
 } from "../../controllers/admin/tours.controller.js";
 import {
   listToursRevenue,
@@ -26,6 +27,7 @@ router.patch(
   authorize("admin"),
   toggleTourVisibility
 );
+router.patch("/:id/featured", auth, authorize("admin"), toggleFeatured);
 router.delete("/:id", auth, authorize("admin"), deleteTour);
 
 // NEW: danh sách tour + tổng doanh thu

@@ -408,3 +408,72 @@ export const rejectDeleteRequest = async (req, res) => {
     res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
   }
 };
+
+/**
+ * GET /api/admin/users/guides
+ * List all approved guides for tour assignment
+ */
+export const listApprovedGuides = async (req, res) => {
+  try {
+    const { search } = req.query;
+
+    // Get guide role ID
+    const guideRole = await Role.findOne({ name: "guide" });
+    if (!guideRole) {
+      return res.json({ items: [] });
+    }
+
+    // Build filter
+    const filter = {
+      role_id: guideRole._id,
+      status: "active",
+    };
+
+    // Search by name or email
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      filter.$or = [{ name: searchRegex }, { email: searchRegex }];
+    }
+
+    // Get all approved guide profiles
+    const approvedProfiles = await GuideProfile.find({ status: "approved" })
+      .select("user_id")
+      .lean();
+    const approvedUserIds = approvedProfiles.map((p) => p.user_id);
+
+    // Only get users who have approved guide profiles
+    filter._id = { $in: approvedUserIds };
+
+    const guides = await User.find(filter)
+      .select("name email avatar_url phone_number")
+      .lean();
+
+    // Get guide profiles for additional info
+    const profilesMap = new Map();
+    const profiles = await GuideProfile.find({
+      user_id: { $in: guides.map((g) => g._id) },
+    }).lean();
+    profiles.forEach((p) => {
+      profilesMap.set(p.user_id.toString(), p);
+    });
+
+    const items = guides.map((guide) => {
+      const profile = profilesMap.get(guide._id.toString());
+      return {
+        _id: guide._id,
+        name: guide.name,
+        email: guide.email,
+        avatar_url: guide.avatar_url,
+        phone: guide.phone_number,
+        about: profile?.about || "",
+        rating: profile?.rating || 0,
+        total_tours: profile?.total_tours || 0,
+      };
+    });
+
+    res.json({ items });
+  } catch (err) {
+    console.error("listApprovedGuides error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+  }
+};

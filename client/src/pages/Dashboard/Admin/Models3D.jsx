@@ -172,12 +172,12 @@ export default function AdminModels3D() {
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      toast.error("Lỗi", "Vui lòng nhập tên mô hình.");
+      toast.error("Thiếu thông tin", "Vui lòng nhập tên mô hình.");
       return;
     }
 
     if (!editingModel && !selectedFile) {
-      toast.error("Lỗi", "Vui lòng chọn file mô hình 3D.");
+      toast.error("Thiếu thông tin", "Vui lòng chọn file mô hình 3D.");
       return;
     }
 
@@ -202,7 +202,7 @@ export default function AdminModels3D() {
       closeModal();
       refetch();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể lưu mô hình 3D.");
+      toast.error("Lỗi lưu mô hình", err.message || "Không thể lưu mô hình 3D.");
     }
   };
 
@@ -219,7 +219,7 @@ export default function AdminModels3D() {
       setDeleteConfirm(null);
       refetch();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể xóa mô hình 3D.");
+      toast.error("Lỗi xóa mô hình", err.message || "Không thể xóa mô hình 3D.");
     }
   };
 

@@ -3,6 +3,7 @@ import { auth, authorize } from "../middleware/auth.js";
 import {
   listArticlesPublic,
   getArticlePublic,
+  getRelatedArticles,
   createArticle,
   updateMyArticle,
   deleteArticle,
@@ -42,6 +43,7 @@ router.delete("/:id/feature-image", auth, deleteFeatureImage); // remove cover o
 
 // Public
 router.get("/", listArticlesPublic);
+router.get("/:id/related", getRelatedArticles); // Related articles - must be before /:id
 router.get("/:id", getArticlePublic);
 
 export default router;

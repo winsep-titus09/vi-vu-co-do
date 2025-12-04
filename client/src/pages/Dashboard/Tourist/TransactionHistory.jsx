@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useMyBookings } from "../../../features/booking/hooks";
+import { formatPrice } from "../../../lib/formatters";
 import Spinner from "../../../components/Loaders/Spinner";
 import { IconCheck, IconClock } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
@@ -65,8 +66,8 @@ export default function TouristTransactionHistory() {
             b.tour_id?.name || b.tourId?.title || "Tour"
           }'`,
           amount: isCancelled
-            ? "+ " + (b.total_price || 0).toLocaleString() + "đ"
-            : "- " + (b.total_price || 0).toLocaleString() + "đ",
+            ? "+ " + formatPrice(b.total_price)
+            : "- " + formatPrice(b.total_price),
           method:
             b.payment_session?.gateway || b.payment_method || "Chưa thanh toán",
           status: isCancelled

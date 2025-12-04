@@ -14,13 +14,17 @@ import {
   IconArrowUpRight,
   IconArrowDownLeft,
   IconDownload,
+  IconX,
 } from "../../../icons/IconCommon";
 import {
   useMonthlyEarnings,
   useGuideDashboard,
+  useMyPayoutRequests,
+  useCreatePayoutRequest,
 } from "../../../features/guides/hooks";
 import Spinner from "../../../components/Loaders/Spinner";
 import { formatCurrency } from "../../../lib/formatters";
+import { useToast } from "../../../components/Toast/useToast";
 
 // Custom Tooltip cho biểu đồ
 const CustomTooltip = ({ active, payload, label }) => {
@@ -57,6 +61,11 @@ export default function GuideEarnings() {
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const toast = useToast();
+
+  // Payout modal state
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState("");
 
   // Fetch data
   const {
@@ -66,6 +75,14 @@ export default function GuideEarnings() {
   } = useMonthlyEarnings(selectedYear);
   const { data: dashboardData, isLoading: dashboardLoading } =
     useGuideDashboard();
+  
+  // Payout data
+  const { 
+    payouts, 
+    isLoading: payoutsLoading, 
+    refetch: refetchPayouts 
+  } = useMyPayoutRequests({ limit: 10 });
+  const { createPayoutRequest, isSubmitting: isCreatingPayout } = useCreatePayoutRequest();
 
   // Prepare chart data
   const chartData = useMemo(() => {
@@ -129,6 +146,81 @@ export default function GuideEarnings() {
   // Total earnings from dashboard (guide share)
   const totalGuideShare = dashboardData?.totalGuideShare || 0;
 
+  // Available balance for withdrawal (from dashboard or calculate)
+  const availableBalance = dashboardData?.availableBalance || totalGuideShare;
+
+  // Handle payout request
+  const handlePayoutRequest = async () => {
+    const amount = parseFloat(payoutAmount.replace(/[.,]/g, ""));
+    
+    if (!amount || amount <= 0) {
+      toast.warning("Số tiền không hợp lệ", "Vui lòng nhập số tiền cần rút");
+      return;
+    }
+    
+    if (amount < 100000) {
+      toast.warning("Số tiền quá nhỏ", "Số tiền rút tối thiểu là 100.000đ");
+      return;
+    }
+    
+    if (amount > availableBalance) {
+      toast.warning("Số dư không đủ", "Số tiền rút vượt quá số dư khả dụng");
+      return;
+    }
+
+    const result = await createPayoutRequest(amount);
+    
+    if (result.success) {
+      toast.success("Yêu cầu đã gửi", "Yêu cầu rút tiền đang được xử lý");
+      setShowPayoutModal(false);
+      setPayoutAmount("");
+      refetchPayouts();
+    } else {
+      toast.error("Lỗi", result.error || "Không thể tạo yêu cầu rút tiền");
+    }
+  };
+
+  // Format input amount
+  const handleAmountChange = (e) => {
+    const value = e.target.value.replace(/\D/g, "");
+    if (value) {
+      setPayoutAmount(parseInt(value).toLocaleString("vi-VN"));
+    } else {
+      setPayoutAmount("");
+    }
+  };
+
+  // Payout status badge
+  const getPayoutStatusBadge = (status) => {
+    switch (status) {
+      case "pending":
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold gap-1">
+            <IconClock className="w-3 h-3" /> Chờ duyệt
+          </span>
+        );
+      case "approved":
+      case "completed":
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold gap-1">
+            <IconCheck className="w-3 h-3" /> Đã chuyển
+          </span>
+        );
+      case "rejected":
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold gap-1">
+            <IconX className="w-3 h-3" /> Từ chối
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold">
+            {status}
+          </span>
+        );
+    }
+  };
+
   // Loading state
   if (earningsLoading || dashboardLoading) {
     return (
@@ -149,6 +241,94 @@ export default function GuideEarnings() {
 
   return (
     <div className="space-y-8 pb-20">
+      {/* PAYOUT MODAL */}
+      {showPayoutModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-heading font-bold text-text-primary">
+                Yêu cầu rút tiền
+              </h3>
+              <button
+                onClick={() => setShowPayoutModal(false)}
+                className="p-2 hover:bg-bg-main rounded-full transition-colors"
+              >
+                <IconX className="w-5 h-5 text-text-secondary" />
+              </button>
+            </div>
+
+            {/* Available Balance */}
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
+              <p className="text-xs text-green-700 font-bold uppercase mb-1">
+                Số dư khả dụng
+              </p>
+              <p className="text-2xl font-bold text-green-700">
+                {formatCurrency(availableBalance)}
+              </p>
+            </div>
+
+            {/* Amount Input */}
+            <div className="mb-6">
+              <label className="block text-sm font-bold text-text-primary mb-2">
+                Số tiền muốn rút
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={payoutAmount}
+                  onChange={handleAmountChange}
+                  placeholder="Nhập số tiền"
+                  className="w-full px-4 py-3 border border-border-light rounded-xl text-lg font-bold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-text-secondary font-bold">
+                  đ
+                </span>
+              </div>
+              <p className="text-xs text-text-secondary mt-2">
+                Tối thiểu: 100.000đ • Phí rút tiền: Miễn phí
+              </p>
+            </div>
+
+            {/* Quick Amount Buttons */}
+            <div className="grid grid-cols-3 gap-2 mb-6">
+              {[500000, 1000000, 2000000].map((amount) => (
+                <button
+                  key={amount}
+                  onClick={() => setPayoutAmount(amount.toLocaleString("vi-VN"))}
+                  disabled={amount > availableBalance}
+                  className="px-3 py-2 border border-border-light rounded-xl text-sm font-bold hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {formatCurrency(amount)}
+                </button>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPayoutModal(false)}
+                className="flex-1 px-4 py-3 border border-border-light rounded-xl font-bold text-text-secondary hover:bg-bg-main transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handlePayoutRequest}
+                disabled={isCreatingPayout || !payoutAmount}
+                className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 shadow-lg shadow-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isCreatingPayout ? (
+                  <>
+                    <Spinner size="sm" className="text-white" /> Đang xử lý...
+                  </>
+                ) : (
+                  "Xác nhận rút tiền"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -171,6 +351,13 @@ export default function GuideEarnings() {
               </option>
             ))}
           </select>
+          <button
+            onClick={() => setShowPayoutModal(true)}
+            disabled={availableBalance <= 0}
+            className="px-4 py-2.5 bg-green-600 text-white rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-green-700 shadow-lg shadow-green-600/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <IconArrowUpRight className="w-4 h-4" /> Rút tiền
+          </button>
           <button className="px-4 py-2.5 bg-primary text-white rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-primary/90 shadow-lg shadow-primary/20 transition-colors">
             <IconDownload className="w-4 h-4" /> Xuất báo cáo
           </button>
@@ -497,6 +684,91 @@ export default function GuideEarnings() {
           </div>
         </div>
       )}
+
+      {/* 6. PAYOUT HISTORY */}
+      <div className="bg-white rounded-3xl border border-border-light overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-border-light flex items-center justify-between">
+          <h3 className="font-bold text-lg text-text-primary">
+            Lịch sử rút tiền
+          </h3>
+          {availableBalance > 0 && (
+            <button
+              onClick={() => setShowPayoutModal(true)}
+              className="text-sm font-bold text-primary hover:underline"
+            >
+              + Yêu cầu rút tiền
+            </button>
+          )}
+        </div>
+
+        {payoutsLoading ? (
+          <div className="flex justify-center py-12">
+            <Spinner size="md" />
+          </div>
+        ) : payouts && payouts.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-bg-main/50 text-text-secondary font-bold text-xs uppercase">
+                <tr>
+                  <th className="p-4 pl-6">Mã yêu cầu</th>
+                  <th className="p-4">Ngày tạo</th>
+                  <th className="p-4 text-right">Số tiền</th>
+                  <th className="p-4 text-center">Trạng thái</th>
+                  <th className="p-4 pr-6">Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payouts.map((payout) => (
+                  <tr
+                    key={payout._id}
+                    className="border-b border-border-light last:border-0 hover:bg-bg-main/20 transition-colors"
+                  >
+                    <td className="p-4 pl-6 font-mono text-xs text-text-secondary">
+                      #{payout._id?.slice(-8).toUpperCase()}
+                    </td>
+                    <td className="p-4 text-text-secondary">
+                      {new Date(payout.createdAt || payout.created_at).toLocaleDateString("vi-VN", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                      })}
+                    </td>
+                    <td className="p-4 text-right font-bold text-text-primary">
+                      {formatCurrency(payout.amount)}
+                    </td>
+                    <td className="p-4 text-center">
+                      {getPayoutStatusBadge(payout.status)}
+                    </td>
+                    <td className="p-4 pr-6 text-text-secondary text-xs max-w-[200px] truncate">
+                      {payout.note || payout.reject_reason || "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-bg-main rounded-full flex items-center justify-center mx-auto mb-4">
+              <IconArrowUpRight className="w-8 h-8 text-text-secondary" />
+            </div>
+            <p className="text-text-secondary font-medium mb-2">
+              Chưa có yêu cầu rút tiền
+            </p>
+            <p className="text-xs text-text-secondary mb-4">
+              Số dư khả dụng: <span className="font-bold text-green-600">{formatCurrency(availableBalance)}</span>
+            </p>
+            {availableBalance >= 100000 && (
+              <button
+                onClick={() => setShowPayoutModal(true)}
+                className="px-4 py-2 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 transition-colors"
+              >
+                Rút tiền ngay
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

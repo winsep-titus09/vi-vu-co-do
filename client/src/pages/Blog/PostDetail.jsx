@@ -6,6 +6,7 @@ import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
 import Spinner from "../../components/Loaders/Spinner";
 import EmptyState from "../../components/Loaders/EmptyState";
 import { useArticle } from "../../features/posts/hooks";
+import { getRelatedArticles } from "../../features/posts/api";
 import { toursApi } from "../../features/tours/api";
 import { formatDate } from "../../lib/formatters";
 // Correct icon imports: only some come from IconBox, others from individual files
@@ -21,12 +22,15 @@ import { IconUser } from "../../icons/IconUser";
 import IconArrowRight from "../../icons/IconArrowRight";
 import BlogCard from "../../components/Cards/BlogCard";
 import TourCard from "../../components/Cards/TourCard";
+import { CommentSection } from "../../components/Comments";
 
 export default function PostDetail() {
   const { slug } = useParams(); // slug is actually the article ID from routes
   const [scrollProgress, setScrollProgress] = useState(0);
   const [relatedTours, setRelatedTours] = useState([]);
   const [toursLoading, setToursLoading] = useState(false);
+  const [relatedArticles, setRelatedArticles] = useState([]);
+  const [articlesLoading, setArticlesLoading] = useState(false);
 
   // Fetch article from API
   const { article, isLoading, error } = useArticle(slug);
@@ -48,6 +52,25 @@ export default function PostDetail() {
 
     fetchRelatedTours();
   }, []);
+
+  // Fetch related articles when article is loaded
+  useEffect(() => {
+    if (!article?._id) return;
+
+    const fetchRelatedArticles = async () => {
+      try {
+        setArticlesLoading(true);
+        const response = await getRelatedArticles(article._id, 3);
+        setRelatedArticles(response?.items || []);
+      } catch (err) {
+        console.error("Error fetching related articles:", err);
+      } finally {
+        setArticlesLoading(false);
+      }
+    };
+
+    fetchRelatedArticles();
+  }, [article?._id]);
 
   // Logic tính toán thanh tiến trình đọc
   useEffect(() => {
@@ -266,8 +289,48 @@ export default function PostDetail() {
               </div>
             </div>
 
-            {/* TODO: BÀI VIẾT LIÊN QUAN - Requires API endpoint for related articles */}
-            {/* TODO: BÌNH LUẬN - Requires comments API */}
+            {/* BÀI VIẾT LIÊN QUAN */}
+            {relatedArticles.length > 0 && (
+              <div className="mt-12 pt-8 border-t border-border-light">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-heading font-bold text-text-primary">
+                    Bài viết liên quan
+                  </h3>
+                  <Link
+                    to="/blog"
+                    className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
+                  >
+                    Xem tất cả <IconArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+                {articlesLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner size="md" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {relatedArticles.map((relArticle) => (
+                      <BlogCard
+                        key={relArticle._id}
+                        post={{
+                          id: relArticle._id,
+                          slug: relArticle.slug || relArticle._id,
+                          title: relArticle.title,
+                          summary: relArticle.excerpt || relArticle.summary,
+                          image: relArticle.cover_image || relArticle.images?.[0],
+                          category: relArticle.categoryId?.name || "Bài viết",
+                          date: formatDate(relArticle.publishedAt || relArticle.createdAt),
+                          author: relArticle.authorId?.name || "Vi Vu Cố Đô",
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* COMMENT SECTION */}
+            <CommentSection articleId={article._id} />
           </div>
 
           {/* --- RIGHT COLUMN: SIDEBAR --- */}

@@ -177,6 +177,7 @@ export const listPendingTourRequests = async (req, res) => {
         .populate("guides.guideId", "name avatar_url")
         .populate("categories", "name slug")
         .populate("locations.locationId", "name slug")
+        .populate("itinerary.locationId", "name")
         .sort({ createdAt: -1 })
         .skip((pg - 1) * lm)
         .limit(lm)
@@ -210,6 +211,7 @@ export const getTourRequest = async (req, res) => {
       .populate("guides.guideId", "name avatar_url")
       .populate("categories", "name slug")
       .populate("locations.locationId", "name slug")
+      .populate("itinerary.locationId", "name")
       .lean();
 
     if (!r) return res.status(404).json({ message: "Không tìm thấy yêu cầu." });
@@ -415,6 +417,7 @@ export const listMyTourRequests = async (req, res) => {
       TourRequest.find(filter)
         .populate("categories", "name")
         .populate("locations.locationId", "name slug")
+        .populate("itinerary.locationId", "name")
         .sort({ createdAt: -1 })
         .skip((pg - 1) * lm)
         .limit(lm)

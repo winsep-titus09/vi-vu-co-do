@@ -132,7 +132,7 @@ export default function AdminPosts() {
       refetch();
       handleCloseForm();
     } else {
-      toast.error("Lỗi", "Không thể cập nhật bài viết.");
+      toast.error("Lỗi cập nhật", "Không thể cập nhật bài viết.");
     }
   };
 
@@ -192,7 +192,7 @@ export default function AdminPosts() {
       toast.success("Thành công!", "Đã duyệt bài viết");
       refetch();
     } else {
-      toast.error("Lỗi", "Không thể duyệt bài viết");
+      toast.error("Lỗi duyệt bài viết", "Không thể duyệt bài viết");
     }
     setConfirmModal({ open: false, type: "", data: null });
   };
@@ -213,7 +213,7 @@ export default function AdminPosts() {
       toast.success("Thành công!", "Đã từ chối bài viết");
       refetch();
     } else {
-      toast.error("Lỗi", "Không thể từ chối bài viết");
+      toast.error("Lỗi từ chối bài viết", "Không thể từ chối bài viết");
     }
     setConfirmModal({ open: false, type: "", data: null });
     setRejectReason("");
@@ -230,7 +230,7 @@ export default function AdminPosts() {
       toast.success("Thành công!", "Đã xóa bài viết");
       refetch();
     } else {
-      toast.error("Lỗi", "Không thể xóa bài viết");
+      toast.error("Lỗi xóa bài viết", "Không thể xóa bài viết");
     }
     setConfirmModal({ open: false, type: "", data: null });
   };

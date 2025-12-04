@@ -27,10 +27,12 @@ const normalizeTour = (tour) => ({
   rating: toNumber(tour.average_rating || tour.rating || 0),
   price: toNumber(tour.price || 0),
   duration: tour.duration_hours || tour.duration || 0,
+  durationUnit: tour.duration_unit || (tour.duration_hours ? "hours" : "days"),
   category: tour.category_id || tour.categories?.[0],
   subtitle: tour.description?.substring(0, 80),
   shortDescription: tour.description,
-  schedules: tour.schedules || [],
+  fixedDepartureTime: tour.fixed_departure_time || "08:00",
+  allowCustomDate: tour.allow_custom_date !== false,
   ...tour,
 });
 
@@ -62,34 +64,59 @@ export default function Hero() {
     fetchFeaturedTour();
   }, []);
 
-  // Format duration (in hours)
-  const formatDuration = (hours) => {
-    if (!hours) return "N/A";
-    const wholeHours = Math.floor(hours);
-    const mins = Math.round((hours - wholeHours) * 60);
-    if (wholeHours === 0) return `${mins} phút`;
-    if (mins === 0) return `${wholeHours} giờ`;
-    return `${wholeHours} giờ ${mins} phút`;
+  // Format duration - ưu tiên duration_hours
+  const formatDuration = (tour) => {
+    // Ưu tiên duration_hours (đơn vị giờ)
+    if (tour.duration_hours && tour.duration_hours > 0) {
+      const hours = tour.duration_hours;
+      const wholeHours = Math.floor(hours);
+      const mins = Math.round((hours - wholeHours) * 60);
+      
+      if (wholeHours === 0) return `${mins} phút`;
+      if (mins === 0) return `${wholeHours} giờ`;
+      return `${wholeHours}h${mins}`;
+    }
+    
+    // Fallback: duration + duration_unit
+    const duration = tour.duration;
+    const unit = tour.duration_unit || "days";
+    
+    if (!duration || duration <= 0) return "N/A";
+    
+    if (unit === "hours") {
+      const wholeHours = Math.floor(duration);
+      const mins = Math.round((duration - wholeHours) * 60);
+      if (wholeHours === 0) return `${mins} phút`;
+      if (mins === 0) return `${wholeHours} giờ`;
+      return `${wholeHours}h${mins}`;
+    }
+    
+    // Đơn vị là ngày
+    if (duration === 1) return "1 ngày";
+    return `${duration} ngày`;
   };
 
-  // Get next departure time
-  const getNextDeparture = () => {
-    if (!featuredTour?.schedules?.length) return "Liên hệ";
-    const now = new Date();
-    const todaySchedules = featuredTour.schedules
-      .filter((s) => {
-        const scheduleDate = new Date(s.date);
-        return (
-          scheduleDate.toDateString() === now.toDateString() &&
-          s.status === "open"
-        );
-      })
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-    if (todaySchedules.length > 0) {
-      return `${todaySchedules[0].startTime} Hôm nay`;
+  // Get departure time display
+  const getDepartureDisplay = () => {
+    if (!featuredTour) return "Liên hệ";
+    
+    const time = featuredTour.fixedDepartureTime || "08:00";
+    
+    if (featuredTour.allowCustomDate) {
+      // Cho phép chọn ngày tự do
+      return (
+        <>
+          {time} <span className="text-text-secondary font-normal">· Tự chọn</span>
+        </>
+      );
     }
-    return "Xem lịch";
+    
+    // Giờ cố định hàng ngày
+    return (
+      <>
+        {time} <span className="text-text-secondary font-normal">· Hàng ngày</span>
+      </>
+    );
   };
 
   return (
@@ -218,10 +245,10 @@ export default function Hero() {
                 <dl className="grid grid-cols-3 gap-2 text-xs">
                   <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
                     <dt className="text-text-secondary mb-1 text-[10px] uppercase">
-                      Thời lượng
+                      Thời gian
                     </dt>
                     <dd className="font-bold text-text-primary">
-                      {formatDuration(featuredTour.duration)}
+                      ~{formatDuration(featuredTour)}
                     </dd>
                   </div>
                   <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
@@ -234,10 +261,10 @@ export default function Hero() {
                   </div>
                   <div className="p-2.5 rounded-xl bg-bg-main border border-border-light text-center">
                     <dt className="text-text-secondary mb-1 text-[10px] uppercase">
-                      Khởi hành
+                      Giờ đi
                     </dt>
-                    <dd className="font-bold text-text-primary">
-                      {getNextDeparture()}
+                    <dd className="font-bold text-text-primary text-[11px] leading-tight">
+                      {getDepartureDisplay()}
                     </dd>
                   </div>
                 </dl>

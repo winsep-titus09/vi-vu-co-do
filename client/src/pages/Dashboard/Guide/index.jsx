@@ -97,7 +97,7 @@ export default function GuideDashboard() {
       toast.success("Thành công!", "Đã chấp nhận yêu cầu đặt tour.");
       refetchRequests();
     } catch (error) {
-      toast.error("Lỗi", error.message || "Không thể chấp nhận yêu cầu");
+      toast.error("Lỗi chấp nhận", error.message || "Không thể chấp nhận yêu cầu");
     }
   };
 
@@ -109,7 +109,7 @@ export default function GuideDashboard() {
       toast.success("Thành công!", "Đã từ chối yêu cầu đặt tour.");
       refetchRequests();
     } catch (error) {
-      toast.error("Lỗi", error.message || "Không thể từ chối yêu cầu");
+      toast.error("Lỗi từ chối", error.message || "Không thể từ chối yêu cầu");
     }
   };
 

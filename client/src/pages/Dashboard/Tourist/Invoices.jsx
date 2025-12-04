@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useMyBookings } from "../../../features/booking/hooks";
+import { toNumber } from "../../../lib/formatters";
 import Spinner from "../../../components/Loaders/Spinner";
 import { IconCheck } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
@@ -38,8 +39,8 @@ export default function TouristInvoices() {
             ? `Hoàn tiền: ${b.tour_id?.name || "Tour"}`
             : b.tour_id?.name || "Tour",
           amount: isRefund
-            ? Math.abs(b.total_price || 0)
-            : -(b.total_price || 0),
+            ? Math.abs(toNumber(b.total_price))
+            : -toNumber(b.total_price),
           date:
             new Date(b.start_date).toLocaleDateString("vi-VN") +
             " " +

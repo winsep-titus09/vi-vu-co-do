@@ -134,31 +134,57 @@ async function suggestDates({ tour, startFrom, requestedSlots, guideId, days = 1
     return out;
 }
 
-// GET /api/tours/:id/check-date?date=YYYY-MM-DD&participants=3&guideId=<optional>
+// GET /api/tours/:tourId/availability?date=YYYY-MM-DD&guests=3&guideId=<optional>
 export const checkTourDate = async (req, res) => {
     try {
-        const { id } = req.params;
-        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ message: "ID không hợp lệ." });
+        const { tourId } = req.params;
+        if (!mongoose.isValidObjectId(tourId)) return res.status(400).json({ available: false, reason: "invalid_id", message: "ID không hợp lệ." });
 
         const dateStr = req.query.date;
-        const participants = toInt(req.query.participants, 1);
+        const participants = toInt(req.query.guests, 1);
         const guideId = req.query.guideId && mongoose.isValidObjectId(req.query.guideId) ? req.query.guideId : null;
 
         const date = toDateAtLocal(dateStr);
-        if (!date) return res.status(400).json({ message: "date không hợp lệ. Dùng YYYY-MM-DD hoặc ISO 8601." });
+        if (!date) return res.status(400).json({ available: false, reason: "invalid_date", message: "Date không hợp lệ. Dùng YYYY-MM-DD." });
 
-        const tour = await Tour.findOne({ _id: id, status: "active", "approval.status": "approved" }).lean();
-        if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
+        const tour = await Tour.findOne({ _id: tourId, status: "active", "approval.status": "approved" }).lean();
+        if (!tour) return res.status(404).json({ available: false, reason: "tour_not_found", message: "Không tìm thấy tour." });
 
         const result = await evaluateDate({ tour, date, requestedSlots: participants, guideId });
+        
+        // Format response for frontend
+        const reasonMessages = {
+            past_date: "Ngày đã qua",
+            custom_date_disabled: "Tour không cho phép chọn ngày tùy ý",
+            min_days_before_start: `Cần đặt trước ít nhất ${tour.min_days_before_start || 1} ngày`,
+            max_days_advance: "Không thể đặt quá xa trong tương lai",
+            closed_weekday: "Tour không hoạt động vào ngày này trong tuần",
+            in_blackout: "Ngày này không khả dụng",
+            no_capacity: `Không đủ chỗ (còn ${result.remaining} chỗ)`,
+            guide_busy: "Hướng dẫn viên đã bận ngày này",
+        };
+        
         if (!result.valid) {
-            const startFrom = new Date(date.getTime() + 24 * 60 * 60 * 1000);
-            result.suggest = await suggestDates({ tour, startFrom, requestedSlots: participants, guideId });
+            const primaryReason = result.reasons[0];
+            return res.json({
+                available: false,
+                reason: primaryReason,
+                reasons: result.reasons,
+                message: reasonMessages[primaryReason] || "Ngày này không khả dụng",
+                remainingSlots: result.remaining,
+                suggest: await suggestDates({ tour, startFrom: new Date(date.getTime() + 24 * 60 * 60 * 1000), requestedSlots: participants, guideId }),
+            });
         }
-        return res.json(result);
+        
+        return res.json({
+            available: true,
+            remainingSlots: result.remaining,
+            capacity: result.capacity,
+            takenSlots: result.taken,
+        });
     } catch (err) {
         console.error("checkTourDate error:", err);
-        return res.status(500).json({ message: "Lỗi máy chủ." });
+        return res.status(500).json({ available: false, reason: "server_error", message: "Lỗi máy chủ." });
     }
 };
 

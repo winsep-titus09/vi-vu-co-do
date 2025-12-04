@@ -64,9 +64,6 @@ const TouristInvoices = lazy(() =>
 // 2. Guide Dashboard Pages
 const GuideDashboard = lazy(() => import("../pages/Dashboard/Guide/index"));
 const GuideMyTours = lazy(() => import("../pages/Dashboard/Guide/MyTours"));
-const GuideMyEditRequests = lazy(() =>
-  import("../pages/Dashboard/Guide/MyEditRequests")
-);
 const GuideCreateTour = lazy(() =>
   import("../pages/Dashboard/Guide/CreateTour")
 );
@@ -103,6 +100,7 @@ const AdminNotifications = lazy(() =>
 );
 const AdminUsers = lazy(() => import("../pages/Dashboard/Admin/Users"));
 const AdminTours = lazy(() => import("../pages/Dashboard/Admin/Tours"));
+const AdminCreateTour = lazy(() => import("../pages/Dashboard/Admin/CreateTour"));
 const AdminPlaces = lazy(() => import("../pages/Dashboard/Admin/Places"));
 const AdminFinance = lazy(() => import("../pages/Dashboard/Admin/Finance"));
 const AdminSettings = lazy(() => import("../pages/Dashboard/Admin/Settings"));
@@ -245,7 +243,7 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: "booking/payment",
+        path: "booking/:bookingId/payment",
         element: (
           <Suspense fallback={<PageFallback />}>
             <BookingStepPayment />
@@ -366,14 +364,6 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <GuideMyTours />
-          </Suspense>
-        ),
-      },
-      {
-        path: "edit-requests",
-        element: (
-          <Suspense fallback={<PageFallback />}>
-            <GuideMyEditRequests />
           </Suspense>
         ),
       },
@@ -532,6 +522,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <AdminTours />
+          </Suspense>
+        ),
+      },
+      {
+        path: "create-tour",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminCreateTour />
           </Suspense>
         ),
       },

@@ -149,7 +149,7 @@ export default function DestinationForm({
 
     try {
       await onSubmit(fd);
-    } catch (err) {
+    } catch {
       // Error handling done in parent
     }
   };

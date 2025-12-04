@@ -2,24 +2,7 @@ import React, { useState } from "react";
 import { useToast } from "../Toast/useToast";
 import { IconStar, IconCheck } from "../../icons/IconBox";
 import { IconX } from "../../icons/IconX";
-
-// Inline Icon Upload
-const IconUploadCloud = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="17 8 12 3 7 8" />
-    <line x1="12" y1="3" x2="12" y2="15" />
-  </svg>
-);
+import { IconUpload } from "../../icons/IconCommon";
 
 export default function ReviewModal({ isOpen, onClose, booking, onSubmit }) {
   const [rating, setRating] = useState(0);
@@ -150,7 +133,7 @@ export default function ReviewModal({ isOpen, onClose, booking, onSubmit }) {
             <div className="flex gap-3 overflow-x-auto py-1">
               {/* Upload Button */}
               <label className="w-20 h-20 flex flex-col items-center justify-center border-2 border-dashed border-border-light rounded-xl cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all shrink-0">
-                <IconUploadCloud className="w-6 h-6 text-text-secondary mb-1" />
+                <IconUpload className="w-6 h-6 text-text-secondary mb-1" />
                 <span className="text-[10px] font-bold text-text-secondary">
                   Thêm ảnh
                 </span>

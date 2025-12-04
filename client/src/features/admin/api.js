@@ -96,8 +96,15 @@ export const adminApi = {
     return response;
   },
 
-  deleteTour: async (id) => {
-    const response = await apiClient.delete(`/admin/tours/${id}`);
+  deleteTour: async (id, reason) => {
+    const response = await apiClient.delete(`/admin/tours/${id}`, {
+      data: { reason }
+    });
+    return response;
+  },
+
+  toggleFeatured: async (id) => {
+    const response = await apiClient.patch(`/admin/tours/${id}/featured`);
     return response;
   },
 
@@ -227,6 +234,27 @@ export const adminApi = {
       `/admin/payment-settings/${gateway}`,
       data
     );
+    return response;
+  },
+
+  // ============================================================================
+  // ADMIN GUIDES API (for tour assignment)
+  // ============================================================================
+
+  getApprovedGuides: async () => {
+    const response = await apiClient.get("/admin/users/guides");
+    return {
+      items: Array.isArray(response?.items) ? response.items : [],
+      total: Number(response?.total || 0),
+    };
+  },
+
+  // ============================================================================
+  // ADMIN CREATE TOUR API
+  // ============================================================================
+
+  createTour: async (data) => {
+    const response = await apiClient.post("/tours", data);
     return response;
   },
 };

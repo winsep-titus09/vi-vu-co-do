@@ -7,6 +7,7 @@ import {
   IconClock,
   IconStar,
   Icon3D,
+  IconCheck,
 } from "../../icons/IconBox.jsx";
 import IconArrowRight from "../../icons/IconArrowRight.jsx";
 
@@ -24,6 +25,27 @@ export default function TourCard({ tour }) {
   // Safely convert rating and price
   const rating = toNumber(tour.rating);
   const price = toNumber(tour.price);
+  
+  // Format duration: ưu tiên duration_hours, fallback duration (days)
+  const formatDuration = () => {
+    if (tour.duration_hours && tour.duration_hours > 0) {
+      const hours = tour.duration_hours;
+      if (hours < 1) return `${Math.round(hours * 60)} phút`;
+      if (hours % 1 === 0) return `${hours} giờ`;
+      return `${hours.toFixed(1)} giờ`;
+    }
+    if (tour.duration) {
+      if (typeof tour.duration === "number") {
+        return `${tour.duration} ${tour.duration_unit === "hours" ? "giờ" : "ngày"}`;
+      }
+      return tour.duration;
+    }
+    return "N/A";
+  };
+  
+  // Lấy highlights hoặc fallback về description
+  const highlights = tour.highlights || [];
+  const displayHighlights = highlights.slice(0, 2);
 
   return (
     // 1. WRAPPER:
@@ -65,7 +87,7 @@ export default function TourCard({ tour }) {
             </span>
             <span className="inline-flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1 border border-white/10">
               <IconClock className="w-3.5 h-3.5" />
-              {tour.duration}
+              {formatDuration()}
             </span>
           </div>
         </div>
@@ -83,13 +105,33 @@ export default function TourCard({ tour }) {
           </span>
         </div>
 
-        <p className="text-sm text-text-secondary line-clamp-2 flex-1">
-          {tour.description}
-        </p>
+        {/* Hiển thị highlights nếu có, fallback về description */}
+        {displayHighlights.length > 0 ? (
+          <div className="space-y-1.5 flex-1">
+            {displayHighlights.map((highlight, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-1.5 text-sm text-text-secondary"
+              >
+                <IconCheck className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                <span className="line-clamp-1">{highlight}</span>
+              </div>
+            ))}
+            {highlights.length > 2 && (
+              <span className="text-xs text-primary font-medium">
+                +{highlights.length - 2} điểm nổi bật khác
+              </span>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-text-secondary line-clamp-2 flex-1">
+            {tour.description}
+          </p>
+        )}
 
         <div className="flex items-center justify-between pt-3 border-t border-border-light mt-auto">
           <span className="text-base font-bold text-primary">
-            ${price.toFixed(0)}{" "}
+            {price.toLocaleString("vi-VN")}₫{" "}
             <span className="text-xs font-normal text-text-secondary">
               / người
             </span>

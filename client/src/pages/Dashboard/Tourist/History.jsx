@@ -5,6 +5,7 @@ import {
   useMyBookings,
   useBookingActions,
 } from "../../../features/booking/hooks";
+import { formatPrice, toNumber } from "../../../lib/formatters";
 import Spinner from "../../../components/Loaders/Spinner";
 import EmptyState from "../../../components/Loaders/EmptyState";
 import ConfirmModal from "../../../components/Modals/ConfirmModal";
@@ -25,6 +26,8 @@ import TicketModal from "../../../components/Modals/TicketModal";
 // ============================================================================
 const tabs = [
   { id: "all", label: "Tất cả" },
+  { id: "pending", label: "Chờ xử lý" },
+  { id: "awaiting_payment", label: "Chờ thanh toán" },
   { id: "confirmed", label: "Sắp tới" },
   { id: "completed", label: "Hoàn thành" },
   { id: "canceled", label: "Đã hủy" },
@@ -62,18 +65,16 @@ export default function HistoryPage() {
         status === "rejected"
       )
         return "cancelled";
-      if (
-        status === "paid" ||
-        status === "awaiting_payment" ||
-        guideDecision === "accepted"
-      )
-        return "confirmed";
+      // Thêm trạng thái awaiting_payment
+      if (status === "awaiting_payment") return "awaiting_payment";
+      if (status === "paid" || guideDecision === "accepted") return "confirmed";
       if (status === "waiting_guide") return "pending";
       return "pending";
     };
 
     return apiBookings.map((b) => ({
       id: b._id,
+      rawStatus: b.status, // Lưu status gốc để gọi API thanh toán
       tourId: b.tour_id?._id,
       tourName: b.tour_id?.name || "Chuyến tham quan",
       image:
@@ -87,7 +88,8 @@ export default function HistoryPage() {
         b.intended_guide_id?.name ||
         b.tour_id?.guide_id?.name ||
         "Chưa phân công",
-      price: (b.total_price || 0).toLocaleString() + "đ",
+      price: formatPrice(b.total_price),
+      totalPrice: toNumber(b.total_price),
       guests:
         b.num_guests ||
         b.participants?.reduce(
@@ -96,12 +98,20 @@ export default function HistoryPage() {
         ) ||
         1,
       status: mapStatus(b),
+      guideDecision: b.guide_decision?.status,
+      paymentDueAt: b.payment_due_at,
     }));
   }, [apiBookings]);
 
   // ============================================================================
   // ACTION HANDLERS
   // ============================================================================
+
+  // Handler thanh toán cho booking awaiting_payment
+  const handlePayNow = (booking) => {
+    // Chuyển đến trang thanh toán với bookingId
+    navigate(`/booking/${booking.id}/payment`);
+  };
 
   const handleCancelBooking = async () => {
     if (!selectedBooking || !cancelReason.trim()) {
@@ -163,6 +173,18 @@ export default function HistoryPage() {
 
   const renderStatus = (status) => {
     switch (status) {
+      case "awaiting_payment":
+        return (
+          <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-bold border border-orange-200 whitespace-nowrap animate-pulse">
+            Chờ thanh toán
+          </span>
+        );
+      case "pending":
+        return (
+          <span className="px-3 py-1 rounded-full bg-yellow-50 text-yellow-700 text-xs font-bold border border-yellow-100 whitespace-nowrap">
+            Chờ HDV duyệt
+          </span>
+        );
       case "confirmed":
         return (
           <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 whitespace-nowrap">
@@ -184,7 +206,7 @@ export default function HistoryPage() {
         );
       default:
         return (
-          <span className="px-3 py-1 rounded-full bg-yellow-50 text-yellow-700 text-xs font-bold border border-yellow-100 whitespace-nowrap">
+          <span className="px-3 py-1 rounded-full bg-gray-50 text-gray-600 text-xs font-bold border border-gray-100 whitespace-nowrap">
             Chờ xử lý
           </span>
         );
@@ -319,6 +341,46 @@ export default function HistoryPage() {
                   </div>
 
                   <div className="flex gap-3 w-full md:w-auto justify-end">
+                    {/* Chờ HDV duyệt */}
+                    {item.status === "pending" && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setSelectedBooking(item);
+                            setIsCancelModalOpen(true);
+                          }}
+                          className="flex-1 md:flex-none px-5 py-2 rounded-xl border border-border-light text-sm font-bold text-text-secondary hover:text-red-500 hover:border-red-200 transition-colors whitespace-nowrap"
+                        >
+                          Hủy yêu cầu
+                        </button>
+                        <span className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-yellow-50 text-yellow-700 text-sm font-bold border border-yellow-200 whitespace-nowrap text-center">
+                          ⏳ Đang chờ HDV xác nhận
+                        </span>
+                      </>
+                    )}
+
+                    {/* Chờ thanh toán - HDV đã duyệt */}
+                    {item.status === "awaiting_payment" && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setSelectedBooking(item);
+                            setIsCancelModalOpen(true);
+                          }}
+                          className="flex-1 md:flex-none px-5 py-2 rounded-xl border border-border-light text-sm font-bold text-text-secondary hover:text-red-500 hover:border-red-200 transition-colors whitespace-nowrap"
+                        >
+                          Hủy
+                        </button>
+                        <button
+                          onClick={() => handlePayNow(item)}
+                          className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20 whitespace-nowrap animate-pulse"
+                        >
+                          💳 Thanh toán ngay
+                        </button>
+                      </>
+                    )}
+
+                    {/* Đã thanh toán - sắp khởi hành */}
                     {item.status === "confirmed" && (
                       <>
                         <button

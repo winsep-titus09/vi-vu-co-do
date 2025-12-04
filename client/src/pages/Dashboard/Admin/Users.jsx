@@ -13,6 +13,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconTrash,
+  IconShieldCheck,
 } from "../../../icons/IconCommon";
 import Spinner from "../../../components/Loaders/Spinner";
 import ConfirmModal from "../../../components/Modals/ConfirmModal";
@@ -55,22 +56,6 @@ function useDebounce(value, delay = 300) {
   }, [value, delay]);
   return debouncedValue;
 }
-
-const IconShieldCheck = ({ className }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-    />
-  </svg>
-);
 
 export default function AdminUsers() {
   const toast = useToast();
@@ -178,7 +163,7 @@ export default function AdminUsers() {
       setLockConfirm(null);
       refetch();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể thay đổi trạng thái");
+      toast.error("Lỗi thay đổi trạng thái", err.message || "Không thể thay đổi trạng thái tài khoản");
     }
   };
 
@@ -188,7 +173,7 @@ export default function AdminUsers() {
       toast.success("Thành công!", `Đã chấp thuận HDV ${guide.user_id?.name}`);
       refetchGuides();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể chấp thuận hồ sơ");
+      toast.error("Lỗi chấp thuận HDV", err.message || "Không thể chấp thuận hồ sơ");
     }
   };
 
@@ -207,7 +192,7 @@ export default function AdminUsers() {
       setRejectConfirm(null);
       refetchGuides();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể từ chối hồ sơ");
+      toast.error("Lỗi từ chối HDV", err.message || "Không thể từ chối hồ sơ");
     }
   };
 
@@ -228,7 +213,7 @@ export default function AdminUsers() {
       refetchDeleteRequests();
       refetch();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể xóa tài khoản");
+      toast.error("Lỗi xóa tài khoản", err.message || "Không thể xóa tài khoản");
     }
   };
 
@@ -247,7 +232,7 @@ export default function AdminUsers() {
       setRejectDeleteConfirm(null);
       refetchDeleteRequests();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể từ chối yêu cầu");
+      toast.error("Lỗi từ chối yêu cầu", err.message || "Không thể từ chối yêu cầu xóa tài khoản");
     }
   };
 

@@ -160,6 +160,12 @@ export const guidesApi = {
     return response;
   },
 
+  // Get my tour detail (with edit permissions)
+  getMyTourDetail: async (tourId) => {
+    const response = await apiClient.get(`/guides/me/tours/${tourId}`);
+    return response;
+  },
+
   // Delete tour
   deleteTour: async (tourId) => {
     const response = await apiClient.delete(`/guides/me/tours/${tourId}`);
@@ -362,6 +368,26 @@ export const guidesApi = {
   // Get my guide application status
   getMyApplication: async () => {
     const response = await apiClient.get("/guides/apply/me");
+    return response;
+  },
+
+  // ========== PAYOUT APIs (for guides) ==========
+
+  /**
+   * Create payout request - HDV yêu cầu rút tiền
+   * @param {number} amount - Số tiền muốn rút
+   */
+  createPayoutRequest: async (amount) => {
+    const response = await apiClient.post("/payouts", { amount });
+    return response;
+  },
+
+  /**
+   * Get my payout requests - Lịch sử yêu cầu rút tiền
+   * @param {Object} params - { page, limit, status }
+   */
+  getMyPayoutRequests: async (params = {}) => {
+    const response = await apiClient.get("/payouts", { params });
     return response;
   },
 };

@@ -4,7 +4,16 @@ import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
 import { placesApi } from "../../features/places/api";
 import { toursApi } from "../../features/tours/api";
 import { reviewsApi } from "../../features/reviews/api";
-import { IconLoader } from "../../icons/IconCommon";
+import { useCreateReview } from "../../features/reviews/hooks";
+import { useAuth } from "../../features/auth/hooks";
+import { useToast } from "../../components/Toast/useToast";
+import {
+  IconLoader,
+  IconDirection,
+  IconHeart,
+  IconTicketAlt,
+  IconArrowRight,
+} from "../../icons/IconCommon";
 import {
   IconMapPin,
   IconClock,
@@ -13,7 +22,6 @@ import {
   IconStar,
   IconShare,
 } from "../../icons/IconBox";
-import IconArrowRight from "../../icons/IconArrowRight";
 import IconInfo from "../../icons/IconInfo";
 import { IconX } from "../../icons/IconX";
 import { IconSun } from "../../icons/IconSun";
@@ -22,6 +30,13 @@ import { IconSun } from "../../icons/IconSun";
 const toNumber = (val) => {
   if (val?.$numberDecimal) return parseFloat(val.$numberDecimal);
   return parseFloat(val) || 0;
+};
+
+// Helper function to format VND
+const formatVND = (price) => {
+  const amount = toNumber(price);
+  if (amount === 0) return "Miễn phí";
+  return amount.toLocaleString("vi-VN") + "đ";
 };
 
 // Helper function to format ticket price
@@ -40,6 +55,9 @@ const formatTicketPrice = (price, currency = "VND") => {
 export default function PlaceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
+  const { isAuthenticated } = useAuth();
+  const { createLocationReview, isLoading: isSubmittingReview } = useCreateReview();
 
   // State management
   const [location, setLocation] = useState(null);
@@ -50,6 +68,12 @@ export default function PlaceDetail() {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [error, setError] = useState("");
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
+
+  // Review modal state
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewVisitDate, setReviewVisitDate] = useState("");
 
   // Fetch location details
   useEffect(() => {
@@ -347,7 +371,17 @@ export default function PlaceDetail() {
                 <h3 className="text-2xl font-heading font-bold text-text-primary">
                   Đánh giá & Bình luận
                 </h3>
-                <button className="px-4 py-2 rounded-full border border-border-light text-sm font-bold hover:bg-bg-main transition-colors">
+                <button 
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      toast.warning("Yêu cầu đăng nhập", "Vui lòng đăng nhập để viết đánh giá");
+                      navigate("/sign-in", { state: { from: `/places/${id}` } });
+                      return;
+                    }
+                    setIsReviewModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-full border border-border-light text-sm font-bold hover:bg-bg-main transition-colors"
+                >
                   Viết đánh giá
                 </button>
               </div>
@@ -488,25 +522,7 @@ export default function PlaceDetail() {
                 <div className="bg-white p-4 grid grid-cols-3 gap-2 border border-t-0 border-border-light rounded-b-3xl">
                   <button className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-bg-main transition-colors group">
                     <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                        ></path>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                        ></path>
-                      </svg>
+                      <IconDirection className="w-4 h-4" />
                     </div>
                     <span className="text-[10px] font-bold text-text-secondary">
                       Chỉ đường
@@ -514,19 +530,7 @@ export default function PlaceDetail() {
                   </button>
                   <button className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-bg-main transition-colors group">
                     <div className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                        ></path>
-                      </svg>
+                      <IconHeart className="w-4 h-4" />
                     </div>
                     <span className="text-[10px] font-bold text-text-secondary">
                       Lưu lại
@@ -562,19 +566,7 @@ export default function PlaceDetail() {
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-3 rounded-xl bg-bg-main/50">
-                    <svg
-                      className="w-5 h-5 text-primary mt-0.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
-                      ></path>
-                    </svg>
+                    <IconTicketAlt className="w-5 h-5 text-primary mt-0.5" />
                     <div>
                       <p className="text-xs font-bold text-text-secondary uppercase">
                         Giá vé tham khảo
@@ -636,11 +628,13 @@ export default function PlaceDetail() {
                               {tour.name}
                             </h4>
                             <div className="flex items-center gap-3 text-xs text-white/60">
-                              <span>${toNumber(tour.price)}</span>
+                              <span>{formatVND(tour.price)}</span>
                               <span>•</span>
                               <span>
-                                {tour.duration}{" "}
-                                {tour.duration_unit === "days" ? "ngày" : "giờ"}
+                                {tour.duration_hours 
+                                  ? `${tour.duration_hours} giờ`
+                                  : `${tour.duration} ${tour.duration_unit === "hours" ? "giờ" : "ngày"}`
+                                }
                               </span>
                             </div>
                           </div>
@@ -678,25 +672,7 @@ export default function PlaceDetail() {
         </div>
         <div className="flex gap-3">
           <button className="w-12 h-12 rounded-full bg-bg-main text-primary border border-border-light flex items-center justify-center hover:bg-primary/10">
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-              ></path>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-              ></path>
-            </svg>
+            <IconDirection className="w-6 h-6" />
           </button>
           <button className="bg-primary text-white px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-primary/30 flex items-center gap-2 active:scale-95 transition-transform">
             Đặt Tour Ngay <IconArrowRight className="w-4 h-4" />
@@ -745,6 +721,167 @@ export default function PlaceDetail() {
                   Xoay phải
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REVIEW MODAL */}
+      {isReviewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border-light">
+              <h3 className="text-xl font-heading font-bold text-text-primary">
+                Viết đánh giá
+              </h3>
+              <button
+                onClick={() => {
+                  setIsReviewModalOpen(false);
+                  setReviewRating(5);
+                  setReviewComment("");
+                  setReviewVisitDate("");
+                }}
+                className="p-2 rounded-full hover:bg-bg-main transition-colors"
+              >
+                <IconX className="w-5 h-5 text-text-secondary" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-6">
+              {/* Place info */}
+              <div className="flex items-center gap-4 p-4 bg-bg-main rounded-2xl">
+                <img
+                  src={placeDetail?.images?.[0]}
+                  alt={placeDetail?.name}
+                  className="w-16 h-16 rounded-xl object-cover"
+                />
+                <div>
+                  <h4 className="font-bold text-text-primary">{placeDetail?.name}</h4>
+                  <p className="text-sm text-text-secondary">{placeDetail?.category}</p>
+                </div>
+              </div>
+
+              {/* Rating */}
+              <div>
+                <label className="block text-sm font-bold text-text-secondary uppercase mb-3">
+                  Đánh giá của bạn
+                </label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      className="p-1 transition-transform hover:scale-110"
+                    >
+                      <IconStar
+                        className={`w-8 h-8 ${
+                          star <= reviewRating
+                            ? "text-[#BC4C00] fill-current"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="ml-2 text-sm text-text-secondary">
+                    {reviewRating === 5
+                      ? "Tuyệt vời"
+                      : reviewRating === 4
+                      ? "Rất tốt"
+                      : reviewRating === 3
+                      ? "Bình thường"
+                      : reviewRating === 2
+                      ? "Tệ"
+                      : "Rất tệ"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Visit date */}
+              <div>
+                <label className="block text-sm font-bold text-text-secondary uppercase mb-2">
+                  Ngày tham quan (tùy chọn)
+                </label>
+                <input
+                  type="date"
+                  value={reviewVisitDate}
+                  onChange={(e) => setReviewVisitDate(e.target.value)}
+                  max={new Date().toISOString().split("T")[0]}
+                  className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                />
+              </div>
+
+              {/* Comment */}
+              <div>
+                <label className="block text-sm font-bold text-text-secondary uppercase mb-2">
+                  Nhận xét của bạn
+                </label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="Chia sẻ trải nghiệm của bạn tại địa điểm này..."
+                  rows={4}
+                  className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-border-light bg-bg-main/30">
+              <button
+                onClick={() => {
+                  setIsReviewModalOpen(false);
+                  setReviewRating(5);
+                  setReviewComment("");
+                  setReviewVisitDate("");
+                }}
+                className="px-6 py-2.5 rounded-xl border border-border-light text-text-secondary font-bold hover:bg-bg-main transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  if (!reviewComment.trim()) {
+                    toast.warning("Thiếu thông tin", "Vui lòng nhập nhận xét");
+                    return;
+                  }
+
+                  const result = await createLocationReview(location._id, {
+                    rating: reviewRating,
+                    comment: reviewComment.trim(),
+                    visit_date: reviewVisitDate || undefined,
+                  });
+
+                  if (result.success) {
+                    toast.success("Thành công!", "Cảm ơn bạn đã đánh giá địa điểm này");
+                    setIsReviewModalOpen(false);
+                    setReviewRating(5);
+                    setReviewComment("");
+                    setReviewVisitDate("");
+                    // Refresh reviews
+                    const response = await reviewsApi.listLocationReviews(location._id, {
+                      limit: 6,
+                      sort: "-createdAt",
+                    });
+                    setReviews(response?.items || []);
+                  } else {
+                    toast.error("Lỗi", result.error || "Không thể gửi đánh giá");
+                  }
+                }}
+                disabled={isSubmittingReview || !reviewComment.trim()}
+                className="px-6 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmittingReview ? (
+                  <>
+                    <IconLoader className="w-4 h-4 animate-spin" />
+                    Đang gửi...
+                  </>
+                ) : (
+                  "Gửi đánh giá"
+                )}
+              </button>
             </div>
           </div>
         </div>

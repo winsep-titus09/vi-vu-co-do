@@ -120,6 +120,7 @@ export function useAdminModels3D(params = {}) {
     } finally {
       setIsLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramsKey]);
 
   useEffect(() => {
@@ -219,6 +220,7 @@ export function useLocations(params = {}) {
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { locations, isLoading, error };

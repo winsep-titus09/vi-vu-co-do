@@ -7,6 +7,7 @@ import User from "../models/User.js";
 import TourCategory from "../models/TourCategory.js";
 import GuideProfile from "../models/GuideProfile.js";
 import Review from "../models/Review.js";
+import ThreeDModel from "../models/ThreeDModel.js";
 
 import { createTourSchema, updateTourSchema } from "../utils/validator.js";
 import { notifyAdmins, notifyUser } from "../services/notify.js";
@@ -160,6 +161,7 @@ export const listTours = async (req, res) => {
         .populate("category_id", "name")
         .populate("guides.guideId", "name avatar_url")
         .populate("locations.locationId", "name slug")
+        .populate("itinerary.locationId", "name")
         .sort(sortObj)
         .skip((pg - 1) * lm)
         .limit(lm),
@@ -184,10 +186,59 @@ export const getTour = async (req, res) => {
     const tour = await Tour.findOne(cond)
       .populate("category_id", "name")
       .populate("guides.guideId", "name avatar_url")
-      .populate("locations.locationId", "name slug")
+      .populate("locations.locationId", "name slug images")
+      .populate("itinerary.locationId", "name slug images")
       .lean();
 
     if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
+
+    // Lấy 3D models cho các locations trong tour
+    const locationIds = [
+      ...new Set([
+        ...(tour.locations || []).map(l => l.locationId?._id?.toString()).filter(Boolean),
+        ...(tour.itinerary || []).map(i => i.locationId?._id?.toString()).filter(Boolean),
+      ])
+    ];
+
+    let threeDModels = [];
+    if (locationIds.length > 0) {
+      threeDModels = await ThreeDModel.find({
+        locationId: { $in: locationIds }
+      }).lean();
+    }
+
+    // Gắn 3D models vào locations
+    const modelsMap = {};
+    threeDModels.forEach(m => {
+      const locId = m.locationId?.toString();
+      if (!modelsMap[locId]) modelsMap[locId] = [];
+      modelsMap[locId].push(m);
+    });
+
+    // Attach to locations
+    if (tour.locations) {
+      tour.locations = tour.locations.map(loc => ({
+        ...loc,
+        locationId: loc.locationId ? {
+          ...loc.locationId,
+          threeDModels: modelsMap[loc.locationId._id?.toString()] || []
+        } : loc.locationId
+      }));
+    }
+
+    // Attach to itinerary
+    if (tour.itinerary) {
+      tour.itinerary = tour.itinerary.map(item => ({
+        ...item,
+        locationId: item.locationId ? {
+          ...item.locationId,
+          threeDModels: modelsMap[item.locationId._id?.toString()] || []
+        } : item.locationId
+      }));
+    }
+
+    // Thêm mảng threeDModels tổng hợp vào tour để dễ truy cập
+    tour.threeDModels = threeDModels;
 
     return res.json(tour);
   } catch (err) {
@@ -390,7 +441,7 @@ export const createTour = async (req, res) => {
   }
 };
 
-/** PATCH /api/tours/:id  (admin; guide chỉ sửa tour của mình khi còn pending) */
+/** PATCH /api/tours/:id  (admin; guide chỉ sửa tour của mình khi còn pending hoặc có quyền edit) */
 export const updateTour = async (req, res) => {
   try {
     const { id } = req.params;
@@ -403,11 +454,27 @@ export const updateTour = async (req, res) => {
     if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
 
     if (roleName === "guide") {
-      const isOwner = tour.created_by?.toString() === req.user._id.toString();
+      // Kiểm tra quyền sở hữu tour
+      const isOwner = 
+        tour.created_by?.toString() === req.user._id.toString() ||
+        tour.guide_id?.toString() === req.user._id.toString() ||
+        tour.guides?.some((g) => g.guideId?.toString() === req.user._id.toString());
+      
       const isPending = tour.approval?.status === "pending";
-      if (!isOwner || !isPending) {
+      
+      // Kiểm tra có đang trong thời gian được phép edit không
+      const hasEditPermission = tour.edit_allowed_until && new Date(tour.edit_allowed_until) > new Date();
+      
+      if (!isOwner) {
         return res.status(403).json({
-          message: "Bạn chỉ có thể sửa tour mình tạo khi còn chờ duyệt.",
+          message: "Bạn không có quyền sửa tour này.",
+        });
+      }
+      
+      if (!isPending && !hasEditPermission) {
+        return res.status(403).json({
+          message: "Tour đã được duyệt. Bạn cần gửi yêu cầu chỉnh sửa cho admin để được cấp quyền.",
+          code: "EDIT_PERMISSION_REQUIRED",
         });
       }
     } else if (roleName !== "admin") {
@@ -563,6 +630,7 @@ export const listFeaturedTours = async (req, res) => {
       .populate("category_id", "name")
       .populate("guides.guideId", "name avatar_url")
       .populate("locations.locationId", "name slug")
+      .populate("itinerary.locationId", "name")
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();

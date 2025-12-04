@@ -530,3 +530,173 @@ export const useAdminUpdateArticle = () => {
 
   return { updateArticle, isUpdating, error };
 };
+
+// ============================================================================
+// ARTICLE COMMENTS HOOKS
+// ============================================================================
+
+/**
+ * Hook to fetch comments for an article
+ * @param {string} articleId - Article ID
+ * @param {Object} params - { page, limit }
+ */
+export const useArticleComments = (articleId, params = {}) => {
+  const [comments, setComments] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+  });
+
+  const paramsKey = JSON.stringify({ articleId, ...params });
+
+  const fetchComments = async () => {
+    if (!articleId) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await postsApi.getArticleComments(articleId, params);
+
+      if (response && typeof response === "object") {
+        setComments(response.items || []);
+        setPagination({
+          page: response.page || 1,
+          limit: response.limit || 20,
+          total: response.total || 0,
+          totalPages: response.totalPages || 1,
+        });
+      } else {
+        setComments([]);
+        setPagination({ page: 1, limit: 20, total: 0, totalPages: 1 });
+      }
+    } catch (err) {
+      console.error("Error fetching article comments:", err);
+      setError(
+        err.response?.data?.message || err.message || "Failed to load comments"
+      );
+      setComments([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (articleId) {
+      fetchComments();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramsKey]);
+
+  return { comments, setComments, isLoading, error, pagination, refetch: fetchComments };
+};
+
+/**
+ * Hook to create a comment on an article
+ */
+export const useCreateComment = () => {
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState(null);
+
+  const createComment = async (articleId, data) => {
+    try {
+      setIsCreating(true);
+      setError(null);
+      const response = await postsApi.createComment(articleId, data);
+      return response;
+    } catch (err) {
+      console.error("Error creating comment:", err);
+      setError(
+        err.response?.data?.message || err.message || "Failed to post comment"
+      );
+      return null;
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  return { createComment, isCreating, error };
+};
+
+/**
+ * Hook to delete a comment
+ */
+export const useDeleteComment = () => {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const deleteComment = async (articleId, commentId) => {
+    try {
+      setIsDeleting(true);
+      setError(null);
+      await postsApi.deleteComment(articleId, commentId);
+      return true;
+    } catch (err) {
+      console.error("Error deleting comment:", err);
+      setError(
+        err.response?.data?.message || err.message || "Failed to delete comment"
+      );
+      return false;
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return { deleteComment, isDeleting, error };
+};
+
+/**
+ * Hook to update a comment
+ */
+export const useUpdateComment = () => {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState(null);
+
+  const updateComment = async (articleId, commentId, data) => {
+    try {
+      setIsUpdating(true);
+      setError(null);
+      const response = await postsApi.updateComment(articleId, commentId, data);
+      return response;
+    } catch (err) {
+      console.error("Error updating comment:", err);
+      setError(
+        err.response?.data?.message || err.message || "Failed to update comment"
+      );
+      return null;
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return { updateComment, isUpdating, error };
+};
+
+/**
+ * Hook to load more replies for a comment
+ */
+export const useCommentReplies = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const loadReplies = async (articleId, commentId, params = {}) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await postsApi.getCommentReplies(articleId, commentId, params);
+      return response;
+    } catch (err) {
+      console.error("Error loading replies:", err);
+      setError(
+        err.response?.data?.message || err.message || "Failed to load replies"
+      );
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return { loadReplies, isLoading, error };
+};

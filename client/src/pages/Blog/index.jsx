@@ -30,8 +30,7 @@ export default function BlogPage() {
   const topicRef = useRef(null);
 
   // Fetch categories from API
-  const { categories: apiCategories, isLoading: categoriesLoading } =
-    useArticleCategories();
+  const { categories: apiCategories } = useArticleCategories();
 
   // Build categories array with "all" option
   const categories = useMemo(() => {

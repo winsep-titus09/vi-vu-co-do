@@ -241,7 +241,7 @@ export const listAllEditRequests = async (req, res) => {
 export const approveEditRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const { apply_changes } = req.body; // Boolean: có áp dụng changes vào tour không
+    const { apply_changes, edit_days = 7 } = req.body; // edit_days: số ngày cho phép HDV chỉnh sửa
 
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({ message: "ID không hợp lệ." });
@@ -260,30 +260,39 @@ export const approveEditRequest = async (req, res) => {
     if (request.request_type === "delete") {
       await Tour.findByIdAndDelete(request.tour_id._id);
     }
-    // If edit request and apply_changes is true, apply changes to tour
-    else if (apply_changes && request.changes) {
+    // If edit request
+    else if (request.request_type === "edit") {
       const tour = await Tour.findById(request.tour_id._id);
       if (tour) {
-        const allowedFields = [
-          "name",
-          "description",
-          "price",
-          "duration",
-          "duration_unit",
-          "max_guests",
-          "cover_image_url",
-          "gallery",
-          "highlights",
-          "includes",
-          "excludes",
-          "itinerary",
-        ];
+        // Nếu có apply_changes và có changes data, áp dụng trực tiếp
+        if (apply_changes && request.changes) {
+          const allowedFields = [
+            "name",
+            "description",
+            "price",
+            "duration",
+            "duration_unit",
+            "max_guests",
+            "cover_image_url",
+            "gallery",
+            "highlights",
+            "includes",
+            "excludes",
+            "itinerary",
+          ];
 
-        for (const field of allowedFields) {
-          if (request.changes[field] !== undefined) {
-            tour[field] = request.changes[field];
+          for (const field of allowedFields) {
+            if (request.changes[field] !== undefined) {
+              tour[field] = request.changes[field];
+            }
           }
         }
+        
+        // Luôn set edit_allowed_until để cho phép HDV chỉnh sửa thêm
+        const daysToAllow = Math.min(Math.max(Number(edit_days) || 7, 1), 30); // 1-30 ngày
+        tour.edit_allowed_until = new Date(Date.now() + daysToAllow * 24 * 60 * 60 * 1000);
+        tour.last_approved_edit_request = request._id;
+        
         await tour.save();
       }
     }
@@ -296,19 +305,40 @@ export const approveEditRequest = async (req, res) => {
 
     // Notify guide
     try {
-      await notifyUser(request.guide_id, {
-        type: "tour_edit_request_approved",
-        title: "Yêu cầu đã được duyệt",
-        message: `Yêu cầu ${
+      const editDeadline = request.request_type === "edit" 
+        ? new Date(Date.now() + (Number(edit_days) || 7) * 24 * 60 * 60 * 1000)
+        : null;
+      
+      await notifyUser({
+        userId: request.guide_id,
+        type: "tour_edit_request:approved",
+        content: `Yêu cầu ${
           request.request_type === "delete" ? "xóa" : "chỉnh sửa"
-        } tour "${request.tour_id.name}" đã được duyệt.`,
-        data: { requestId: request._id },
+        } tour "${request.tour_id.name}" đã được duyệt.${
+          request.request_type === "edit" 
+            ? ` Bạn có thể chỉnh sửa tour trong ${edit_days || 7} ngày.` 
+            : ""
+        }`,
+        url: request.request_type === "edit" 
+          ? `/dashboard/guide/edit-tour/${request.tour_id._id}`
+          : `/dashboard/guide/my-tours`,
+        meta: { 
+          requestId: request._id,
+          tourId: request.tour_id._id,
+          requestType: request.request_type,
+          editDeadline: editDeadline?.toISOString(),
+        },
       });
     } catch (notifyErr) {
       console.error("Notify error:", notifyErr);
     }
 
-    res.json({ message: "Đã duyệt yêu cầu.", request });
+    res.json({ 
+      message: request.request_type === "edit" 
+        ? `Đã duyệt yêu cầu. HDV có thể chỉnh sửa tour trong ${edit_days || 7} ngày.`
+        : "Đã duyệt yêu cầu xóa tour.", 
+      request 
+    });
   } catch (err) {
     console.error("approveEditRequest error:", err);
     res.status(500).json({ message: "Lỗi máy chủ." });

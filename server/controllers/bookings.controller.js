@@ -19,19 +19,22 @@ import {
 const ObjectId = mongoose.Types.ObjectId;
 
 /**
- * Price computation: children <11 free (no slot)
+ * Price computation: 
+ * - Adults (age >= 12): full price
+ * - Children (age < 12): 50% price
  */
 function computePrice({ basePrice, participants }) {
     let total = 0;
     const normalized = participants.map((p) => {
-        const isFree = typeof p.age_provided === "number" ? p.age_provided < 11 : false;
-        const price = isFree ? 0 : Number(basePrice);
-        if (!isFree) total += price;
+        const age = typeof p.age_provided === "number" ? p.age_provided : 30; // default adult
+        const isChild = age < 12;
+        const price = isChild ? Math.round(Number(basePrice) / 2) : Number(basePrice);
+        total += price;
         return {
             full_name: p.full_name || null,
             age_provided: typeof p.age_provided === "number" ? p.age_provided : null,
-            is_free: isFree,
-            count_slot: !isFree,
+            is_child: isChild,
+            count_slot: true, // Tất cả đều chiếm slot
             price_applied: price,
             seat_index: p.seat_index ?? null,
             is_primary_contact: !!p.is_primary_contact,
@@ -263,17 +266,9 @@ export const createBooking = async (req, res) => {
                 });
             }
 
-            // 3.  Kiểm tra guide đã lock ngày này cho tour này chưa (auto-approve)
-            const locked = await hasGuideLockedThisTourDate(intendedGuide, tour._id, start, computedEnd);
-            if (locked) {
-                status = "awaiting_payment";
-                guide_decision = {
-                    status: "accepted",
-                    decided_at: new Date(),
-                    decided_by: intendedGuide,
-                };
-                payment_due_at = new Date(Date.now() + paymentMins * 60 * 1000);
-            }
+            // 3.  Kiểm tra guide đã lock ngày này cho tour này chưa
+            // Lưu ý: Không còn auto-approve, booking vẫn cần guide duyệt thủ công
+            // const locked = await hasGuideLockedThisTourDate(intendedGuide, tour._id, start, computedEnd);
         }
 
         // ========== KIỂM TRA TẤT CẢ GUIDE CỦA TOUR ĐỀU BẬN ==========
@@ -890,7 +885,10 @@ export const getBooking = async (req, res) => {
     try {
         const { id } = req.params;
         if (!ObjectId.isValid(id)) return res.status(400).json({ message: "booking id không hợp lệ" });
-        const doc = await Booking.findById(id);
+        const doc = await Booking.findById(id)
+            .populate("tour_id", "name slug cover_image_url images duration location fixed_departure_time")
+            .populate("customer_id", "name email phone_number avatar_url")
+            .populate("intended_guide_id", "name avatar_url");
         if (!doc) return res.status(404).json({ message: "Không tìm thấy" });
         res.json({ booking: doc });
     } catch (e) {

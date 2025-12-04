@@ -135,6 +135,89 @@ export const getArticlePublic = async (req, res) => {
   }
 };
 
+/** Public: get related articles (same category or by same author) */
+export const getRelatedArticles = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const limit = Math.min(parseInt(req.query.limit || "4", 10), 10);
+
+    // Find the current article first
+    let currentArticle;
+    if (mongoose.isValidObjectId(id)) {
+      currentArticle = await Article.findById(id).lean();
+    } else {
+      currentArticle = await Article.findOne({ slug: id }).lean();
+    }
+
+    if (!currentArticle) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    // Build query for related articles
+    const baseFilter = {
+      _id: { $ne: currentArticle._id }, // exclude current article
+      "approval.status": "approved",
+      status: "active",
+      authorId: { $exists: true, $ne: null },
+    };
+
+    let relatedArticles = [];
+
+    // Strategy 1: Same category
+    if (currentArticle.categoryId) {
+      relatedArticles = await Article.find({
+        ...baseFilter,
+        categoryId: currentArticle.categoryId,
+      })
+        .sort({ publishedAt: -1, createdAt: -1 })
+        .limit(limit)
+        .populate("authorId", "name avatar_url")
+        .populate("categoryId", "name slug")
+        .lean();
+    }
+
+    // Strategy 2: If not enough, get by same author
+    if (relatedArticles.length < limit && currentArticle.authorId) {
+      const excludeIds = [currentArticle._id, ...relatedArticles.map(a => a._id)];
+      const byAuthor = await Article.find({
+        ...baseFilter,
+        _id: { $nin: excludeIds },
+        authorId: currentArticle.authorId,
+      })
+        .sort({ publishedAt: -1, createdAt: -1 })
+        .limit(limit - relatedArticles.length)
+        .populate("authorId", "name avatar_url")
+        .populate("categoryId", "name slug")
+        .lean();
+      
+      relatedArticles = [...relatedArticles, ...byAuthor];
+    }
+
+    // Strategy 3: If still not enough, get latest articles
+    if (relatedArticles.length < limit) {
+      const excludeIds = [currentArticle._id, ...relatedArticles.map(a => a._id)];
+      const latest = await Article.find({
+        ...baseFilter,
+        _id: { $nin: excludeIds },
+      })
+        .sort({ publishedAt: -1, createdAt: -1 })
+        .limit(limit - relatedArticles.length)
+        .populate("authorId", "name avatar_url")
+        .populate("categoryId", "name slug")
+        .lean();
+      
+      relatedArticles = [...relatedArticles, ...latest];
+    }
+
+    return res.json({ items: relatedArticles });
+  } catch (err) {
+    console.error("getRelatedArticles error:", err);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: err.message });
+  }
+};
+
 /** Guide: create article (author forced to req.user._id; approval = pending) */
 export const createArticle = async (req, res) => {
   try {
@@ -689,6 +772,7 @@ export const adminUpdateArticle = async (req, res) => {
 export default {
   listArticlesPublic,
   getArticlePublic,
+  getRelatedArticles,
   createArticle,
   listMyArticles,
   getMyArticle,
