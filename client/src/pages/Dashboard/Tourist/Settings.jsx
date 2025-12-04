@@ -270,7 +270,7 @@ export default function SettingsPage() {
       </div>
 
       {/* BECOME A GUIDE SECTION */}
-      <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-6 rounded-3xl border border-primary/20">
+      <div className="bg-linear-to-r from-primary/10 to-secondary/10 p-6 rounded-3xl border border-primary/20">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-white rounded-xl shadow-sm">
             <IconBriefcase className="w-6 h-6 text-primary" />

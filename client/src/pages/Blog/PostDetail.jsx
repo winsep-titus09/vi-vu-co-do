@@ -146,7 +146,7 @@ export default function PostDetail() {
           alt={postData.title}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+        <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/40 to-transparent"></div>
 
         <div className="absolute bottom-0 left-0 w-full pb-12 md:pb-16">
           <div className="container-main">

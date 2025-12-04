@@ -13,7 +13,7 @@ export default function TicketModal({ isOpen, onClose, booking }) {
   if (!isOpen || !booking) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 py-6">
+    <div className="fixed inset-0 z-100 flex items-center justify-center px-4 py-6">
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity animate-fade-in"
@@ -29,7 +29,7 @@ export default function TicketModal({ isOpen, onClose, booking }) {
             alt={booking.tourName}
             className="w-full h-full object-cover opacity-60"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-bg-main"></div>
+          <div className="absolute inset-0 bg-linear-to-b from-transparent to-bg-main"></div>
           <button
             onClick={onClose}
             className="absolute top-3 right-3 p-1.5 bg-white/20 hover:bg-white/40 backdrop-blur rounded-full text-text-primary transition-colors"

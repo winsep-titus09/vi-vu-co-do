@@ -1,6 +1,6 @@
 // src/pages/Tours/Detail/index.jsx
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useToast } from "../../../components/Toast/useToast";
 import { format } from "date-fns";
@@ -253,6 +253,23 @@ export default function TourDetailPage() {
     navigate("/booking/review", { state: bookingData });
   };
 
+  // Đếm tổng số ảnh panorama từ tất cả locations (đặt trước early return để tuân thủ Rules of Hooks)
+  const total3DModels = useMemo(() => {
+    if (!tour) return 0;
+    let count = 0;
+    // Từ threeDModels trực tiếp
+    count += tour.threeDModels?.length || 0;
+    // Từ locations
+    for (const loc of tour.locations || []) {
+      count += loc.locationId?.threeDModels?.length || 0;
+    }
+    // Từ itinerary
+    for (const item of tour.itinerary || []) {
+      count += item.locationId?.threeDModels?.length || 0;
+    }
+    return count;
+  }, [tour]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -503,6 +520,11 @@ export default function TourDetailPage() {
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider text-primary shadow-sm border border-primary/10">
                     <Icon3D className="w-3.5 h-3.5" /> {first3DModel?.file_type === "panorama" ? "Panorama 360°" : "3D Model"}
                   </span>
+                  {total3DModels > 1 && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-black/50 backdrop-blur text-[10px] font-bold text-white">
+                      {total3DModels} ảnh
+                    </span>
+                  )}
                 </div>
                 <div className="absolute inset-0 bg-gray-900">
                   {has3DModel ? (
@@ -541,8 +563,15 @@ export default function TourDetailPage() {
                       {has3DModel ? (first3DModel.file_type === "panorama" ? "Xem Panorama 360°" : "Tương tác 3D") : "Chưa có 3D"}
                     </button>
                   </div>
-                  <div className="absolute bottom-3 left-3 text-white/60 text-[10px] font-medium uppercase tracking-wider">
-                    {has3DModel ? (first3DModel.name || "Nhấn để xem chi tiết") : "Sắp có"}
+                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                    <span className="text-white/60 text-[10px] font-medium uppercase tracking-wider">
+                      {has3DModel ? (first3DModel.name || "Nhấn để xem chi tiết") : "Sắp có"}
+                    </span>
+                    {has3DModel && total3DModels > 1 && (
+                      <span className="text-white/80 text-[10px] font-medium">
+                        Xem tất cả {total3DModels} ảnh 360° →
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1121,200 +1150,341 @@ export default function TourDetailPage() {
       </div>
 
       {/* 3D/PANORAMA VIEWER MODAL */}
-      {is3DModalOpen && first3DModel && (
-        <div 
-          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center animate-fade-in"
-          onClick={() => setIs3DModalOpen(false)}
-        >
-          {/* Close button */}
-          <button
-            onClick={() => setIs3DModalOpen(false)}
-            className="absolute top-4 right-4 z-50 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-          >
-            <IconX className="w-6 h-6" />
-          </button>
-
-          {/* Model info */}
-          <div className="absolute top-4 left-4 z-50 text-white">
-            <h3 className="text-lg font-bold">{first3DModel.name || "Panorama 360°"}</h3>
-            {first3DModel.description && (
-              <p className="text-sm text-white/70 mt-1 max-w-md">{first3DModel.description}</p>
-            )}
-          </div>
-
-          {/* Viewer content */}
-          <div 
-            className="relative w-full h-full max-w-7xl max-h-[90vh] mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {first3DModel.file_type === "panorama" ? (
-              <PanoramaViewer imageUrl={first3DModel.file_url} />
-            ) : (
-              // GLB/GLTF viewer placeholder
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="text-center text-white">
-                  <Icon3D className="w-20 h-20 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium">3D Model Viewer</p>
-                  <p className="text-sm text-white/60 mt-2">Đang phát triển...</p>
-                  <a 
-                    href={first3DModel.file_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="inline-block mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90"
-                  >
-                    Tải xuống file 3D
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Instructions */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-xs text-center">
-            <p>Kéo để xoay • Cuộn để phóng to/thu nhỏ • Nhấn ESC hoặc bên ngoài để đóng</p>
-          </div>
-        </div>
+      {is3DModalOpen && tour?.threeDModels?.length > 0 && (
+        <PanoramaViewerModal
+          models={tour.threeDModels}
+          locations={tour.locations}
+          onClose={() => setIs3DModalOpen(false)}
+        />
       )}
     </div>
   );
 }
 
 // ============================================================================
-// PANORAMA VIEWER COMPONENT
+// PANORAMA VIEWER MODAL COMPONENT (using Photo Sphere Viewer)
 // ============================================================================
-function PanoramaViewer({ imageUrl }) {
-  const containerRef = useRef(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-  const [rotation, setRotation] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
+function PanoramaViewerModal({ models, locations, onClose }) {
+  const viewerRef = useRef(null);
+  const viewerInstance = useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Handle mouse/touch drag
-  const handleMouseDown = (e) => {
-    setIsDragging(true);
-    setStartPos({ x: e.clientX, y: e.clientY });
-  };
+  // Group models by location
+  const modelsByLocation = useMemo(() => {
+    const groups = {};
+    
+    // Group models that have locationId
+    models.forEach(model => {
+      if (model.file_type !== "panorama") return;
+      
+      const locId = model.locationId?._id || model.locationId || "unknown";
+      if (!groups[locId]) {
+        // Find location info
+        const locInfo = locations?.find(l => 
+          (l.locationId?._id || l.locationId) === locId
+        );
+        groups[locId] = {
+          id: locId,
+          name: locInfo?.locationId?.name || model.name || "Địa điểm",
+          models: []
+        };
+      }
+      groups[locId].models.push(model);
+    });
 
-  const handleMouseMove = (e) => {
-    if (!isDragging) return;
-    const deltaX = e.clientX - startPos.x;
-    const deltaY = e.clientY - startPos.y;
-    setRotation(prev => ({
-      x: Math.max(-60, Math.min(60, prev.x - deltaY * 0.3)),
-      y: prev.y + deltaX * 0.3
-    }));
-    setStartPos({ x: e.clientX, y: e.clientY });
-  };
+    // If no groups, create one default group
+    if (Object.keys(groups).length === 0) {
+      const panoramas = models.filter(m => m.file_type === "panorama");
+      if (panoramas.length > 0) {
+        groups["default"] = {
+          id: "default",
+          name: "Ảnh Panorama 360°",
+          models: panoramas
+        };
+      }
+    }
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+    return groups;
+  }, [models, locations]);
 
-  // Handle touch events
-  const handleTouchStart = (e) => {
-    if (e.touches.length === 1) {
-      setIsDragging(true);
-      setStartPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+  const locationKeys = Object.keys(modelsByLocation);
+  const [currentLocationKey, setCurrentLocationKey] = useState("");
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Update currentLocationKey when locationKeys change
+  useEffect(() => {
+    if (locationKeys.length > 0 && !currentLocationKey) {
+      setCurrentLocationKey(locationKeys[0]);
+    }
+  }, [locationKeys, currentLocationKey]);
+
+  const currentLocation = modelsByLocation[currentLocationKey];
+  const currentModel = currentLocation?.models?.[currentImageIndex];
+  const totalImages = currentLocation?.models?.length || 0;
+
+  // Initialize Photo Sphere Viewer
+  useEffect(() => {
+    if (!viewerRef.current || !currentModel?.file_url) return;
+
+    const initViewer = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Dynamically import to avoid SSR issues
+        const { Viewer } = await import("@photo-sphere-viewer/core");
+        await import("@photo-sphere-viewer/core/index.css");
+
+        // Destroy existing viewer
+        if (viewerInstance.current) {
+          viewerInstance.current.destroy();
+        }
+
+        viewerInstance.current = new Viewer({
+          container: viewerRef.current,
+          panorama: currentModel.file_url,
+          navbar: ["zoom", "fullscreen"],
+          defaultZoomLvl: 50,
+          touchmoveTwoFingers: false,
+          mousewheelCtrlKey: false,
+          loadingTxt: "Đang tải ảnh 360°...",
+        });
+
+        viewerInstance.current.addEventListener("ready", () => {
+          setIsLoading(false);
+        });
+
+        viewerInstance.current.addEventListener("error", (e) => {
+          console.error("Panorama error:", e);
+          setError("Không thể tải ảnh panorama");
+          setIsLoading(false);
+        });
+
+      } catch (err) {
+        console.error("Failed to init viewer:", err);
+        setError("Không thể khởi tạo trình xem 360°");
+        setIsLoading(false);
+      }
+    };
+
+    initViewer();
+
+    return () => {
+      if (viewerInstance.current) {
+        viewerInstance.current.destroy();
+        viewerInstance.current = null;
+      }
+    };
+  }, [currentModel?.file_url]);
+
+  // Change panorama without reinitializing
+  const changePanorama = async (imageUrl) => {
+    if (!viewerInstance.current || !imageUrl) return;
+    
+    try {
+      setIsLoading(true);
+      await viewerInstance.current.setPanorama(imageUrl, {
+        transition: 1000,
+        showLoader: true,
+      });
+      setIsLoading(false);
+    } catch (err) {
+      console.error("Failed to change panorama:", err);
+      setError("Không thể chuyển ảnh");
+      setIsLoading(false);
     }
   };
 
-  const handleTouchMove = (e) => {
-    if (!isDragging || e.touches.length !== 1) return;
-    const deltaX = e.touches[0].clientX - startPos.x;
-    const deltaY = e.touches[0].clientY - startPos.y;
-    setRotation(prev => ({
-      x: Math.max(-60, Math.min(60, prev.x - deltaY * 0.3)),
-      y: prev.y + deltaX * 0.3
-    }));
-    setStartPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+  // Navigation handlers
+  const goToImage = (index) => {
+    if (index < 0 || index >= totalImages) return;
+    setCurrentImageIndex(index);
+    const model = currentLocation?.models?.[index];
+    if (model?.file_url && viewerInstance.current) {
+      changePanorama(model.file_url);
+    }
   };
 
-  // Handle zoom
-  const handleWheel = (e) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setZoom(prev => Math.max(0.5, Math.min(3, prev + delta)));
+  const nextImage = () => goToImage(currentImageIndex + 1);
+  const prevImage = () => goToImage(currentImageIndex - 1);
+
+  const changeLocation = (key) => {
+    setCurrentLocationKey(key);
+    setCurrentImageIndex(0);
+    const firstModel = modelsByLocation[key]?.models?.[0];
+    if (firstModel?.file_url && viewerInstance.current) {
+      changePanorama(firstModel.file_url);
+    }
   };
 
-  // Keyboard controls
+  // Handle ESC key
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      switch(e.key) {
-        case 'ArrowLeft':
-          setRotation(prev => ({ ...prev, y: prev.y - 10 }));
-          break;
-        case 'ArrowRight':
-          setRotation(prev => ({ ...prev, y: prev.y + 10 }));
-          break;
-        case 'ArrowUp':
-          setRotation(prev => ({ ...prev, x: Math.min(60, prev.x + 10) }));
-          break;
-        case 'ArrowDown':
-          setRotation(prev => ({ ...prev, x: Math.max(-60, prev.x - 10) }));
-          break;
-        case '+':
-        case '=':
-          setZoom(prev => Math.min(3, prev + 0.2));
-          break;
-        case '-':
-          setZoom(prev => Math.max(0.5, prev - 0.2));
-          break;
-      }
+    const handleEsc = (e) => {
+      if (e.key === "Escape") onClose();
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    document.addEventListener("keydown", handleEsc);
+    document.body.style.overflow = "hidden";
+    
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "auto";
+    };
+  }, [onClose]);
+
+  // Handle arrow keys for navigation
+  useEffect(() => {
+    const handleKeys = (e) => {
+      if (e.key === "ArrowLeft") prevImage();
+      if (e.key === "ArrowRight") nextImage();
+    };
+    document.addEventListener("keydown", handleKeys);
+    return () => document.removeEventListener("keydown", handleKeys);
+  }, [currentImageIndex, totalImages]);
+
+  if (locationKeys.length === 0) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center">
+        <div className="text-white text-center">
+          <Icon3D className="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <p>Không có ảnh panorama 360°</p>
+          <button onClick={onClose} className="mt-4 px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30">
+            Đóng
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing select-none rounded-2xl"
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleMouseUp}
-      onWheel={handleWheel}
-      style={{ perspective: '1000px' }}
-    >
-      <div
-        className="w-full h-full transition-transform duration-100 ease-out"
-        style={{
-          transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) scale(${zoom})`,
-          transformStyle: 'preserve-3d'
-        }}
-      >
-        <img
-          src={imageUrl}
-          alt="Panorama 360°"
-          className="w-full h-full object-cover"
-          draggable={false}
-        />
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/80 to-transparent p-4">
+        <div className="flex items-start justify-between">
+          <div className="text-white">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <Icon3D className="w-5 h-5" />
+              {currentLocation?.name || "Panorama 360°"}
+            </h3>
+            {currentModel?.description && (
+              <p className="text-sm text-white/70 mt-1 max-w-lg">{currentModel.description}</p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          >
+            <IconX className="w-6 h-6" />
+          </button>
+        </div>
       </div>
-      
-      {/* Zoom controls */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-        <button
-          onClick={() => setZoom(prev => Math.min(3, prev + 0.2))}
-          className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-xl font-bold transition-colors"
-        >
-          +
-        </button>
-        <button
-          onClick={() => setZoom(prev => Math.max(0.5, prev - 0.2))}
-          className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-xl font-bold transition-colors"
-        >
-          −
-        </button>
-        <button
-          onClick={() => { setRotation({ x: 0, y: 0 }); setZoom(1); }}
-          className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-xs font-bold transition-colors"
-          title="Reset"
-        >
-          ↺
-        </button>
+
+      {/* Viewer Container */}
+      <div ref={viewerRef} className="flex-1 w-full" />
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-40">
+          <div className="text-center text-white">
+            <IconLoader className="w-10 h-10 animate-spin mx-auto mb-2" />
+            <p className="text-sm">Đang tải ảnh 360°...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error Overlay */}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-40">
+          <div className="text-center text-white">
+            <p className="text-red-400 mb-4">{error}</p>
+            <button 
+              onClick={() => { setError(null); goToImage(currentImageIndex); }}
+              className="px-4 py-2 bg-primary rounded-lg hover:bg-primary/90"
+            >
+              Thử lại
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Controls */}
+      <div className="absolute bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4">
+        <div className="max-w-4xl mx-auto space-y-3">
+          
+          {/* Location selector (if multiple locations) */}
+          {locationKeys.length > 1 && (
+            <div className="flex flex-wrap gap-2 justify-center">
+              {locationKeys.map((key) => {
+                const loc = modelsByLocation[key];
+                const isActive = key === currentLocationKey;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => changeLocation(key)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      isActive
+                        ? "bg-primary text-white border-primary"
+                        : "bg-white/10 text-white/80 border-white/20 hover:bg-white/20"
+                    } border`}
+                  >
+                    {loc.name} ({loc.models.length})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Image navigation */}
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={prevImage}
+              disabled={currentImageIndex === 0}
+              className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+            >
+              <span>◀</span> Ảnh trước
+            </button>
+
+            <div className="text-white text-sm font-medium bg-white/10 px-4 py-2 rounded-full">
+              {currentImageIndex + 1} / {totalImages}
+            </div>
+
+            <button
+              onClick={nextImage}
+              disabled={currentImageIndex >= totalImages - 1}
+              className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+            >
+              Ảnh tiếp <span>▶</span>
+            </button>
+          </div>
+
+          {/* Thumbnail strip (if more than 1 image) */}
+          {totalImages > 1 && (
+            <div className="flex gap-2 justify-center overflow-x-auto py-2 px-4 -mx-4">
+              {currentLocation?.models?.map((model, idx) => (
+                <button
+                  key={model._id || idx}
+                  onClick={() => goToImage(idx)}
+                  className={`flex-shrink-0 w-16 h-10 rounded-lg overflow-hidden border-2 transition-all ${
+                    idx === currentImageIndex
+                      ? "border-primary ring-2 ring-primary/50"
+                      : "border-transparent opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  <img
+                    src={model.thumbnail_url || model.file_url}
+                    alt={`Ảnh ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Instructions */}
+          <p className="text-white/50 text-xs text-center">
+            Kéo để xoay 360° • Cuộn để zoom • Mũi tên ←→ để chuyển ảnh • ESC để đóng
+          </p>
+        </div>
       </div>
     </div>
   );

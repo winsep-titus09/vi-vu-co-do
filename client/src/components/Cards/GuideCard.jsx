@@ -7,8 +7,9 @@ import IconVerify from "../../icons/IconVerify.jsx";
 
 /**
  * GuideCard - Style: Portrait & Reveal Bio on Hover
+ * Wrapped with React.memo for performance optimization
  */
-export default function GuideCard({ guide }) {
+const GuideCard = React.memo(function GuideCard({ guide }) {
   return (
     <Link
       to={`/guides/${guide.id}`}
@@ -19,6 +20,7 @@ export default function GuideCard({ guide }) {
         <img
           src={guide.image}
           alt={guide.name}
+          loading="lazy"
           className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
         {/* Gradient overlay */}
@@ -72,4 +74,6 @@ export default function GuideCard({ guide }) {
       </div>
     </Link>
   );
-}
+});
+
+export default GuideCard;

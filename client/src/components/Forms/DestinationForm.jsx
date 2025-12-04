@@ -8,6 +8,7 @@ import {
   IconUpload,
   IconLoader,
 } from "../../icons/IconCommon";
+import Icon360 from "../../icons/Icon360";
 
 // Default coords for Hue city center
 const DEFAULT_COORDS = [107.5901, 16.4637]; // [lng, lat]
@@ -33,6 +34,10 @@ export default function DestinationForm({
         existingImages: initialData.images || [],
         has3D: initialData.threeDModels?.length > 0 || false,
         modelFile: null,
+        // Panorama fields
+        hasPanorama: initialData.threeDModels?.some(m => m.file_type === "panorama") || false,
+        panoramaFile: null,
+        existingPanorama: initialData.threeDModels?.find(m => m.file_type === "panorama") || null,
       };
     }
     return {
@@ -45,17 +50,25 @@ export default function DestinationForm({
       existingImages: [],
       has3D: false,
       modelFile: null,
+      hasPanorama: false,
+      panoramaFile: null,
+      existingPanorama: null,
     };
   });
 
   const [previewImg, setPreviewImg] = useState(
     initialData?.images?.[0] || null
   );
+  const [panoramaPreview, setPanoramaPreview] = useState(
+    initialData?.threeDModels?.find(m => m.file_type === "panorama")?.file_url || null
+  );
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isPanoramaDragging, setIsPanoramaDragging] = useState(false);
 
   const fileInputRef = useRef(null);
   const modelInputRef = useRef(null);
+  const panoramaInputRef = useRef(null);
 
   // Get selected category name for display
   const selectedCategoryName = useMemo(() => {
@@ -105,6 +118,37 @@ export default function DestinationForm({
     if (file) setFormData((prev) => ({ ...prev, modelFile: file }));
   };
 
+  // Panorama file handling
+  const processPanoramaFile = (file) => {
+    if (file && file.type.startsWith("image/")) {
+      setFormData((prev) => ({ ...prev, panoramaFile: file, existingPanorama: null }));
+      const objectUrl = URL.createObjectURL(file);
+      setPanoramaPreview(objectUrl);
+    }
+  };
+
+  const handlePanoramaChange = (e) => processPanoramaFile(e.target.files[0]);
+
+  const handleRemovePanorama = () => {
+    setFormData((prev) => ({ ...prev, panoramaFile: null, existingPanorama: null }));
+    setPanoramaPreview(null);
+    if (panoramaInputRef.current) panoramaInputRef.current.value = "";
+  };
+
+  const handlePanoramaDragOver = (e) => {
+    e.preventDefault();
+    setIsPanoramaDragging(true);
+  };
+  const handlePanoramaDragLeave = (e) => {
+    e.preventDefault();
+    setIsPanoramaDragging(false);
+  };
+  const handlePanoramaDrop = (e) => {
+    e.preventDefault();
+    setIsPanoramaDragging(false);
+    processPanoramaFile(e.dataTransfer.files[0]);
+  };
+
   const toast = useToast();
 
   const handleSubmit = async (e) => {
@@ -145,6 +189,11 @@ export default function DestinationForm({
     // 3D model file
     if (formData.has3D && formData.modelFile) {
       fd.append("model3d", formData.modelFile);
+    }
+
+    // Panorama file
+    if (formData.hasPanorama && formData.panoramaFile) {
+      fd.append("panorama", formData.panoramaFile);
     }
 
     try {
@@ -407,6 +456,127 @@ export default function DestinationForm({
                     : "Chưa có file nào được chọn"}
                 </span>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Row 6: Panorama 360° Option */}
+        <div className="space-y-3">
+          <div
+            className={`flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer select-none ${
+              formData.hasPanorama
+                ? "bg-secondary/5 border-secondary"
+                : "bg-bg-main/30 border-border-light hover:border-secondary/50"
+            }`}
+            onClick={() => handleChange("hasPanorama", !formData.hasPanorama)}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                  formData.hasPanorama
+                    ? "bg-secondary text-white"
+                    : "bg-gray-100 text-gray-400"
+                }`}
+              >
+                <Icon360 className="w-5 h-5" />
+              </div>
+              <div>
+                <span
+                  className={`text-sm font-bold ${
+                    formData.hasPanorama ? "text-secondary" : "text-text-primary"
+                  }`}
+                >
+                  Ảnh Panorama 360°
+                </span>
+                <p className="text-[10px] text-text-secondary">
+                  Cho phép xem không gian 360° tương tác.
+                </p>
+              </div>
+            </div>
+            <div
+              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                formData.hasPanorama
+                  ? "border-secondary bg-secondary text-white"
+                  : "border-gray-200"
+              }`}
+            >
+              {formData.hasPanorama && <IconCheck className="w-3.5 h-3.5" />}
+            </div>
+          </div>
+
+          {/* Conditional File Upload for Panorama */}
+          {formData.hasPanorama && (
+            <div className="pl-4 border-l-2 border-secondary/20 ml-5 animate-fade-in-up space-y-3">
+              <label className="text-xs font-bold text-text-secondary uppercase block">
+                Ảnh Panorama (JPG, PNG - khuyến nghị 2:1)
+              </label>
+              
+              <input
+                type="file"
+                ref={panoramaInputRef}
+                onChange={handlePanoramaChange}
+                className="hidden"
+                accept="image/jpeg,image/jpg,image/png"
+              />
+
+              {!panoramaPreview ? (
+                <div
+                  onClick={() => panoramaInputRef.current.click()}
+                  onDragOver={handlePanoramaDragOver}
+                  onDragLeave={handlePanoramaDragLeave}
+                  onDrop={handlePanoramaDrop}
+                  className={`
+                    border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all group
+                    ${
+                      isPanoramaDragging
+                        ? "border-secondary bg-secondary/10 scale-[1.02]"
+                        : "border-border-light hover:bg-secondary/5 hover:border-secondary/50"
+                    }
+                  `}
+                >
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 transition-colors ${
+                      isPanoramaDragging
+                        ? "bg-secondary text-white"
+                        : "bg-gray-100 text-text-secondary group-hover:bg-secondary/10 group-hover:text-secondary"
+                    }`}
+                  >
+                    <Icon360 className="w-5 h-5" />
+                  </div>
+                  <p className="text-sm font-bold text-text-primary">
+                    {isPanoramaDragging ? "Thả ảnh vào đây" : "Tải ảnh 360° lên"}
+                  </p>
+                  <p className="text-xs text-text-secondary mt-1">
+                    Kéo thả hoặc click • Tỉ lệ 2:1 (VD: 4096x2048)
+                  </p>
+                </div>
+              ) : (
+                <div className="relative w-full h-32 rounded-xl overflow-hidden border border-border-light group">
+                  <img
+                    src={panoramaPreview}
+                    alt="Panorama Preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-2 left-2 bg-secondary/90 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                    <Icon360 className="w-3 h-3" /> 360°
+                  </div>
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={handleRemovePanorama}
+                      className="bg-white text-red-500 px-4 py-2 rounded-lg font-bold text-xs shadow-lg hover:bg-red-50 transition-colors"
+                    >
+                      Xóa ảnh
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {formData.existingPanorama && !formData.panoramaFile && (
+                <p className="text-xs text-secondary">
+                  ✓ Đã có ảnh panorama: {formData.existingPanorama.name}
+                </p>
+              )}
             </div>
           )}
         </div>

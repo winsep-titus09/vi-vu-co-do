@@ -1,6 +1,6 @@
 // src/pages/Tours/index.jsx
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import FilterBar from "../../components/Filters/FilterBar";
 import TourCard from "../../components/Cards/TourCard";
 import { IconChevronDown } from "../../icons/IconChevronDown";
@@ -35,7 +35,7 @@ const normalizeTour = (tour) => ({
   ...tour,
 });
 
-// Sort options
+// Sort options - moved outside component to prevent recreation
 const sortOptions = [
   "Phổ biến nhất",
   "Giá thấp đến cao",
@@ -114,25 +114,42 @@ export default function ToursPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelectSort = (option) => {
+  const handleSelectSort = useCallback((option) => {
     setSortBy(option);
     setIsSortOpen(false);
-  };
+  }, []);
 
-  const handleFilterChange = (newFilters) => {
+  const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters);
     setCurrentPage(1); // Reset to first page when filters change
-  };
+  }, []);
 
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setFilters({});
     setCurrentPage(1);
-  };
+  }, []);
+
+  // Memoize pagination calculation
+  const paginationPages = useMemo(() => {
+    return Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+      let pageNum;
+      if (totalPages <= 5) {
+        pageNum = i + 1;
+      } else if (currentPage <= 3) {
+        pageNum = i + 1;
+      } else if (currentPage >= totalPages - 2) {
+        pageNum = totalPages - 4 + i;
+      } else {
+        pageNum = currentPage - 2 + i;
+      }
+      return pageNum;
+    });
+  }, [currentPage, totalPages]);
 
   return (
     <div className="min-h-screen bg-bg-main pb-20">
       {/* Header & Filter Section */}
-      <section className="relative pt-10 pb-12 bg-gradient-to-b from-white to-bg-main z-30">
+      <section className="relative pt-10 pb-12 bg-linear-to-b from-white to-bg-main z-30">
         <div className="container-main space-y-6 relative">
           <Breadcrumbs items={[{ label: "Chuyến tham quan" }]} />
           {/* Tiêu đề & Mô tả */}
@@ -140,7 +157,7 @@ export default function ToursPage() {
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-secondary mb-2">
               Khám phá Cố đô
             </p>
-            <h1 className="!text-4xl md:text-5xl font-heading font-bold text-text-primary">
+            <h1 className="text-4xl! md:text-5xl font-heading font-bold text-text-primary">
               Tìm chuyến đi của bạn
             </h1>
             {/* CẬP NHẬT: Thêm dòng <p> mô tả dưới H1 */}
@@ -253,32 +270,19 @@ export default function ToursPage() {
             </button>
 
             {/* Các trang */}
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-              let pageNum;
-              if (totalPages <= 5) {
-                pageNum = i + 1;
-              } else if (currentPage <= 3) {
-                pageNum = i + 1;
-              } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i;
-              } else {
-                pageNum = currentPage - 2 + i;
-              }
-
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-10 h-10 flex items-center justify-center rounded-full font-bold transition-all ${
-                    currentPage === pageNum
-                      ? "bg-primary text-white shadow-md shadow-primary/20 scale-105"
-                      : "text-text-secondary hover:bg-white hover:text-primary hover:shadow-sm"
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
+            {paginationPages.map((pageNum) => (
+              <button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+                className={`w-10 h-10 flex items-center justify-center rounded-full font-bold transition-all ${
+                  currentPage === pageNum
+                    ? "bg-primary text-white shadow-md shadow-primary/20 scale-105"
+                    : "text-text-secondary hover:bg-white hover:text-primary hover:shadow-sm"
+                }`}
+              >
+                {pageNum}
+              </button>
+            ))}
 
             {totalPages > 5 && currentPage < totalPages - 2 && (
               <>

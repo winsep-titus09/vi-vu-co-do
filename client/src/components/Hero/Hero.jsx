@@ -132,7 +132,7 @@ export default function Hero() {
             Du lịch Văn hoá & Di sản
           </p>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-heading font-bold tracking-tight text-text-primary leading-[1.1]">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-heading font-bold tracking-tight text-text-primary leading-tight">
             Khám phá những câu chuyện <br className="hidden sm:inline" />
             <span className="text-primary">vượt thời gian</span> cùng chuyên
             gia.
@@ -205,11 +205,11 @@ export default function Hero() {
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary">
                       Tour Tiêu Biểu
                     </p>
-                    <h2 className="!text-2xl font-heading font-bold text-text-primary line-clamp-1">
+                    <h2 className="text-2xl! font-heading font-bold text-text-primary line-clamp-1">
                       {featuredTour.title}
                     </h2>
                   </div>
-                  <span className="inline-flex items-center rounded-full bg-[#FEFAE0] text-[#BC4C00] text-xs font-bold px-2.5 py-1 border border-[#BC4C00]/10 flex-shrink-0">
+                  <span className="inline-flex items-center rounded-full bg-[#FEFAE0] text-[#BC4C00] text-xs font-bold px-2.5 py-1 border border-[#BC4C00]/10 shrink-0">
                     <IconStar className="w-3 h-3 mr-1" />
                     {featuredTour.rating?.toFixed(1) || "5.0"}
                   </span>
@@ -227,7 +227,7 @@ export default function Hero() {
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                   {/* Overlay Gradient */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center pb-5 px-5 text-center">
+                  <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center pb-5 px-5 text-center">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-secondary mb-1">
                         {featuredTour.category?.name || "Trải nghiệm 3D"}
@@ -285,7 +285,7 @@ export default function Hero() {
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-secondary">
                       Tour Tiêu Biểu
                     </p>
-                    <h2 className="!text-2xl font-heading font-bold text-text-primary">
+                    <h2 className="text-2xl! font-heading font-bold text-text-primary">
                       Dạo bộ Đại Nội về đêm
                     </h2>
                   </div>
@@ -301,7 +301,7 @@ export default function Hero() {
                     alt="Đại Nội Huế"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center pb-5 px-5 text-center">
+                  <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent flex items-end justify-center pb-5 px-5 text-center">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-secondary mb-1">
                         Trải nghiệm 3D

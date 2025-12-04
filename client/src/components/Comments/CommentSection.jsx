@@ -180,7 +180,7 @@ const CommentSection = ({ articleId }) => {
 
     return (
       <div className={`flex gap-3 ${isReply ? "ml-12 mt-3" : ""}`}>
-        <div className="flex-shrink-0">{getAvatar(comment.userId)}</div>
+        <div className="shrink-0">{getAvatar(comment.userId)}</div>
 
         <div className="flex-1 min-w-0">
           <div className="bg-gray-50 rounded-lg px-4 py-3">
@@ -192,7 +192,7 @@ const CommentSection = ({ articleId }) => {
                 {formatTime(comment.createdAt)}
               </span>
             </div>
-            <p className="text-gray-700 whitespace-pre-wrap break-words">
+            <p className="text-gray-700 whitespace-pre-wrap wrap-break-word">
               {comment.content}
             </p>
           </div>
@@ -297,7 +297,7 @@ const CommentSection = ({ articleId }) => {
       {isAuthenticated ? (
         <form onSubmit={handleSubmitComment} className="mb-8">
           <div className="flex gap-3">
-            <div className="flex-shrink-0">{getAvatar(user)}</div>
+            <div className="shrink-0">{getAvatar(user)}</div>
             <div className="flex-1">
               <textarea
                 value={newComment}

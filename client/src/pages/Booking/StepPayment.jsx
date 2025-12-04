@@ -178,21 +178,21 @@ export default function BookingStepPayment() {
               </div>
               <span className="text-sm font-bold hidden md:block">Xác nhận đặt</span>
             </div>
-            <div className="w-6 h-[1px] bg-green-600"></div>
+            <div className="w-6 h-px bg-green-600"></div>
             <div className="flex items-center gap-2 text-green-600">
               <div className="w-6 h-6 rounded-full bg-green-600 text-white flex items-center justify-center text-xs font-bold">
                 <IconCheck className="w-4 h-4" />
               </div>
               <span className="text-sm font-bold hidden md:block">HDV duyệt</span>
             </div>
-            <div className="w-6 h-[1px] bg-gray-300"></div>
+            <div className="w-6 h-px bg-gray-300"></div>
             <div className="flex items-center gap-2 text-primary">
               <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
                 3
               </div>
               <span className="text-sm font-bold">Thanh toán</span>
             </div>
-            <div className="w-6 h-[1px] bg-gray-300"></div>
+            <div className="w-6 h-px bg-gray-300"></div>
             <div className="flex items-center gap-2 text-text-secondary opacity-60">
               <div className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-bold">
                 4

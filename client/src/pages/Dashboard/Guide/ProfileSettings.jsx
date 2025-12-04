@@ -527,7 +527,7 @@ export default function GuideProfileSettings() {
       {activeTab === "finance" && (
         <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
           {/* Card Preview Visual */}
-          <div className="bg-gradient-to-br from-[#2C3E50] to-[#4CA1AF] rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="bg-linear-to-br from-[#2C3E50] to-[#4CA1AF] rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
             <div className="relative z-10 flex justify-between items-start">
               <div>
                 <p className="text-white/70 text-xs font-bold uppercase tracking-widest mb-1">

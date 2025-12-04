@@ -279,7 +279,7 @@ export default function HistoryPage() {
               //    - 16rem (256px) cứng cho cột ảnh.
               //    - 1fr cho cột nội dung.
               // 2. min-h-[240px]: Đảm bảo chiều cao tối thiểu không đổi.
-              className="group w-full bg-white p-4 rounded-3xl border border-border-light hover:border-primary/30 hover:shadow-md transition-all grid grid-cols-1 md:grid-cols-[16rem_1fr] gap-6 md:min-h-[240px]"
+              className="group w-full bg-white p-4 rounded-3xl border border-border-light hover:border-primary/30 hover:shadow-md transition-all grid grid-cols-1 md:grid-cols-[16rem_1fr] gap-6 md:min-h-60"
             >
               {/* Image Column */}
               <div className="relative w-full h-48 md:h-full rounded-2xl overflow-hidden">

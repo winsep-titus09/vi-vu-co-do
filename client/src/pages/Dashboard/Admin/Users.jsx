@@ -792,7 +792,7 @@ export default function AdminUsers() {
       {/* --- LIGHTBOX MODAL --- */}
       {lightboxImg && (
         <div
-          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 z-100 bg-black/90 flex items-center justify-center p-4 animate-fade-in"
           onClick={() => setLightboxImg(null)}
         >
           <button className="absolute top-6 right-6 text-white hover:text-gray-300 p-2 bg-white/10 rounded-full backdrop-blur-sm">

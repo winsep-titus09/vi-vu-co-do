@@ -235,7 +235,7 @@ export default function PlaceDetail() {
               className="w-full h-full object-cover hover:scale-105 transition-transform duration-1000"
               alt="Main"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+            <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent"></div>
             <div className="absolute bottom-8 left-8 right-8 text-white">
               <div className="flex items-center gap-2 mb-3">
                 <span className="px-3 py-1 rounded-full bg-white/20 backdrop-blur text-xs font-bold uppercase tracking-wider">
@@ -502,7 +502,7 @@ export default function PlaceDetail() {
             <div className="sticky top-24 space-y-6">
               {/* WEATHER & UTILITY WIDGET */}
               <div className="rounded-3xl overflow-hidden shadow-lg shadow-blue-500/10">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-5 text-white relative overflow-hidden">
+                <div className="bg-linear-to-br from-blue-500 to-blue-600 p-5 text-white relative overflow-hidden">
                   <div className="relative z-10 flex justify-between items-start">
                     <div>
                       <p className="text-3xl font-bold">
@@ -690,7 +690,7 @@ export default function PlaceDetail() {
             <IconX className="w-10 h-10" />
           </button>
           <div className="relative w-full h-full max-w-6xl max-h-[85vh] bg-black rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col">
-            <div className="absolute top-0 left-0 right-0 p-4 z-10 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+            <div className="absolute top-0 left-0 right-0 p-4 z-10 bg-linear-to-b from-black/80 to-transparent pointer-events-none">
               <h3 className="text-white font-heading font-bold text-xl text-center">
                 {placeDetail.name} - Mô hình 3D
               </h3>

@@ -280,7 +280,7 @@ export default function GuideDashboard() {
                             {formatTimeAgo(req.createdAt)}
                           </span>
                         </div>
-                        <p className="text-sm text-text-primary font-medium mb-2 break-words whitespace-normal">
+                        <p className="text-sm text-text-primary font-medium mb-2 wrap-break-word whitespace-normal">
                           Đặt tour:{" "}
                           <span className="text-primary font-bold">
                             {req.tour_id?.name || "Tour"}
@@ -349,7 +349,7 @@ export default function GuideDashboard() {
                     key={item._id}
                     className="flex gap-4 items-start relative"
                   >
-                    <div className="absolute left-[22px] top-10 bottom-[-20px] w-0.5 bg-border-light last:hidden"></div>
+                    <div className="absolute left-[22px] top-10 -bottom-5 w-0.5 bg-border-light last:hidden"></div>
 
                     <div className="w-12 h-12 rounded-xl bg-bg-main text-primary flex flex-col items-center justify-center shrink-0 border border-border-light z-10 relative">
                       <span className="text-[10px] font-bold uppercase">
@@ -395,7 +395,7 @@ export default function GuideDashboard() {
           </div>
 
           {/* Quick Report */}
-          <div className="bg-gradient-to-br from-[#2C3E50] to-[#34495E] p-6 rounded-3xl text-white relative overflow-hidden shadow-lg">
+          <div className="bg-linear-to-br from-[#2C3E50] to-[#34495E] p-6 rounded-3xl text-white relative overflow-hidden shadow-lg">
             <div className="relative z-10">
               <h3 className="font-bold mb-4 flex items-center gap-2">
                 <IconChart className="w-5 h-5 text-secondary" /> Hiệu quả tuần

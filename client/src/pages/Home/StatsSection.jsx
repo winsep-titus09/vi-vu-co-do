@@ -145,7 +145,7 @@ export default function StatsSection() {
                   </span>
                 </div>
 
-                <h3 className="!text-lg font-bold text-text-primary mb-2">
+                <h3 className="text-lg! font-bold text-text-primary mb-2">
                   {item.label}
                 </h3>
                 <p className="text-sm text-text-secondary font-medium">

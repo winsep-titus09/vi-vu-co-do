@@ -3,7 +3,11 @@ import { Link } from "react-router-dom";
 import { IconMapPin } from "../../icons/IconBox";
 import IconArrowRight from "../../icons/IconArrowRight";
 
-export default function DestinationCard({ place }) {
+/**
+ * DestinationCard - Card hiển thị địa điểm
+ * Wrapped with React.memo for performance optimization
+ */
+const DestinationCard = React.memo(function DestinationCard({ place }) {
   const { id, name, category, image, address, description } = place;
 
   return (
@@ -15,11 +19,12 @@ export default function DestinationCard({ place }) {
       <img
         src={image}
         alt={name}
+        loading="lazy"
         className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
       />
 
       {/* Overlay Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 transition-opacity group-hover:opacity-90"></div>
+      <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-transparent opacity-80 transition-opacity group-hover:opacity-90"></div>
 
       {/* Content */}
       <div className="absolute inset-0 p-6 flex flex-col justify-end text-white">
@@ -51,4 +56,6 @@ export default function DestinationCard({ place }) {
       </div>
     </Link>
   );
-}
+});
+
+export default DestinationCard;

@@ -267,7 +267,7 @@ export default function AdminPosts() {
           {/* Modal Content */}
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-fade-in-up z-10">
             {/* Form Header */}
-            <div className="px-6 py-4 border-b border-border-light bg-gradient-to-r from-primary/5 to-transparent flex justify-between items-center sticky top-0 bg-white z-10">
+            <div className="px-6 py-4 border-b border-border-light bg-linear-to-r from-primary/5 to-transparent flex justify-between items-center sticky top-0 bg-white z-10">
               <h2 className="font-heading font-bold text-text-primary flex items-center gap-2">
                 <IconFileText className="w-5 h-5 text-primary" />
                 Chỉnh sửa bài viết
@@ -712,7 +712,7 @@ export default function AdminPosts() {
 
       {/* Reject Modal with Reason Input */}
       {confirmModal.open && confirmModal.type === "reject" && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-100 flex items-center justify-center px-4">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => {

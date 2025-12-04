@@ -72,7 +72,7 @@ export default function BookingStepReview() {
               <span className="text-sm font-bold">Xác nhận đặt</span>
             </div>
 
-            <div className="w-6 h-[1px] bg-gray-300"></div>
+            <div className="w-6 h-px bg-gray-300"></div>
 
             {/* Step 2: Inactive */}
             <div className="flex items-center gap-2 text-text-secondary opacity-60">
@@ -84,7 +84,7 @@ export default function BookingStepReview() {
               </span>
             </div>
 
-            <div className="w-6 h-[1px] bg-gray-300"></div>
+            <div className="w-6 h-px bg-gray-300"></div>
 
             {/* Step 3: Inactive */}
             <div className="flex items-center gap-2 text-text-secondary opacity-60">
@@ -96,7 +96,7 @@ export default function BookingStepReview() {
               </span>
             </div>
 
-            <div className="w-6 h-[1px] bg-gray-300"></div>
+            <div className="w-6 h-px bg-gray-300"></div>
 
             {/* Step 4: Inactive */}
             <div className="flex items-center gap-2 text-text-secondary opacity-60">

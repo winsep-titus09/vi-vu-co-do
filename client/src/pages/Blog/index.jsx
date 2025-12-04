@@ -261,7 +261,7 @@ export default function BlogPage() {
             {[...galleryImages, ...galleryImages].map((src, idx) => (
               <div
                 key={idx}
-                className="relative w-64 h-80 rounded-2xl overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
+                className="relative w-64 h-80 rounded-2xl overflow-hidden shrink-0 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
               >
                 <img
                   src={src}
@@ -280,7 +280,7 @@ export default function BlogPage() {
             {[...galleryImages, ...galleryImages].map((src, idx) => (
               <div
                 key={`dup-${idx}`}
-                className="relative w-64 h-80 rounded-2xl overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
+                className="relative w-64 h-80 rounded-2xl overflow-hidden shrink-0 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
               >
                 <img
                   src={src}
