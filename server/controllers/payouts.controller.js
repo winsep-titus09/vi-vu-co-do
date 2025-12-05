@@ -7,14 +7,11 @@ import { notifyUser, notifyAdmins } from "../services/notify.js";
 
 /**
  * Helper: send email using SMTP if configured.
- * - Reads SMTP settings from environment:
- *   SMTP_HOST, SMTP_PORT, SMTP_SECURE (true/false), SMTP_AUTH_USER, SMTP_AUTH_PASS
- * - If no SMTP config present, this function is a no-op.
  */
 async function sendEmail({ to, subject, text, html }) {
     try {
         const host = process.env.SMTP_HOST;
-        if (!host) return; // SMTP not configured, skip
+        if (!host) return;
 
         const transporter = nodemailer.createTransport({
             host,
@@ -37,15 +34,12 @@ async function sendEmail({ to, subject, text, html }) {
             html,
         });
     } catch (err) {
-        // email is best-effort — do not throw to avoid breaking main flow
         console.warn("sendEmail error:", err && err.message ? err.message : err);
     }
 }
 
 /**
  * Helper: resolve admin email addresses.
- * - First try env ADMIN_EMAILS (comma-separated)
- * - Otherwise query users with role 'admin'
  */
 async function getAdminEmails() {
     const envList = process.env.ADMIN_EMAILS;
@@ -63,9 +57,7 @@ async function getAdminEmails() {
 
 /**
  * Guide: create a payout (withdraw) request.
- * - Notifies admins via notifyAdmins (in-app) and email (if SMTP configured).
- * POST /api/payouts/request
- * Body: { amount }
+ * POST /api/payouts
  */
 export const createPayoutRequest = async (req, res) => {
     try {
@@ -95,7 +87,8 @@ export const createPayoutRequest = async (req, res) => {
         try {
             await notifyAdmins({
                 type: "payout:requested",
-                content: `Guide ${guide.name || guide._id} yêu cầu rút ${numericAmount}.`,
+                content: `Guide ${guide.name || guide._id} yêu cầu rút ${numericAmount.toLocaleString("vi-VN")}đ.`,
+                url: "/dashboard/admin/finance?tab=withdrawals",
                 meta: { payoutRequestId: reqDoc._id, guideId, guideName: guide.name, guideEmail: guide.email, amount: numericAmount }
             });
         } catch (e) {
@@ -107,8 +100,8 @@ export const createPayoutRequest = async (req, res) => {
             const adminEmails = await getAdminEmails();
             if (adminEmails.length > 0) {
                 const subject = `Yêu cầu rút tiền từ guide ${guide.name || guide._id}`;
-                const text = `Guide ${guide.name || guide._id} (id: ${String(guide._id)}) đã gửi yêu cầu rút ${numericAmount}.\n\nXem chi tiết: admin panel.`;
-                const html = `<p>Guide <strong>${guide.name || guide._id}</strong> (id: ${String(guide._id)}) đã gửi yêu cầu rút <strong>${numericAmount}</strong>.</p><p>Request ID: ${reqDoc._id}</p>`;
+                const text = `Guide ${guide.name || guide._id} (id: ${String(guide._id)}) đã gửi yêu cầu rút ${numericAmount.toLocaleString("vi-VN")}đ.\n\nXem chi tiết: admin panel.`;
+                const html = `<p>Guide <strong>${guide.name || guide._id}</strong> (id: ${String(guide._id)}) đã gửi yêu cầu rút <strong>${numericAmount.toLocaleString("vi-VN")}đ</strong>.</p><p>Request ID: ${reqDoc._id}</p>`;
                 await sendEmail({ to: adminEmails.join(","), subject, text, html });
             }
         } catch (e) {
@@ -124,15 +117,31 @@ export const createPayoutRequest = async (req, res) => {
 
 /**
  * Guide: list own payout requests
- * GET /api/payouts/my
+ * GET /api/payouts
  */
 export const getMyPayoutRequests = async (req, res) => {
     try {
         const guideId = req.user?._id;
         if (!guideId) return res.status(401).json({ ok: false, message: "Unauthorized" });
 
-        const list = await PayoutRequest.find({ guide: guideId }).sort({ createdAt: -1 });
-        return res.json({ ok: true, list });
+        const { page = 1, limit = 20 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const [items, total] = await Promise.all([
+            PayoutRequest.find({ guide: guideId })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(parseInt(limit)),
+            PayoutRequest.countDocuments({ guide: guideId })
+        ]);
+
+        return res.json({
+            ok: true,
+            items,
+            total,
+            page: parseInt(page),
+            totalPages: Math.ceil(total / parseInt(limit))
+        });
     } catch (err) {
         console.error("getMyPayoutRequests error:", err);
         return res.status(500).json({ ok: false, message: "Server error", error: err.message });
@@ -140,192 +149,183 @@ export const getMyPayoutRequests = async (req, res) => {
 };
 
 /**
- * Admin: approve payout request
- * - Updates guide balance, marks request approved, creates Transaction ledger (withdraw)
- * - Sends in-app notify to guide and email (if configured)
- * PATCH/POST /api/payouts/admin/:id/approve
- * Body: { externalTxId? }
+ * Admin: list all payout requests
+ * GET /api/payouts/admin/list
  */
-export const adminApprovePayoutRequest = async (req, res) => {
-    const session = await mongoose.startSession();
+export const adminListPayoutRequests = async (req, res) => {
     try {
-        const admin = req.user;
-        if (!admin || !(admin.role === "admin" || admin?.role_id?.name === "admin")) {
-            return res.status(403).json({ ok: false, message: "Chỉ admin" });
+        const { status, page = 1, limit = 20, search } = req.query;
+        const filter = {};
+
+        if (status && status !== "all") {
+            filter.status = status;
         }
 
-        const { id } = req.params;
-        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ ok: false, message: "Invalid payout request id" });
+        const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        session.startTransaction();
+        let query = PayoutRequest.find(filter)
+            .populate("guide", "name email avatar phone")
+            .populate("processedBy", "name")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
 
-        const payoutReq = await PayoutRequest.findById(id).session(session);
-        if (!payoutReq) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(404).json({ ok: false, message: "Payout request không tồn tại" });
-        }
-        if (payoutReq.status !== "pending") {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({ ok: false, message: "Payout request đã xử lý" });
-        }
+        const [items, total, pendingCount] = await Promise.all([
+            query,
+            PayoutRequest.countDocuments(filter),
+            PayoutRequest.countDocuments({ status: "pending" })
+        ]);
 
-        const guide = await User.findById(payoutReq.guide).session(session);
-        if (!guide) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(404).json({ ok: false, message: "Guide không tồn tại" });
-        }
-        if ((guide.balance || 0) < payoutReq.amount) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({ ok: false, message: "Guide không đủ số dư" });
+        // Filter by search if provided (search in guide name/email)
+        let filteredItems = items;
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filteredItems = items.filter(item =>
+                item.guide?.name?.toLowerCase().includes(searchLower) ||
+                item.guide?.email?.toLowerCase().includes(searchLower)
+            );
         }
 
-        // decrement guide balance
-        guide.balance = guide.balance - payoutReq.amount;
-        await guide.save({ session });
-
-        // mark payout request approved
-        payoutReq.status = "approved";
-        payoutReq.processedAt = new Date();
-        payoutReq.processedBy = admin._id;
-        if (req.body.externalTxId) payoutReq.externalTransactionId = req.body.externalTxId;
-        await payoutReq.save({ session });
-
-        // ledger transaction (withdraw) - create without bookingId
-        try {
-            const txPayload = {
-                userId: admin._id,
-                payeeUserId: payoutReq.guide,
-                amount: mongoose.Types.Decimal128.fromString(String(payoutReq.amount)),
-                commission_fee: mongoose.Types.Decimal128.fromString("0"),
-                net_amount: mongoose.Types.Decimal128.fromString(String(payoutReq.amount)),
-                transaction_type: "withdraw",
-                status: "confirmed",
-                payment_gateway: "manual",
-                transaction_code: req.body.externalTxId || `withdraw-${payoutReq._id}`,
-                note: `Payout withdrawal approved for guide ${String(payoutReq.guide)}`,
-            };
-
-            await Transaction.create([txPayload], { session });
-        } catch (txErr) {
-            console.warn("adminApprovePayoutRequest: failed to create Transaction:", txErr);
-            // do not abort; the core business (balance change + approval) already completed
-        }
-
-        await session.commitTransaction();
-        session.endSession();
-
-        // notify guide in-app and by email
-        try {
-            // NOTE: use type 'payout:paid' so notify service will send payoutPaid template
-            await notifyUser({
-                userId: payoutReq.guide,
-                type: "payout:paid",
-                content: `Yêu cầu rút ${payoutReq.amount} của bạn đã được admin duyệt và thực hiện.`,
-                url: `/guide/payouts/${payoutReq._id}`,
-                meta: {
-                    payoutId: payoutReq._id,
-                    payoutRequestId: payoutReq._id,
-                    amount: payoutReq.amount,
-                    transactionCode: payoutReq.externalTransactionId || req.body.externalTxId || `withdraw-${payoutReq._id}`,
-                    confirmedAt: payoutReq.processedAt || new Date(),
-                },
-            });
-        } catch (e) {
-            console.warn("notifyUser failed:", e);
-        }
-
-        // email admin (best-effort)
-        try {
-            const guideDoc = await User.findById(payoutReq.guide).lean();
-            if (guideDoc && guideDoc.email) {
-                const subject = `Yêu cầu rút ${payoutReq.amount} đã được duyệt`;
-                const text = `Yêu cầu rút ${payoutReq.amount} của guide ${guideDoc.name || guideDoc._id} đã được duyệt.\n\nRequest ID: ${payoutReq._id}`;
-                const html = `<p>Yêu cầu rút <strong>${payoutReq.amount}</strong> của <strong>${guideDoc.name || guideDoc._id}</strong> đã được duyệt.</p><p>Request ID: ${payoutReq._id}</p>`;
-                await sendEmail({ to: process.env.ADMIN_EMAILS || "", subject, text, html });
-            }
-        } catch (e) {
-            console.warn("guide email send failed:", e);
-        }
-
-        return res.json({ ok: true, payoutRequest: payoutReq });
+        return res.json({
+            ok: true,
+            items: filteredItems,
+            total,
+            pendingCount,
+            page: parseInt(page),
+            totalPages: Math.ceil(total / parseInt(limit))
+        });
     } catch (err) {
-        await session.abortTransaction();
-        session.endSession();
-        console.error("adminApprovePayoutRequest error:", err);
+        console.error("adminListPayoutRequests error:", err);
         return res.status(500).json({ ok: false, message: "Server error", error: err.message });
     }
 };
 
 /**
+ * Admin: approve payout request
+ * POST /api/payouts/admin/:id/approve
+ */
+export const adminApprovePayoutRequest = async (req, res) => {
+    const session = await mongoose.startSession();
+    try {
+        session.startTransaction();
+
+        const { id } = req.params;
+        const { externalTxId, note } = req.body;
+        const adminId = req.user?._id;
+
+        const payoutReq = await PayoutRequest.findById(id).session(session);
+        if (!payoutReq) {
+            await session.abortTransaction();
+            return res.status(404).json({ ok: false, message: "Không tìm thấy yêu cầu" });
+        }
+        if (payoutReq.status !== "pending") {
+            await session.abortTransaction();
+            return res.status(400).json({ ok: false, message: "Yêu cầu đã được xử lý" });
+        }
+
+        const guide = await User.findById(payoutReq.guide).session(session);
+        if (!guide) {
+            await session.abortTransaction();
+            return res.status(404).json({ ok: false, message: "Guide không tồn tại" });
+        }
+
+        if (payoutReq.amount > (guide.balance || 0)) {
+            await session.abortTransaction();
+            return res.status(400).json({ ok: false, message: "Số dư guide không đủ" });
+        }
+
+        // Deduct balance
+        guide.balance = (guide.balance || 0) - payoutReq.amount;
+        await guide.save({ session });
+
+        // Update payout request
+        payoutReq.status = "approved";
+        payoutReq.processedAt = new Date();
+        payoutReq.processedBy = adminId;
+        payoutReq.adminNote = note || null;
+        payoutReq.externalTransactionId = externalTxId || null;
+        await payoutReq.save({ session });
+
+        // Create transaction record - theo đúng schema Transaction
+        await Transaction.create([{
+            userId: guide._id,
+            payeeUserId: guide._id,
+            bookingId: null, // null cho withdraw type
+            amount: mongoose.Types.Decimal128.fromString(String(payoutReq.amount)),
+            commission_fee: mongoose.Types.Decimal128.fromString("0"),
+            net_amount: mongoose.Types.Decimal128.fromString(String(payoutReq.amount)),
+            transaction_type: "withdraw",
+            status: "confirmed",
+            payment_gateway: "manual",
+            transaction_code: externalTxId || `WD-${payoutReq._id}`,
+            note: `Rút tiền - Yêu cầu #${payoutReq._id}`,
+            confirmed_by: adminId,
+            confirmed_at: new Date()
+        }], { session });
+
+        await session.commitTransaction();
+
+        // Notify guide
+        try {
+            await notifyUser({
+                userId: guide._id,
+                type: "payout:approved",
+                content: `Yêu cầu rút ${payoutReq.amount.toLocaleString("vi-VN")}đ đã được duyệt.`,
+                meta: { payoutRequestId: payoutReq._id, amount: payoutReq.amount }
+            });
+        } catch (e) {
+            console.warn("notifyUser failed:", e);
+        }
+
+        return res.json({ ok: true, message: "Đã duyệt yêu cầu rút tiền", payoutRequest: payoutReq });
+    } catch (err) {
+        await session.abortTransaction();
+        console.error("adminApprovePayoutRequest error:", err);
+        return res.status(500).json({ ok: false, message: "Server error", error: err.message });
+    } finally {
+        session.endSession();
+    }
+};
+
+/**
  * Admin: reject payout request
- * PATCH/POST /api/payouts/admin/:id/reject
- * Body: { note? }
+ * POST /api/payouts/admin/:id/reject
  */
 export const adminRejectPayoutRequest = async (req, res) => {
     try {
-        const admin = req.user;
-        if (!admin || !(admin.role === "admin" || admin?.role_id?.name === "admin")) {
-            return res.status(403).json({ ok: false, message: "Chỉ admin" });
-        }
-
         const { id } = req.params;
-        const { note } = req.body || {};
-        if (!mongoose.isValidObjectId(id)) return res.status(400).json({ ok: false, message: "Invalid payout request id" });
+        const { reason } = req.body;
+        const adminId = req.user?._id;
 
         const payoutReq = await PayoutRequest.findById(id);
-        if (!payoutReq) return res.status(404).json({ ok: false, message: "Payout request không tồn tại" });
-        if (payoutReq.status !== "pending") return res.status(400).json({ ok: false, message: "Payout request đã xử lý" });
+        if (!payoutReq) {
+            return res.status(404).json({ ok: false, message: "Không tìm thấy yêu cầu" });
+        }
+        if (payoutReq.status !== "pending") {
+            return res.status(400).json({ ok: false, message: "Yêu cầu đã được xử lý" });
+        }
 
         payoutReq.status = "rejected";
         payoutReq.processedAt = new Date();
-        payoutReq.processedBy = admin._id;
-        payoutReq.adminNote = note || null;
+        payoutReq.processedBy = adminId;
+        payoutReq.adminNote = reason || "Yêu cầu bị từ chối";
         await payoutReq.save();
 
-        // in-app notify guide of rejection
+        // Notify guide
         try {
             await notifyUser({
                 userId: payoutReq.guide,
                 type: "payout:rejected",
-                content: `Yêu cầu rút ${payoutReq.amount} của bạn đã bị từ chối.`,
-                url: `/guide/payouts/${payoutReq._id}`,
-                meta: {
-                    payoutRequestId: payoutReq._id,
-                    amount: payoutReq.amount,
-                    message: note || ""
-                }
+                content: `Yêu cầu rút ${payoutReq.amount.toLocaleString("vi-VN")}đ đã bị từ chối. Lý do: ${reason || "Không có lý do cụ thể"}`,
+                meta: { payoutRequestId: payoutReq._id, amount: payoutReq.amount, reason }
             });
         } catch (e) {
-            console.warn("notifyUser reject failed:", e);
+            console.warn("notifyUser failed:", e);
         }
 
-        // optional email to guide on rejection
-        try {
-            const guideDoc = await User.findById(payoutReq.guide).lean();
-            if (guideDoc && guideDoc.email) {
-                const subject = `Yêu cầu rút ${payoutReq.amount} đã bị từ chối`;
-                const text = `Yêu cầu rút ${payoutReq.amount} của bạn đã bị từ chối.\n\nRequest ID: ${payoutReq._id}\nNote: ${note || ""}`;
-                const html = `<p>Yêu cầu rút <strong>${payoutReq.amount}</strong> của bạn đã bị từ chối.</p><p>Ghi chú: ${note || ""}</p><p>Request ID: ${payoutReq._id}</p>`;
-                await sendEmail({ to: guideDoc.email, subject, text, html });
-            }
-        } catch (e) {
-            console.warn("guide rejection email failed:", e);
-        }
-
-        return res.json({ ok: true, payoutRequest: payoutReq });
+        return res.json({ ok: true, message: "Đã từ chối yêu cầu", payoutRequest: payoutReq });
     } catch (err) {
         console.error("adminRejectPayoutRequest error:", err);
         return res.status(500).json({ ok: false, message: "Server error", error: err.message });
     }
-};
-
-export default {
-    createPayoutRequest,
-    getMyPayoutRequests,
-    adminApprovePayoutRequest,
-    adminRejectPayoutRequest,
 };

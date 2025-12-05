@@ -3,21 +3,27 @@ import Tour from "../models/Tour.js";
 import Booking from "../models/Booking.js";
 import Transaction from "../models/Transaction.js";
 import TourRequest from "../models/TourRequest.js";
+import User from "../models/User.js"; // THÊM IMPORT
 
 /**
  * GET /api/guides/me/dashboard
- * Trả: danh sách tour HDV được gán (gross, percentage, guideShare, bookingsCount) + tổng
+ * Trả: danh sách tour HDV được gán (gross, percentage, guideShare, bookingsCount) + tổng + availableBalance
  */
 export async function guideDashboard(req, res) {
   try {
     const guideId = req.user._id;
+
+    // Lấy balance từ User
+    const guide = await User.findById(guideId).select("balance").lean();
+    const availableBalance = guide?.balance || 0;
+
     // Lấy tour mà guide được gán
     const tours = await Tour.find({ "guides.guideId": guideId })
       .select("name slug guides")
       .lean();
 
     if (!tours.length)
-      return res.json({ items: [], totalGross: 0, totalGuideShare: 0 });
+      return res.json({ items: [], totalGross: 0, totalGuideShare: 0, availableBalance });
 
     const tourIds = tours.map((t) => t._id);
 
@@ -26,7 +32,7 @@ export async function guideDashboard(req, res) {
       {
         $match: {
           tour_id: { $in: tourIds },
-          status: { $in: ["paid", "completed"] }, // tùy theo hệ thống, chỉnh status phù hợp
+          status: { $in: ["paid", "completed"] },
         },
       },
       {
@@ -51,7 +57,6 @@ export async function guideDashboard(req, res) {
       const guideEntry =
         (t.guides || []).find((g) => String(g.guideId) === String(guideId)) ||
         {};
-      // percentage = phí nền tảng (0.15 = 15%), HDV nhận (1 - percentage) = 85%
       const percentage =
         typeof guideEntry.percentage === "number" ? guideEntry.percentage : 0.1;
       const guideShare = Math.round((entry.gross || 0) * (1 - percentage));
@@ -69,7 +74,7 @@ export async function guideDashboard(req, res) {
     const totalGross = items.reduce((s, it) => s + it.gross, 0);
     const totalGuideShare = items.reduce((s, it) => s + it.guideShare, 0);
 
-    return res.json({ items, totalGross, totalGuideShare });
+    return res.json({ items, totalGross, totalGuideShare, availableBalance });
   } catch (err) {
     console.error("guideDashboard error:", err);
     return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
@@ -378,10 +383,10 @@ export async function getGuideTours(req, res) {
             booking_count: 0,
             total_revenue: 0,
           };
-          
+
           // Kiểm tra quyền chỉnh sửa (có edit_allowed_until và còn hiệu lực)
           const canEdit = item.edit_allowed_until && new Date(item.edit_allowed_until) > new Date();
-          
+
           return {
             ...item,
             booking_count: stats.booking_count,

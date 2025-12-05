@@ -982,8 +982,8 @@ export function useMyPayoutRequests(params = {}) {
       setIsLoading(true);
       setError(null);
       const response = await guidesApi.getMyPayoutRequests(params);
-      setPayouts(response?.items || response?.payouts || []);
-      setTotal(response?.total || 0);
+      setPayouts(response?.items || response?.payouts || response?.list || []);
+      setTotal(response?.total || response?.items?.length || response?.list?.length || 0);
     } catch (err) {
       console.error("Fetch payout requests error:", err);
       setError(err.message || "Không thể tải lịch sử rút tiền");

@@ -257,6 +257,24 @@ export const adminApi = {
     const response = await apiClient.post("/tours", data);
     return response;
   },
+
+  // ============================================================================
+  // ADMIN PAYOUT REQUESTS (Withdrawal requests from guides)
+  // ============================================================================
+  getPayoutRequests: async (params = {}) => {
+    const response = await apiClient.get("/payouts/admin/list", { params });
+    return response;
+  },
+
+  approvePayoutRequest: async (id, data = {}) => {
+    const response = await apiClient.post(`/payouts/admin/${id}/approve`, data);
+    return response;
+  },
+
+  rejectPayoutRequest: async (id, data = {}) => {
+    const response = await apiClient.post(`/payouts/admin/${id}/reject`, data);
+    return response;
+  },
 };
 
 export default adminApi;

@@ -948,3 +948,87 @@ export function useAdminCreateTour() {
 
   return { createTour, isLoading, error };
 }
+
+// ============================================================================
+// ADMIN PAYOUT REQUESTS (Withdrawal requests)
+// ============================================================================
+export function useAdminPayoutRequests(params = {}) {
+  const [data, setData] = useState({ items: [], total: 0, pendingCount: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadToken, refetch] = useReloadTrigger();
+  const paramsKey = useMemo(() => JSON.stringify(params || {}), [params]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function fetchData() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await adminApi.getPayoutRequests(params);
+        if (!ignore) {
+          setData({
+            items: response?.items || [],
+            total: response?.total || 0,
+            pendingCount: response?.pendingCount || 0,
+            page: response?.page || 1,
+            totalPages: response?.totalPages || 1
+          });
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(getErrorMessage(err));
+          setData({ items: [], total: 0, pendingCount: 0 });
+        }
+      } finally {
+        if (!ignore) setIsLoading(false);
+      }
+    }
+    fetchData();
+    return () => { ignore = true; };
+  }, [paramsKey, reloadToken]);
+
+  return { ...data, isLoading, error, refetch };
+}
+
+export function useApprovePayoutRequest() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const approve = async (id, data = {}) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await adminApi.approvePayoutRequest(id, data);
+      return response;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return { approve, isLoading, error };
+}
+
+export function useRejectPayoutRequest() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const reject = async (id, data = {}) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await adminApi.rejectPayoutRequest(id, data);
+      return response;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return { reject, isLoading, error };
+}

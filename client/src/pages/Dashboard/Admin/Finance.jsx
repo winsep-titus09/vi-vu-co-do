@@ -13,11 +13,15 @@ import {
   IconTrendingUp,
 } from "../../../icons/IconCommon";
 import Spinner from "../../../components/Loaders/Spinner";
+import EmptyState from "../../../components/Loaders/EmptyState";
 import {
   useFinanceStats,
   useFinanceTransactions,
   useFinancePayouts,
   useConfirmPayout,
+  useAdminPayoutRequests,    // THÊM
+  useApprovePayoutRequest,   // THÊM
+  useRejectPayoutRequest,    // THÊM
 } from "../../../features/admin/hooks";
 import { formatCurrency } from "../../../lib/formatters";
 
@@ -42,6 +46,13 @@ const PAYOUT_STATUS_OPTIONS = [
   { value: "paid", label: "Đã chuyển" },
 ];
 
+const WITHDRAWAL_STATUS_OPTIONS = [
+  { value: "all", label: "Tất cả" },
+  { value: "pending", label: "Chờ duyệt" },
+  { value: "approved", label: "Đã duyệt" },
+  { value: "rejected", label: "Đã từ chối" },
+];
+
 const TYPE_OPTIONS = [
   { value: "all", label: "Tất cả loại" },
   { value: "charge", label: "Thanh toán" },
@@ -64,13 +75,19 @@ export default function AdminFinance() {
   const [isTypeOpen, setIsTypeOpen] = useState(false);
   const [payoutStatusFilter, setPayoutStatusFilter] = useState("all");
   const [isPayoutStatusOpen, setIsPayoutStatusOpen] = useState(false);
+  
+  // THÊM: Filter cho withdrawals
+  const [withdrawalStatusFilter, setWithdrawalStatusFilter] = useState("all");
+  const [isWithdrawalStatusOpen, setIsWithdrawalStatusOpen] = useState(false);
+  const [withdrawalSearch, setWithdrawalSearch] = useState("");
 
   // Pagination
   const [txPage, setTxPage] = useState(1);
   const [payoutPage, setPayoutPage] = useState(1);
+  const [withdrawalPage, setWithdrawalPage] = useState(1); // THÊM
   const PAGE_SIZE = 20;
 
-  // API Hooks
+  // API Hooks - existing
   const {
     stats,
     isLoading: statsLoading,
@@ -115,6 +132,36 @@ export default function AdminFinance() {
 
   const { confirm: confirmPayoutApi, isLoading: confirmingPayout } =
     useConfirmPayout();
+
+  // THÊM: Hook cho withdrawal requests
+  const withdrawalParams = useMemo(
+    () => ({
+      page: withdrawalPage,
+      limit: PAGE_SIZE,
+      ...(withdrawalStatusFilter !== "all" && { status: withdrawalStatusFilter }),
+      ...(withdrawalSearch && { search: withdrawalSearch }),
+    }),
+    [withdrawalPage, withdrawalStatusFilter, withdrawalSearch]
+  );
+
+  const {
+    items: withdrawalRequests,
+    total: withdrawalTotal,
+    totalPages: withdrawalTotalPages,
+    pendingCount: withdrawalPendingCount,
+    isLoading: withdrawalsLoading,
+    refetch: refetchWithdrawals,
+  } = useAdminPayoutRequests(withdrawalParams);
+
+  const { approve: approveWithdrawal, isLoading: approvingWithdrawal } = useApprovePayoutRequest();
+  const { reject: rejectWithdrawal, isLoading: rejectingWithdrawal } = useRejectPayoutRequest();
+
+  // THÊM: Modal state cho approve/reject
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [externalTxId, setExternalTxId] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
 
   // Helper Badge
   const getStatusBadge = (status) => {
@@ -219,12 +266,49 @@ export default function AdminFinance() {
     }
   };
 
+  // THÊM: Handle approve withdrawal
+  const handleApproveWithdrawal = async () => {
+    if (!selectedWithdrawal) return;
+    try {
+      await approveWithdrawal(selectedWithdrawal._id, { externalTxId, note: "" });
+      toast.success("Thành công!", "Đã duyệt yêu cầu rút tiền.");
+      setShowApproveModal(false);
+      setSelectedWithdrawal(null);
+      setExternalTxId("");
+      refetchWithdrawals();
+      refetchStats();
+    } catch (err) {
+      toast.error("Lỗi!", err?.message || "Không thể duyệt yêu cầu.");
+    }
+  };
+
+  // THÊM: Handle reject withdrawal
+  const handleRejectWithdrawal = async () => {
+    if (!selectedWithdrawal) return;
+    if (!rejectReason.trim()) {
+      toast.warning("Thiếu thông tin", "Vui lòng nhập lý do từ chối.");
+      return;
+    }
+    try {
+      await rejectWithdrawal(selectedWithdrawal._id, { reason: rejectReason });
+      toast.success("Thành công!", "Đã từ chối yêu cầu rút tiền.");
+      setShowRejectModal(false);
+      setSelectedWithdrawal(null);
+      setRejectReason("");
+      refetchWithdrawals();
+    } catch (err) {
+      toast.error("Lỗi!", err?.message || "Không thể từ chối yêu cầu.");
+    }
+  };
+
   const handleRefresh = () => {
     refetchStats();
     if (activeTab === "transactions") {
       refetchTx();
-    } else {
+    } else if (activeTab === "payouts") {
       refetchPayouts();
+    } else if (activeTab === "withdrawals") {
+      refetchWithdrawals();
     }
   };
 
@@ -417,7 +501,7 @@ export default function AdminFinance() {
               : "text-text-secondary hover:bg-bg-main"
           }`}
         >
-          <IconWallet className="w-4 h-4" /> Lịch sử giao dịch
+          <IconWallet className="w-4 h-4" /> Giao dịch
         </button>
         <button
           onClick={() => setActiveTab("payouts")}
@@ -428,6 +512,21 @@ export default function AdminFinance() {
           }`}
         >
           <IconCheck className="w-4 h-4" /> Thanh toán HDV
+        </button>
+        <button
+          onClick={() => setActiveTab("withdrawals")}
+          className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 relative ${
+            activeTab === "withdrawals"
+              ? "bg-primary text-white shadow-md"
+              : "text-text-secondary hover:bg-bg-main"
+          }`}
+        >
+          <IconArrowRight className="w-4 h-4 rotate-180" /> Yêu cầu rút tiền
+          {withdrawalPendingCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+              {withdrawalPendingCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -870,6 +969,314 @@ export default function AdminFinance() {
           )}
         </div>
       )}
+
+      {/* --- TAB 3: WITHDRAWALS (MỚI) --- */}
+      {activeTab === "withdrawals" && (
+        <div className="bg-white rounded-3xl border border-border-light overflow-hidden shadow-sm animate-fade-in">
+          {/* Toolbar */}
+          <div className="p-4 border-b border-border-light flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1 max-w-md">
+              <input
+                type="text"
+                placeholder="Tìm theo tên HDV, email..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary outline-none text-sm transition-all"
+                value={withdrawalSearch}
+                onChange={(e) => {
+                  setWithdrawalSearch(e.target.value);
+                  setWithdrawalPage(1);
+                }}
+              />
+              <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+            </div>
+
+            {/* Status filter */}
+            <div className="relative">
+              <button
+                onClick={() => setIsWithdrawalStatusOpen(!isWithdrawalStatusOpen)}
+                className={`px-4 py-2.5 border rounded-xl bg-white text-sm font-bold flex items-center gap-2 transition-all min-w-[160px] justify-between ${
+                  isWithdrawalStatusOpen
+                    ? "border-primary ring-1 ring-primary"
+                    : "border-border-light hover:border-primary/50 text-text-secondary"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <IconFilter className="w-4 h-4" />
+                  {WITHDRAWAL_STATUS_OPTIONS.find((o) => o.value === withdrawalStatusFilter)?.label}
+                </span>
+                <IconChevronDown
+                  className={`w-4 h-4 transition-transform ${
+                    isWithdrawalStatusOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {isWithdrawalStatusOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setIsWithdrawalStatusOpen(false)}
+                  ></div>
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-border-light z-20 py-1 animate-fade-in-up overflow-hidden">
+                    {WITHDRAWAL_STATUS_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setWithdrawalStatusFilter(opt.value);
+                          setIsWithdrawalStatusOpen(false);
+                          setWithdrawalPage(1);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm font-medium hover:bg-gray-50 flex justify-between items-center ${
+                          withdrawalStatusFilter === opt.value
+                            ? "text-primary bg-primary/5"
+                            : "text-text-primary"
+                        }`}
+                      >
+                        {opt.label}
+                        {withdrawalStatusFilter === opt.value && (
+                          <IconCheck className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Table */}
+          {withdrawalsLoading ? (
+            <div className="p-10 flex justify-center">
+              <Spinner className="w-8 h-8" />
+            </div>
+          ) : withdrawalRequests.length === 0 ? (
+            <div className="p-10">
+              <EmptyState
+                title="Chưa có yêu cầu rút tiền"
+                message="Các yêu cầu rút tiền từ HDV sẽ hiển thị ở đây."
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-bg-main/50 text-left">
+                    <th className="px-4 py-3 font-bold text-text-secondary">Hướng dẫn viên</th>
+                    <th className="px-4 py-3 font-bold text-text-secondary">Số tiền</th>
+                    <th className="px-4 py-3 font-bold text-text-secondary">Ngày yêu cầu</th>
+                    <th className="px-4 py-3 font-bold text-text-secondary">Trạng thái</th>
+                    <th className="px-4 py-3 font-bold text-text-secondary">Ghi chú</th>
+                    <th className="px-4 py-3 font-bold text-text-secondary text-center">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-light">
+                  {withdrawalRequests.map((req) => (
+                    <tr key={req._id} className="hover:bg-bg-main/30 transition-colors">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={req.guide?.avatar || "/images/default-avatar.png"}
+                            alt=""
+                            className="w-9 h-9 rounded-full object-cover border border-border-light"
+                          />
+                          <div>
+                            <p className="font-bold text-text-primary">{req.guide?.name || "N/A"}</p>
+                            <p className="text-xs text-text-secondary">{req.guide?.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="font-bold text-primary">
+                          {formatCurrency(req.amount)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-text-secondary">
+                        {formatDate(req.createdAt)}
+                      </td>
+                      <td className="px-4 py-4">
+                        {getWithdrawalStatusBadge(req.status)}
+                      </td>
+                      <td className="px-4 py-4 text-text-secondary max-w-[200px] truncate">
+                        {req.adminNote || "-"}
+                      </td>
+                      <td className="px-4 py-4">
+                        {req.status === "pending" ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedWithdrawal(req);
+                                setShowApproveModal(true);
+                              }}
+                              disabled={approvingWithdrawal}
+                              className="px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+                            >
+                              Duyệt
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedWithdrawal(req);
+                                setShowRejectModal(true);
+                              }}
+                              disabled={rejectingWithdrawal}
+                              className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                            >
+                              Từ chối
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-text-secondary text-center block">
+                            {req.processedAt ? formatDate(req.processedAt) : "-"}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {withdrawalTotalPages > 1 && (
+            <div className="p-4 border-t border-border-light flex justify-between items-center">
+              <span className="text-sm text-text-secondary">
+                Hiển thị {withdrawalRequests.length} / {withdrawalTotal} yêu cầu
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setWithdrawalPage((p) => Math.max(1, p - 1))}
+                  disabled={withdrawalPage <= 1}
+                  className="px-3 py-1.5 border border-border-light rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-bg-main transition-colors"
+                >
+                  Trước
+                </button>
+                <span className="px-3 py-1.5 text-sm">
+                  {withdrawalPage} / {withdrawalTotalPages}
+                </span>
+                <button
+                  onClick={() => setWithdrawalPage((p) => Math.min(withdrawalTotalPages, p + 1))}
+                  disabled={withdrawalPage >= withdrawalTotalPages}
+                  className="px-3 py-1.5 border border-border-light rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-bg-main transition-colors"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal: Approve Withdrawal */}
+      {showApproveModal && selectedWithdrawal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-scale-in">
+            <h3 className="text-lg font-bold text-text-primary mb-4">
+              Xác nhận duyệt yêu cầu rút tiền
+            </h3>
+            <div className="space-y-3 mb-4">
+              <p className="text-sm text-text-secondary">
+                HDV: <strong>{selectedWithdrawal.guide?.name}</strong>
+              </p>
+              <p className="text-sm text-text-secondary">
+                Số tiền: <strong className="text-primary">{formatCurrency(selectedWithdrawal.amount)}</strong>
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1">
+                  Mã giao dịch ngân hàng (tùy chọn)
+                </label>
+                <input
+                  type="text"
+                  value={externalTxId}
+                  onChange={(e) => setExternalTxId(e.target.value)}
+                  placeholder="VD: VCB123456789"
+                  className="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:border-primary outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowApproveModal(false);
+                  setSelectedWithdrawal(null);
+                  setExternalTxId("");
+                }}
+                className="flex-1 px-4 py-2.5 border border-border-light rounded-xl font-bold text-sm hover:bg-bg-main transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleApproveWithdrawal}
+                disabled={approvingWithdrawal}
+                className="flex-1 px-4 py-2.5 bg-green-500 text-white rounded-xl font-bold text-sm hover:bg-green-600 transition-colors disabled:opacity-50"
+              >
+                {approvingWithdrawal ? "Đang xử lý..." : "Xác nhận duyệt"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Reject Withdrawal */}
+      {showRejectModal && selectedWithdrawal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-scale-in">
+            <h3 className="text-lg font-bold text-text-primary mb-4">
+              Từ chối yêu cầu rút tiền
+            </h3>
+            <div className="space-y-3 mb-4">
+              <p className="text-sm text-text-secondary">
+                HDV: <strong>{selectedWithdrawal.guide?.name}</strong>
+              </p>
+              <p className="text-sm text-text-secondary">
+                Số tiền: <strong className="text-primary">{formatCurrency(selectedWithdrawal.amount)}</strong>
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1">
+                  Lý do từ chối <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Nhập lý do từ chối..."
+                  rows={3}
+                  className="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:border-primary outline-none resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setSelectedWithdrawal(null);
+                  setRejectReason("");
+                }}
+                className="flex-1 px-4 py-2.5 border border-border-light rounded-xl font-bold text-sm hover:bg-bg-main transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleRejectWithdrawal}
+                disabled={rejectingWithdrawal}
+                className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {rejectingWithdrawal ? "Đang xử lý..." : "Xác nhận từ chối"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const getWithdrawalStatusBadge = (status) => {
+  switch (status) {
+    case 'pending':
+      return <span className="badge bg-warning">Đang chờ</span>;
+    case 'approved':
+      return <span className="badge bg-success">Đã duyệt</span>;
+    case 'rejected':
+      return <span className="badge bg-danger">Từ chối</span>;
+    default:
+      return <span className="badge bg-secondary">{status}</span>;
+  }
+};

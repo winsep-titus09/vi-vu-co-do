@@ -15,6 +15,7 @@ import {
   IconArrowDownLeft,
   IconDownload,
   IconX,
+  IconRefresh,
 } from "../../../icons/IconCommon";
 import {
   useMonthlyEarnings,
@@ -73,7 +74,7 @@ export default function GuideEarnings() {
     isLoading: earningsLoading,
     error: earningsError,
   } = useMonthlyEarnings(selectedYear);
-  const { data: dashboardData, isLoading: dashboardLoading } =
+  const { data: dashboardData, isLoading: dashboardLoading, refetch: refetchDashboard } =
     useGuideDashboard();
   
   // Payout data
@@ -147,7 +148,9 @@ export default function GuideEarnings() {
   const totalGuideShare = dashboardData?.totalGuideShare || 0;
 
   // Available balance for withdrawal (from dashboard or calculate)
-  const availableBalance = dashboardData?.availableBalance || totalGuideShare;
+  const availableBalance = typeof dashboardData?.availableBalance === "number" 
+    ? dashboardData.availableBalance 
+    : totalGuideShare;
 
   // Handle payout request
   const handlePayoutRequest = async () => {
@@ -175,6 +178,7 @@ export default function GuideEarnings() {
       setShowPayoutModal(false);
       setPayoutAmount("");
       refetchPayouts();
+      refetchDashboard(); // THÊM: Cập nhật lại số dư
     } else {
       toast.error("Lỗi", result.error || "Không thể tạo yêu cầu rút tiền");
     }
@@ -258,11 +262,20 @@ export default function GuideEarnings() {
             </div>
 
             {/* Available Balance */}
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-              <p className="text-xs text-green-700 font-bold uppercase mb-1">
-                Số dư khả dụng
-              </p>
-              <p className="text-2xl font-bold text-green-700">
+            <div className="bg-white rounded-2xl p-6 border border-border-light shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-text-secondary font-medium">
+                  Số dư khả dụng
+                </p>
+                <button
+                  onClick={refetchDashboard}
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                  title="Làm mới số dư"
+                >
+                  <IconRefresh className="w-3 h-3" /> Cập nhật
+                </button>
+              </div>
+              <p className="text-2xl font-bold text-green-600">
                 {formatCurrency(availableBalance)}
               </p>
             </div>
@@ -353,7 +366,6 @@ export default function GuideEarnings() {
           </select>
           <button
             onClick={() => setShowPayoutModal(true)}
-            disabled={availableBalance <= 0}
             className="px-4 py-2.5 bg-green-600 text-white rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-green-700 shadow-lg shadow-green-600/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <IconArrowUpRight className="w-4 h-4" /> Rút tiền
