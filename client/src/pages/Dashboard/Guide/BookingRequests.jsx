@@ -33,11 +33,15 @@ export default function BookingRequests() {
   const getDisplayStatusForCount = (booking) => {
     const status = booking.status;
     const guideDecision = booking.guide_decision?.status;
+    
+    // Completed phải được tính riêng hoặc gộp vào accepted
+    if (status === "completed") {
+      return "accepted"; // Gộp completed vào "Đã nhận"
+    }
     if (
       guideDecision === "accepted" ||
       status === "awaiting_payment" ||
-      status === "paid" ||
-      status === "completed"
+      status === "paid"
     ) {
       return "accepted";
     }
@@ -81,7 +85,7 @@ export default function BookingRequests() {
   const getStatusFilter = () => {
     if (activeTab === "all") return undefined;
     if (activeTab === "pending") return "waiting_guide";
-    if (activeTab === "accepted") return "awaiting_payment,paid,completed";
+    if (activeTab === "accepted") return "awaiting_payment,paid,completed"; // Bao gồm completed
     if (activeTab === "rejected") return "rejected,canceled";
     return undefined;
   };
@@ -250,17 +254,17 @@ export default function BookingRequests() {
                         whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2
                         ${
                           activeTab === tab.id
-                            ? "bg-primary text-white shadow-md shadow-primary/20"
-                            : "text-text-secondary hover:bg-gray-50"
+                            ? "bg-primary text-white shadow-lg shadow-primary/30"
+                            : "bg-bg-main text-text-secondary hover:text-primary"
                         }
                     `}
             >
               {tab.label}
-              {tab.count > 0 && tab.id !== "all" && (
+              {tab.count > 0 && (
                 <span
-                  className={`min-w-5 h-5 px-1.5 rounded-full flex items-center justify-center text-[10px] ${
+                  className={`px-1.5 py-0.5 text-[10px] rounded-full ${
                     activeTab === tab.id
-                      ? "bg-white text-primary"
+                      ? "bg-white/20 text-white"
                       : "bg-gray-200 text-text-secondary"
                   }`}
                 >
@@ -270,13 +274,13 @@ export default function BookingRequests() {
             </button>
           ))}
         </div>
-
-        <div className="relative w-full md:w-72">
+        <div className="relative flex-1 md:flex-initial md:w-64">
           <input
             type="text"
-            placeholder="Tìm tên khách hoặc tour..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl border border-border-light bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm transition-all"
+            placeholder="Tìm theo tour hoặc tên khách..."
+            value={search}
             onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border-light bg-bg-main/50 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
           />
           <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
         </div>
@@ -447,6 +451,12 @@ export default function BookingRequests() {
                         >
                           <IconCheck className="w-4 h-4" /> Hoàn thành tour
                         </button>
+                      )}
+
+                      {req.status === "completed" && (
+                        <p className="text-xs text-blue-600 text-center font-medium">
+                          ✓ Tour đã hoàn thành
+                        </p>
                       )}
                     </div>
                   </div>

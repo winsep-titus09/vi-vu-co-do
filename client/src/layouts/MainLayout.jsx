@@ -3,6 +3,7 @@
 import { Outlet } from "react-router-dom";
 import Navbar from "../components/Navbar/Navbar";
 import Footer from "../components/Footer/Footer";
+import ScrollToTop from "../components/Common/ScrollToTop";
 
 /**
  * Layout công khai:
@@ -11,6 +12,7 @@ import Footer from "../components/Footer/Footer";
 export default function MainLayout() {
   return (
     <div className="flex flex-col min-h-screen bg-bg-main">
+      <ScrollToTop />
       {/* Navbar nằm ở root của layout để kiểm soát position 'absolute' */}
       <Navbar />
 

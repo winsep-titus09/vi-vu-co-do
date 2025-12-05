@@ -26,13 +26,15 @@ export default function TouristInvoices() {
     return bookings
       .filter(
         (b) =>
-          b.status === "confirmed" ||
+          b.status === "paid" ||         // ✅ Sửa: "paid" thay vì "confirmed"
           b.status === "completed" ||
           b.status === "canceled"
       )
       .map((b) => {
-        const isRefund =
-          b.status === "canceled" && b.payment_status === "refunded";
+        const isCanceled = b.status === "canceled";
+        const isRefund = isCanceled && b.refund_transaction_id;
+        const isPaid = b.status === "paid" || b.status === "completed";
+
         return {
           id: b._id?.slice(-8).toUpperCase() || "N/A",
           tourName: isRefund
@@ -45,11 +47,8 @@ export default function TouristInvoices() {
             new Date(b.start_date).toLocaleDateString("vi-VN") +
             " " +
             (b.start_time || ""),
-          method: b.payment_method || "Chưa thanh toán",
-          status:
-            b.payment_status === "paid" || b.payment_status === "refunded"
-              ? "success"
-              : "failed",
+          method: b.payment_session?.gateway || b.payment_method || "Chưa thanh toán",
+          status: isPaid || isRefund ? "success" : "failed",  // ✅ Sửa logic xác định status
           type: isRefund ? "refund" : "payment",
         };
       })
@@ -173,8 +172,7 @@ export default function TouristInvoices() {
                 <th className="p-4">Thời gian</th>
                 <th className="p-4">Phương thức</th>
                 <th className="p-4 text-right">Số tiền</th>
-                <th className="p-4">Trạng thái</th>
-                <th className="p-4 pr-6 text-right"></th>
+                <th className="p-4 pr-6">Trạng thái</th>
               </tr>
             </thead>
             <tbody>
@@ -217,20 +215,13 @@ export default function TouristInvoices() {
                     <td className="p-4 text-right">
                       {formatCurrency(item.amount)}
                     </td>
-                    <td className="p-4">{getStatusBadge(item.status)}</td>
-                    <td className="p-4 pr-6 text-right">
-                      {item.status === "success" && (
-                        <button className="text-xs font-bold text-primary hover:underline flex items-center gap-1 justify-end ml-auto">
-                          <IconDownload className="w-3 h-3" /> Hóa đơn
-                        </button>
-                      )}
-                    </td>
+                    <td className="p-4 pr-6">{getStatusBadge(item.status)}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td
-                    colSpan="7"
+                    colSpan="6"
                     className="p-8 text-center text-text-secondary"
                   >
                     <div className="flex flex-col items-center justify-center">

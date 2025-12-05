@@ -37,7 +37,7 @@ const paymentMethods = [
       </div>
     ),
   },
-  { id: "momo", name: "Ví MoMo", desc: "Quét mã QR", icon: LogoMomo },
+  { id: "momo", name: "Ví MoMo", desc: "Thanh toán qua ATM/Ngân hàng", icon: LogoMomo },
   {
     id: "vnpay",
     name: "VNPay QR",
@@ -117,7 +117,7 @@ export default function BookingStepPayment() {
       toast.info("Đang chuyển đến cổng thanh toán...");
 
       // Map payment method
-      let paymentMethod = "wallet"; // momo default
+      let paymentMethod = "atm"; // momo ATM (thay vì wallet/QR)
       if (selectedMethod === "vnpay") paymentMethod = "atm";
       if (selectedMethod === "card") paymentMethod = "credit";
 

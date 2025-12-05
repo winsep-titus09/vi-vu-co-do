@@ -82,6 +82,10 @@ export default function TourDetailPage() {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
   
+  // Gallery lightbox state
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  
   // Availability state
   const [availabilityStatus, setAvailabilityStatus] = useState(null);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
@@ -189,6 +193,39 @@ export default function TourDetailPage() {
       document.body.style.overflow = 'auto';
     };
   }, [is3DModalOpen]);
+
+  // Handle gallery modal - ESC key and body scroll
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setIsGalleryOpen(false);
+    };
+    if (isGalleryOpen) {
+      document.addEventListener('keydown', handleEsc);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEsc);
+      document.body.style.overflow = 'auto';
+    };
+  }, [isGalleryOpen]);
+
+  // Gallery navigation functions
+  const openGallery = (index) => {
+    setGalleryIndex(index);
+    setIsGalleryOpen(true);
+  };
+
+  const nextGalleryImage = () => {
+    if (tour?.gallery && galleryIndex < tour.gallery.length - 1) {
+      setGalleryIndex(galleryIndex + 1);
+    }
+  };
+
+  const prevGalleryImage = () => {
+    if (galleryIndex > 0) {
+      setGalleryIndex(galleryIndex - 1);
+    }
+  };
 
   const handleSelectDate = (date) => {
     setSelectedDate(date);
@@ -492,6 +529,7 @@ export default function TourDetailPage() {
                 {tour?.gallery?.slice(0, 3).map((img, idx) => (
                   <div
                     key={idx}
+                    onClick={() => openGallery(idx)}
                     className="rounded-xl overflow-hidden cursor-pointer border-2 border-transparent hover:border-primary transition-all"
                   >
                     <img
@@ -502,7 +540,10 @@ export default function TourDetailPage() {
                   </div>
                 ))}
                 {tour?.gallery?.length > 3 && (
-                  <div className="rounded-xl overflow-hidden cursor-pointer bg-gray-100 flex items-center justify-center text-xs font-bold text-text-secondary border-2 border-transparent hover:border-primary transition-all hover:bg-primary/5 hover:text-primary">
+                  <div 
+                    onClick={() => openGallery(3)}
+                    className="rounded-xl overflow-hidden cursor-pointer bg-gray-100 flex items-center justify-center text-xs font-bold text-text-secondary border-2 border-transparent hover:border-primary transition-all hover:bg-primary/5 hover:text-primary"
+                  >
                     +{tour.gallery.length - 3} ảnh
                   </div>
                 )}
@@ -1156,6 +1197,94 @@ export default function TourDetailPage() {
           locations={tour.locations}
           onClose={() => setIs3DModalOpen(false)}
         />
+      )}
+
+      {/* Gallery Lightbox Modal */}
+      {isGalleryOpen && tour?.gallery && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+          onClick={() => setIsGalleryOpen(false)}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setIsGalleryOpen(false)}
+            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <IconX className="w-6 h-6 text-white" />
+          </button>
+
+          {/* Image counter */}
+          <div className="absolute top-4 left-4 text-white/80 text-sm font-medium">
+            {galleryIndex + 1} / {tour.gallery.length}
+          </div>
+
+          {/* Main image container */}
+          <div 
+            className="relative max-w-5xl max-h-[85vh] w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={tour.gallery[galleryIndex]}
+              alt={`Gallery ${galleryIndex + 1}`}
+              className="w-full h-full object-contain rounded-lg"
+            />
+
+            {/* Previous button */}
+            {galleryIndex > 0 && (
+              <button
+                onClick={prevGalleryImage}
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+
+            {/* Next button */}
+            {galleryIndex < tour.gallery.length - 1 && (
+              <button
+                onClick={nextGalleryImage}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Thumbnail strip */}
+          {tour.gallery.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 max-w-full overflow-x-auto px-4 py-2">
+              {tour.gallery.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGalleryIndex(idx);
+                  }}
+                  className={`flex-shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all ${
+                    idx === galleryIndex
+                      ? "border-primary ring-2 ring-primary/50"
+                      : "border-transparent opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  <img
+                    src={img}
+                    alt={`Thumbnail ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Keyboard hint */}
+          <p className="absolute bottom-20 left-1/2 -translate-x-1/2 text-white/50 text-xs">
+            Mũi tên ←→ để chuyển ảnh • ESC để đóng
+          </p>
+        </div>
       )}
     </div>
   );

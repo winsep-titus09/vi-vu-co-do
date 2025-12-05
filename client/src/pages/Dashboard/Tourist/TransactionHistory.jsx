@@ -24,6 +24,12 @@ export default function TouristTransactionHistory() {
   const transactions = useMemo(() => {
     if (!bookings) return [];
 
+    // DEBUG - Xóa sau khi fix xong
+    console.log("=== RAW BOOKINGS ===", bookings.map(b => ({ 
+      _id: b._id, 
+      status: b.status,
+      payment_session: b.payment_session?.status
+    })));
     // Map booking status to transaction-friendly status
     const getTransactionStatus = (booking) => {
       const status = booking.status;
@@ -37,14 +43,20 @@ export default function TouristTransactionHistory() {
       )
         return "cancelled";
 
-      // Check confirmed states
-      if (
-        status === "paid" ||
-        status === "completed" ||
-        status === "awaiting_payment" ||
-        guideStatus === "accepted"
-      )
-        return "confirmed";
+      // Check paid/completed states (thanh toán thành công)
+      if (status === "paid" || status === "completed") {
+        return "paid";
+      }
+
+      // Check awaiting payment (HDV đã duyệt, chờ thanh toán)
+      if (status === "awaiting_payment" || guideStatus === "accepted") {
+        return "awaiting";
+      }
+
+      // Waiting guide
+      if (status === "waiting_guide") {
+        return "waiting";
+      }
 
       return status;
     };
@@ -52,11 +64,22 @@ export default function TouristTransactionHistory() {
     return bookings
       .filter((b) => {
         const mappedStatus = getTransactionStatus(b);
-        return mappedStatus === "confirmed" || mappedStatus === "cancelled";
+        // Hiển thị: đã thanh toán, đã hủy, chờ thanh toán
+        return ["paid", "cancelled", "awaiting"].includes(mappedStatus);
       })
       .map((b) => {
         const mappedStatus = getTransactionStatus(b);
         const isCancelled = mappedStatus === "cancelled";
+        const isPaid = mappedStatus === "paid";
+
+        // Xác định trạng thái giao dịch
+        let txStatus = "pending";
+        if (isCancelled) {
+          txStatus = "refunded";
+        } else if (isPaid) {
+          txStatus = "success";
+        }
+
         return {
           id: b._id?.slice(-8).toUpperCase() || "N/A",
           date: new Date(b.booking_date || b.createdAt).toLocaleDateString(
@@ -70,11 +93,7 @@ export default function TouristTransactionHistory() {
             : "- " + formatPrice(b.total_price),
           method:
             b.payment_session?.gateway || b.payment_method || "Chưa thanh toán",
-          status: isCancelled
-            ? "refunded"
-            : b.status === "paid" || b.payment_status === "paid"
-            ? "success"
-            : "pending",
+          status: txStatus,
           type: isCancelled ? "refund" : "payment",
         };
       })
@@ -117,6 +136,12 @@ export default function TouristTransactionHistory() {
             <IconArrowRight className="w-3 h-3 rotate-180" /> Hoàn tiền
           </span>
         );
+      case "pending":
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700 text-[10px] font-bold flex items-center gap-1 w-fit">
+            <IconClock className="w-3 h-3" /> Chờ thanh toán
+          </span>
+        );
       case "failed":
         return (
           <span className="px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-[10px] font-bold flex items-center gap-1 w-fit">
@@ -124,7 +149,11 @@ export default function TouristTransactionHistory() {
           </span>
         );
       default:
-        return null;
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-[10px] font-bold flex items-center gap-1 w-fit">
+            <IconClock className="w-3 h-3" /> Đang xử lý
+          </span>
+        );
     }
   };
 

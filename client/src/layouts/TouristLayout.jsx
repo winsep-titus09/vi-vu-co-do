@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { Outlet, NavLink } from "react-router-dom";
 import Navbar from "../components/Navbar/Navbar";
 import Footer from "../components/Footer/Footer";
+import ScrollToTop from "../components/Common/ScrollToTop";
 import { useNotifications } from "../features/notifications/hooks";
 import { IconUser } from "../icons/IconUser";
 import { IconCalendar } from "../icons/IconBox";
@@ -82,6 +83,7 @@ export default function TouristLayout() {
 
   return (
     <div className="min-h-screen bg-bg-main flex flex-col">
+      <ScrollToTop />
       <Navbar />
 
       <div className="flex-1 container-main py-8">
