@@ -10,6 +10,7 @@ import {
   listDeleteRequests,
   approveDeleteRequest,
   rejectDeleteRequest,
+  listApprovedGuides,
 } from "../../controllers/admin/users.controller.js";
 
 const router = express.Router();
@@ -19,6 +20,9 @@ router.get("/", auth, authorize("admin"), listUsers);
 
 // GET /api/admin/users/stats - Get user statistics
 router.get("/stats", auth, authorize("admin"), getUserStats);
+
+// GET /api/admin/users/guides - List approved guides for tour assignment
+router.get("/guides", auth, authorize("admin"), listApprovedGuides);
 
 // GET /api/admin/users/delete-requests - List pending delete requests
 router.get("/delete-requests", auth, authorize("admin"), listDeleteRequests);

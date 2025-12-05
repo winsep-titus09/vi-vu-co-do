@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useMemo, useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import Breadcrumbs from "../../../components/Breadcrumbs/Breadcrumbs";
 import TourCard from "../../../components/Cards/TourCard";
 import Spinner from "../../../components/Loaders/Spinner";
@@ -10,12 +10,17 @@ import {
   useGuideBusyDates,
   useGuideReviews,
 } from "../../../features/guides/hooks";
+import { useCreateReview } from "../../../features/reviews/hooks";
+import { useAuth } from "../../../features/auth/hooks";
+import { useToast } from "../../../components/Toast/useToast";
 import {
   IconStar,
   IconPlay,
   IconCalendar,
   IconCheck,
 } from "../../../icons/IconBox";
+import { IconLoader } from "../../../icons/IconCommon";
+import { IconX } from "../../../icons/IconX";
 import IconVerify from "../../../icons/IconVerify";
 import IconShieldCheck from "../../../icons/IconShieldCheck";
 import IconMail from "../../../icons/IconMail";
@@ -26,7 +31,17 @@ import IconLotus from "../../../icons/IconLotus";
 
 export default function GuideProfile() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { isAuthenticated } = useAuth();
+  const { createGuideReview, isLoading: isSubmittingReview } = useCreateReview();
+  
   const { guide: apiGuide, isLoading, error } = useGuideProfile(id);
+
+  // Review modal state
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
 
   // Fetch guide's tours
   const { tours: apiTours, isLoading: toursLoading } = useGuideTours(id, {
@@ -94,9 +109,9 @@ export default function GuideProfile() {
       id: tour._id,
       name: tour.name,
       price: tour.price,
-      duration: `${tour.duration} ${
-        tour.duration_unit === "hours" ? "giờ" : "ngày"
-      }`,
+      duration: tour.duration_hours 
+        ? `${tour.duration_hours} giờ`
+        : `${tour.duration} ${tour.duration_unit === "hours" ? "giờ" : "ngày"}`,
       rating: tour.rating || 5.0,
       image:
         tour.cover_image_url ||
@@ -370,11 +385,26 @@ export default function GuideProfile() {
                 <h2 className="text-2xl font-heading font-bold text-text-primary">
                   Đánh giá từ du khách
                 </h2>
-                {reviewStats && reviewStats.totalReviews > 2 && (
-                  <button className="px-4 py-2 rounded-full border border-border-light text-sm font-bold hover:bg-white hover:border-primary transition-all">
-                    Xem tất cả {reviewStats.totalReviews} đánh giá
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        toast.warning("Yêu cầu đăng nhập", "Vui lòng đăng nhập để viết đánh giá");
+                        navigate("/sign-in", { state: { from: `/guides/${id}` } });
+                        return;
+                      }
+                      setIsReviewModalOpen(true);
+                    }}
+                    className="px-4 py-2 rounded-full border border-primary text-primary text-sm font-bold hover:bg-primary hover:text-white transition-all"
+                  >
+                    Viết đánh giá
                   </button>
-                )}
+                  {reviewStats && reviewStats.totalReviews > 2 && (
+                    <button className="px-4 py-2 rounded-full border border-border-light text-sm font-bold hover:bg-white hover:border-primary transition-all">
+                      Xem tất cả {reviewStats.totalReviews} đánh giá
+                    </button>
+                  )}
+                </div>
               </div>
               {reviewsLoading ? (
                 <div className="flex justify-center py-8">
@@ -439,6 +469,146 @@ export default function GuideProfile() {
           Liên hệ / Đặt lịch
         </button>
       </div>
+
+      {/* REVIEW MODAL */}
+      {isReviewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border-light">
+              <h3 className="text-xl font-heading font-bold text-text-primary">
+                Đánh giá hướng dẫn viên
+              </h3>
+              <button
+                onClick={() => {
+                  setIsReviewModalOpen(false);
+                  setReviewRating(5);
+                  setReviewComment("");
+                }}
+                className="p-2 rounded-full hover:bg-bg-main transition-colors"
+              >
+                <IconX className="w-5 h-5 text-text-secondary" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-6">
+              {/* Guide info */}
+              <div className="flex items-center gap-4 p-4 bg-bg-main rounded-2xl">
+                <img
+                  src={guideDetail?.avatar}
+                  alt={guideDetail?.name}
+                  className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
+                />
+                <div>
+                  <h4 className="font-bold text-text-primary">{guideDetail?.name}</h4>
+                  <p className="text-sm text-text-secondary">{guideDetail?.role}</p>
+                </div>
+              </div>
+
+              {/* Rating */}
+              <div>
+                <label className="block text-sm font-bold text-text-secondary uppercase mb-3">
+                  Đánh giá của bạn
+                </label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      className="p-1 transition-transform hover:scale-110"
+                    >
+                      <IconStar
+                        className={`w-8 h-8 ${
+                          star <= reviewRating
+                            ? "text-[#BC4C00] fill-current"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="ml-2 text-sm text-text-secondary">
+                    {reviewRating === 5
+                      ? "Tuyệt vời"
+                      : reviewRating === 4
+                      ? "Rất tốt"
+                      : reviewRating === 3
+                      ? "Bình thường"
+                      : reviewRating === 2
+                      ? "Tệ"
+                      : "Rất tệ"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Comment */}
+              <div>
+                <label className="block text-sm font-bold text-text-secondary uppercase mb-2">
+                  Nhận xét của bạn
+                </label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="Chia sẻ trải nghiệm của bạn với hướng dẫn viên này..."
+                  rows={4}
+                  className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-border-light bg-bg-main/30">
+              <button
+                onClick={() => {
+                  setIsReviewModalOpen(false);
+                  setReviewRating(5);
+                  setReviewComment("");
+                }}
+                className="px-6 py-2.5 rounded-xl border border-border-light text-text-secondary font-bold hover:bg-bg-main transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  if (!reviewComment.trim()) {
+                    toast.warning("Thiếu thông tin", "Vui lòng nhập nhận xét");
+                    return;
+                  }
+
+                  const result = await createGuideReview({
+                    guide_id: id,
+                    rating: reviewRating,
+                    comment: reviewComment.trim(),
+                  });
+
+                  if (result.success) {
+                    toast.success("Thành công!", "Cảm ơn bạn đã đánh giá hướng dẫn viên");
+                    setIsReviewModalOpen(false);
+                    setReviewRating(5);
+                    setReviewComment("");
+                    // Reload page to show new review
+                    window.location.reload();
+                  } else {
+                    toast.error("Lỗi", result.error || "Không thể gửi đánh giá");
+                  }
+                }}
+                disabled={isSubmittingReview || !reviewComment.trim()}
+                className="px-6 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmittingReview ? (
+                  <>
+                    <IconLoader className="w-4 h-4 animate-spin" />
+                    Đang gửi...
+                  </>
+                ) : (
+                  "Gửi đánh giá"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

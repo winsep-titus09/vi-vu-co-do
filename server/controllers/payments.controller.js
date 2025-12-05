@@ -9,11 +9,11 @@ import { notifyAdmins, notifyUser } from "../services/notify.js";
 
 // Helper: build requestType từ method client gửi
 function resolveRequestType(method) {
-    const envDefault = process.env.MOMO_REQUEST_TYPE || "captureWallet";
-    const m = (method || "").toLowerCase(); // "wallet" | "atm" | "credit"
+    const envDefault = process.env.MOMO_REQUEST_TYPE || "payWithCC";
+    const m = (method || "").toLowerCase(); // "wallet" | "atm" | "credit" | "card"
     if (m === "wallet") return "captureWallet";
     if (m === "atm") return "payWithATM";
-    if (m === "credit") return "payWithCredit";
+    if (m === "credit" || m === "card") return "payWithCC"; // Thẻ quốc tế qua MoMo
     return envDefault;
 }
 

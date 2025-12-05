@@ -31,7 +31,7 @@ export default function FeaturedPosts() {
 
   return (
     // Sử dụng nền map-bg như mẫu
-    <section className="relative py-20 lg:py-28 bg-[#fcfaf5] overflow-hidden">
+    <section className="relative py-20 lg:py-28 bg-bg-main overflow-hidden">
       {/* Background Map (Mờ) */}
       <div
         className="absolute inset-0 z-0 pointer-events-none bg-center bg-no-repeat bg-cover"
@@ -51,7 +51,7 @@ export default function FeaturedPosts() {
           </div>
 
           {/* Main Title */}
-          <h2 className="!text-3xl md:text-4xl lg:text-5xl font-heading font-black text-text-primary uppercase tracking-tight">
+          <h2 className="text-3xl! md:text-4xl lg:text-5xl font-heading font-black text-text-primary uppercase tracking-tight">
             Tin tức & Cập nhật Du lịch
           </h2>
         </div>

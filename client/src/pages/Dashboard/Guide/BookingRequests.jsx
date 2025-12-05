@@ -8,72 +8,16 @@ import {
 } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
 import { IconUser } from "../../../icons/IconUser";
+import {
+  IconLoader,
+  IconX,
+  IconMessage,
+  IconFilter,
+} from "../../../icons/IconCommon";
 import { useGuideBookings } from "../../../features/guides/hooks";
 import guidesApi from "../../../features/guides/api";
 import { formatCurrency, formatTimeAgo } from "../../../lib/formatters";
 import { useToast } from "../../../components/Toast/useToast";
-
-// Inline Icons
-const IconLoader = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
-
-const IconX = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-
-const IconMessage = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
-
-const IconFilter = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-  </svg>
-);
 
 export default function BookingRequests() {
   const [activeTab, setActiveTab] = useState("pending");
@@ -171,15 +115,9 @@ export default function BookingRequests() {
     const status = booking.status;
     const guideDecision = booking.guide_decision?.status;
 
-    // Check guide decision first
-    if (
-      guideDecision === "accepted" ||
-      status === "awaiting_payment" ||
-      status === "paid" ||
-      status === "completed"
-    ) {
-      return "accepted";
-    }
+    if (status === "completed") return "completed";
+    if (status === "paid") return "paid"; // Đã thanh toán - cần hoàn thành
+    if (status === "awaiting_payment" || guideDecision === "accepted") return "accepted";
     if (
       guideDecision === "rejected" ||
       status === "rejected" ||
@@ -190,7 +128,6 @@ export default function BookingRequests() {
     if (status === "waiting_guide" || guideDecision === "pending") {
       return "pending";
     }
-    if (status === "completed") return "completed";
     return "pending";
   };
 
@@ -201,7 +138,7 @@ export default function BookingRequests() {
       toast.success("Thành công!", "Đã chấp nhận yêu cầu đặt tour.");
       handleRefetch();
     } catch (error) {
-      toast.error("Lỗi", error.message || "Không thể chấp nhận yêu cầu");
+      toast.error("Lỗi chấp nhận", error.message || "Không thể chấp nhận yêu cầu");
     }
   };
 
@@ -214,7 +151,19 @@ export default function BookingRequests() {
       toast.success("Thành công!", "Đã từ chối yêu cầu đặt tour.");
       handleRefetch();
     } catch (error) {
-      toast.error("Lỗi", error.message || "Không thể từ chối yêu cầu");
+      toast.error("Lỗi từ chối", error.message || "Không thể từ chối yêu cầu");
+    }
+  };
+
+  // Handle complete booking
+  const handleComplete = async (bookingId) => {
+    if (!window.confirm("Xác nhận tour này đã hoàn thành?")) return;
+    try {
+      await guidesApi.completeBooking(bookingId);
+      toast.success("Thành công!", "Tour đã được đánh dấu hoàn thành.");
+      handleRefetch();
+    } catch (error) {
+      toast.error("Lỗi hoàn thành", error.message || "Không thể đánh dấu hoàn thành tour");
     }
   };
 
@@ -249,8 +198,14 @@ export default function BookingRequests() {
         );
       case "accepted":
         return (
+          <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-bold border border-orange-200 whitespace-nowrap">
+            Chờ thanh toán
+          </span>
+        );
+      case "paid":
+        return (
           <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 whitespace-nowrap">
-            Đã chấp nhận
+            Đã thanh toán
           </span>
         );
       case "rejected":
@@ -407,7 +362,7 @@ export default function BookingRequests() {
                       {/* [LINKED] Nhấn vào tên tour để xem chi tiết */}
                       <Link
                         to={`/dashboard/guide/requests/${req.id}`}
-                        className="text-2xl font-heading font-bold text-text-primary line-clamp-2 text-primary group-hover:underline cursor-pointer hover:text-primary-dark transition-colors"
+                        className="text-2xl font-heading font-bold text-primary line-clamp-2 group-hover:underline cursor-pointer hover:text-primary-dark transition-colors"
                       >
                         {req.tourName}
                       </Link>
@@ -480,8 +435,17 @@ export default function BookingRequests() {
                       )}
 
                       {req.status === "accepted" && (
-                        <button className="w-full px-4 py-2 rounded-xl border border-primary text-primary bg-white hover:bg-primary/5 font-bold text-sm transition-colors whitespace-nowrap">
-                          Nhắn tin
+                        <p className="text-xs text-orange-600 text-center">
+                          Đang chờ khách thanh toán
+                        </p>
+                      )}
+
+                      {req.status === "paid" && (
+                        <button
+                          onClick={() => handleComplete(booking._id)}
+                          className="w-full px-4 py-2 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 shadow-lg shadow-green-600/20 transition-all flex items-center justify-center gap-2 whitespace-nowrap"
+                        >
+                          <IconCheck className="w-4 h-4" /> Hoàn thành tour
                         </button>
                       )}
                     </div>

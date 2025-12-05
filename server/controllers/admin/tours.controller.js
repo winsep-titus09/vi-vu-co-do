@@ -1,6 +1,8 @@
 // server/controllers/admin/tours.controller.js
 import mongoose from "mongoose";
 import Tour from "../../models/Tour.js";
+import Booking from "../../models/Booking.js";
+import Notification from "../../models/Notification.js";
 
 /** GET /api/admin/tours?status=pending&page=1&limit=10&search=keyword */
 export const listAdminTours = async (req, res) => {
@@ -170,28 +172,145 @@ export const toggleTourVisibility = async (req, res) => {
 export const deleteTour = async (req, res) => {
   try {
     const { id } = req.params;
+    const { reason } = req.body; // Lý do hủy tour
+    
+    if (!mongoose.isValidObjectId(id))
+      return res.status(400).json({ message: "ID không hợp lệ." });
+
+    const tour = await Tour.findById(id)
+      .populate("created_by", "name email")
+      .populate("guides.guideId", "name email");
+      
+    if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
+
+    // Check if tour has any paid/completed bookings
+    const paidBookings = await Booking.find({ 
+      tour_id: id,
+      status: { $in: ["paid", "completed"] }
+    }).populate("customer_id", "name email");
+
+    if (paidBookings.length > 0) {
+      return res.status(400).json({
+        message: `Không thể xóa tour đã có ${paidBookings.length} booking đã thanh toán/hoàn thành. Hãy ẩn tour thay vì xóa hoặc hoàn tiền cho khách trước.`,
+        hasBookings: true,
+        bookingCount: paidBookings.length,
+        bookings: paidBookings.map(b => ({
+          id: b._id,
+          customer: b.customer_id?.name,
+          status: b.status,
+          startDate: b.start_date
+        }))
+      });
+    }
+
+    // Check for pending/awaiting_payment bookings
+    const pendingBookings = await Booking.find({ 
+      tour_id: id,
+      status: { $in: ["waiting_guide", "awaiting_payment"] }
+    }).populate("customer_id", "name email");
+
+    // Get unique recipients (guide and tourists)
+    const notifications = [];
+    const tourName = tour.name;
+    const cancelReason = reason || "Tour đã bị xóa bởi quản trị viên";
+
+    // Notify guide(s)
+    if (tour.created_by) {
+      notifications.push({
+        recipientId: tour.created_by._id,
+        type: "tour:deleted",
+        channel: "in_app",
+        content: `Tour "${tourName}" của bạn đã bị xóa bởi quản trị viên. Lý do: ${cancelReason}`,
+        url: "/dashboard/guide/tours",
+        audience: "user",
+        meta: { tourId: id, reason: cancelReason }
+      });
+    }
+
+    // Also notify other guides assigned to tour
+    if (tour.guides && tour.guides.length > 0) {
+      for (const guide of tour.guides) {
+        if (guide.guideId && guide.guideId._id?.toString() !== tour.created_by?._id?.toString()) {
+          notifications.push({
+            recipientId: guide.guideId._id,
+            type: "tour:deleted",
+            channel: "in_app",
+            content: `Tour "${tourName}" mà bạn hướng dẫn đã bị xóa. Lý do: ${cancelReason}`,
+            url: "/dashboard/guide/tours",
+            audience: "user",
+            meta: { tourId: id, reason: cancelReason }
+          });
+        }
+      }
+    }
+
+    // Cancel pending bookings and notify tourists
+    for (const booking of pendingBookings) {
+      // Update booking status to canceled
+      booking.status = "canceled";
+      booking.canceled_at = new Date();
+      booking.canceled_by = req.user._id;
+      booking.cancel_reason = `Tour đã bị hủy: ${cancelReason}`;
+      await booking.save();
+
+      // Notify tourist
+      if (booking.customer_id) {
+        notifications.push({
+          recipientId: booking.customer_id._id,
+          type: "booking:canceled",
+          channel: "in_app",
+          content: `Đặt tour "${tourName}" của bạn đã bị hủy do tour bị xóa. Lý do: ${cancelReason}`,
+          url: "/dashboard/tourist/history",
+          audience: "user",
+          meta: { 
+            tourId: id, 
+            bookingId: booking._id,
+            reason: cancelReason 
+          }
+        });
+      }
+    }
+
+    // Create all notifications
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+    }
+
+    // Delete the tour
+    await Tour.findByIdAndDelete(id);
+    
+    res.json({ 
+      message: "Đã xóa tour thành công.",
+      canceledBookings: pendingBookings.length,
+      notificationsSent: notifications.length
+    });
+  } catch (err) {
+    console.error("deleteTour error:", err);
+    res.status(500).json({ message: "Lỗi máy chủ." });
+  }
+};
+
+/** PATCH /api/admin/tours/:id/featured - Toggle featured status */
+export const toggleFeatured = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
     if (!mongoose.isValidObjectId(id))
       return res.status(400).json({ message: "ID không hợp lệ." });
 
     const tour = await Tour.findById(id);
     if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
 
-    // Check if tour has any bookings
-    const Booking = mongoose.model("Booking");
-    const bookingCount = await Booking.countDocuments({ tour_id: id });
+    // Toggle featured status
+    tour.featured = !tour.featured;
+    await tour.save();
 
-    if (bookingCount > 0) {
-      return res.status(400).json({
-        message: `Không thể xóa tour đã có ${bookingCount} lượt đặt. Hãy ẩn tour thay vì xóa.`,
-        hasBookings: true,
-        bookingCount,
-      });
-    }
-
-    await Tour.findByIdAndDelete(id);
-    res.json({ message: "Đã xóa tour thành công." });
+    res.json({
+      message: tour.featured ? "Đã đánh dấu tour tiêu biểu" : "Đã bỏ đánh dấu tiêu biểu",
+      featured: tour.featured,
+    });
   } catch (err) {
-    console.error("deleteTour error:", err);
+    console.error("toggleFeatured error:", err);
     res.status(500).json({ message: "Lỗi máy chủ." });
   }
 };

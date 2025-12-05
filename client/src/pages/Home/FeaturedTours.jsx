@@ -129,7 +129,7 @@ export default function FeaturedTours() {
       {/* --- BACKGROUND DECOR --- */}
 
       {/* 1. Dải màu mờ trên cùng (Fade-in từ section trên) */}
-      <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-white via-white/60 to-transparent z-0 pointer-events-none" />
+      <div className="absolute top-0 left-0 w-full h-40 bg-linear-to-b from-white via-white/60 to-transparent z-0 pointer-events-none" />
 
       {/* 2. CẬP NHẬT: Bản đồ nền mờ (Map Background) */}
       {/* Đặt ở giữa (top-20) để làm nền cho tiêu đề và phần đầu của grid card */}

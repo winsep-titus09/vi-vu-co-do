@@ -13,6 +13,10 @@ import {
   IconChevronLeft,
   IconImage,
   IconLoader,
+  IconGripVertical,
+  IconTrash,
+  IconChevronUp,
+  IconChevronDown,
 } from "../../../icons/IconCommon";
 import {
   useTourCategories,
@@ -22,74 +26,6 @@ import {
 import { uploadApi } from "../../../features/upload/api";
 import { formatCurrency } from "../../../lib/formatters";
 import { useToast } from "../../../components/Toast/useToast";
-
-// Icons for itinerary
-const IconGripVertical = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <circle cx="9" cy="5" r="1" />
-    <circle cx="9" cy="12" r="1" />
-    <circle cx="9" cy="19" r="1" />
-    <circle cx="15" cy="5" r="1" />
-    <circle cx="15" cy="12" r="1" />
-    <circle cx="15" cy="19" r="1" />
-  </svg>
-);
-
-const IconTrash = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M3 6h18" />
-    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-  </svg>
-);
-
-const IconChevronUp = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="m18 15-6-6-6 6" />
-  </svg>
-);
-
-const IconChevronDown = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="m6 9 6 6 6-6" />
-  </svg>
-);
 
 export default function CreateTour() {
   const navigate = useNavigate();
@@ -114,7 +50,8 @@ export default function CreateTour() {
     price: "",
     max_guests: "",
     cover_image_url: "",
-    video_url: "", // Video giới thiệu (YouTube/Vimeo URL)
+    video_url: "", // Video giới thiệu tour (YouTube/Vimeo URL)
+    guide_video_url: "", // Video giới thiệu hướng dẫn viên
     // New fields
     fixed_departure_time: "08:00",
     min_days_before_start: 1,
@@ -125,6 +62,7 @@ export default function CreateTour() {
   const [galleryPreviews, setGalleryPreviews] = useState([]); // preview URLs cho hiển thị
   const [galleryUrls, setGalleryUrls] = useState([]); // actual URLs (from upload or paste)
   const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
 
   // Highlights/Amenities
   const [highlights, setHighlights] = useState([{ id: 1, text: "" }]);
@@ -132,6 +70,12 @@ export default function CreateTour() {
   // Includes / Excludes
   const [includes, setIncludes] = useState([{ id: 1, text: "" }]);
   const [excludes, setExcludes] = useState([{ id: 1, text: "" }]);
+
+  // Amenities (tiện ích)
+  const [amenities, setAmenities] = useState([{ id: 1, text: "" }]);
+
+  // Rules (quy tắc)
+  const [rules, setRules] = useState([{ id: 1, text: "" }]);
 
   // Fetch data from API
   const { categories, isLoading: loadingCategories } = useTourCategories();
@@ -351,17 +295,45 @@ export default function CreateTour() {
     }
   };
 
-  // Giả lập upload ảnh (trong thực tế cần upload lên server/cloud)
-  const handleImageChange = (e) => {
+  // Upload ảnh bìa lên cloud
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImage(reader.result);
-        // TODO: Upload to cloud and get URL
-        setFormData((prev) => ({ ...prev, cover_image_url: reader.result }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // Validate file
+    if (!file.type.startsWith("image/")) {
+      toast.warning("File không hợp lệ", "Vui lòng chọn file ảnh");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.warning("File quá lớn", "Kích thước ảnh tối đa 5MB");
+      return;
+    }
+
+    // Preview ngay lập tức
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload to cloud
+    setIsUploadingCover(true);
+    try {
+      const result = await uploadApi.uploadImages([file], "tours/cover");
+      if (result.success && result.images?.[0]) {
+        setFormData((prev) => ({ ...prev, cover_image_url: result.images[0].url }));
+        toast.success("Upload thành công", "Đã tải ảnh bìa lên");
+      } else {
+        throw new Error("Upload không thành công");
+      }
+    } catch (err) {
+      console.error("Cover image upload error:", err);
+      toast.error("Lỗi upload", err.message || "Không thể tải ảnh lên. Vui lòng thử lại.");
+      // Reset preview nếu upload thất bại
+      setPreviewImage(null);
+    } finally {
+      setIsUploadingCover(false);
     }
   };
 
@@ -435,7 +407,8 @@ export default function CreateTour() {
         max_guests: Number(formData.max_guests) || 10,
         categories: [formData.category_id],
         cover_image_url: isValidUrl ? imageUrl : null,
-        video_url: formData.video_url?.trim() || null, // Video giới thiệu
+        video_url: formData.video_url?.trim() || null, // Video giới thiệu tour
+        guide_video_url: formData.guide_video_url?.trim() || null, // Video giới thiệu HDV
         gallery: validGalleryUrls,
         itinerary: itineraryItems
           .filter((item) => item.title || item.description)
@@ -461,6 +434,12 @@ export default function CreateTour() {
         excludes: excludes
           .filter((e) => e.text.trim())
           .map((e) => e.text.trim()),
+        amenities: amenities
+          .filter((a) => a.text.trim())
+          .map((a) => a.text.trim()),
+        rules: rules
+          .filter((r) => r.text.trim())
+          .map((r) => r.text.trim()),
         fixed_departure_time: formData.fixed_departure_time || "08:00",
         min_days_before_start: Number(formData.min_days_before_start) || 1,
         max_days_advance: Number(formData.max_days_advance) || 90,
@@ -574,19 +553,7 @@ export default function CreateTour() {
                         </select>
                       )}
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary">
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M19 9l-7 7-7-7"
-                          ></path>
-                        </svg>
+                        <IconChevronDown className="w-4 h-4" />
                       </div>
                     </div>
                   </div>
@@ -1076,27 +1043,53 @@ export default function CreateTour() {
               <label className="text-sm font-bold text-text-secondary uppercase">
                 Ảnh bìa Tour <span className="text-red-500">*</span>
               </label>
-              <div className="border-2 border-dashed border-border-light rounded-3xl p-8 text-center hover:bg-bg-main/50 hover:border-primary/50 transition-all cursor-pointer group relative overflow-hidden">
+              <div className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all relative overflow-hidden ${
+                isUploadingCover 
+                  ? "border-primary/50 bg-primary/5" 
+                  : "border-border-light hover:bg-bg-main/50 hover:border-primary/50 cursor-pointer group"
+              }`}>
                 {previewImage ? (
                   <div className="relative h-64 w-full">
                     <img
                       src={previewImage}
                       alt="Preview"
-                      className="w-full h-full object-contain rounded-xl"
+                      className={`w-full h-full object-contain rounded-xl ${isUploadingCover ? "opacity-50" : ""}`}
                     />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPreviewImage(null);
-                        setFormData((prev) => ({
-                          ...prev,
-                          cover_image_url: "",
-                        }));
-                      }}
-                      className="absolute top-2 right-2 bg-white/80 p-1 rounded-full hover:bg-white text-red-500 shadow-sm"
-                    >
-                      <IconX className="w-5 h-5" />
-                    </button>
+                    {isUploadingCover && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-white/90 px-4 py-2 rounded-full flex items-center gap-2 shadow-lg">
+                          <IconLoader className="w-5 h-5 animate-spin text-primary" />
+                          <span className="text-sm font-bold text-primary">Đang tải lên...</span>
+                        </div>
+                      </div>
+                    )}
+                    {!isUploadingCover && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewImage(null);
+                          setFormData((prev) => ({
+                            ...prev,
+                            cover_image_url: "",
+                          }));
+                        }}
+                        className="absolute top-2 right-2 bg-white/80 p-1 rounded-full hover:bg-white text-red-500 shadow-sm"
+                      >
+                        <IconX className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                ) : isUploadingCover ? (
+                  <div className="py-8">
+                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <IconLoader className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                    <p className="text-sm text-primary font-bold">
+                      Đang tải ảnh lên...
+                    </p>
+                    <p className="text-xs text-text-secondary mt-1">
+                      Vui lòng chờ trong giây lát
+                    </p>
                   </div>
                 ) : (
                   <div className="py-8">
@@ -1116,14 +1109,15 @@ export default function CreateTour() {
                   className="absolute inset-0 opacity-0 cursor-pointer"
                   onChange={handleImageChange}
                   accept="image/*"
+                  disabled={isUploadingCover}
                 />
               </div>
             </div>
 
-            {/* Video giới thiệu */}
+            {/* Video giới thiệu tour */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-text-secondary uppercase">
-                Video giới thiệu (YouTube/Vimeo URL)
+                Video giới thiệu tour (YouTube/Vimeo URL)
               </label>
               <input
                 type="url"
@@ -1138,7 +1132,29 @@ export default function CreateTour() {
                 className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none transition-all"
               />
               <p className="text-xs text-text-secondary">
-                Dán link video YouTube hoặc Vimeo để giới thiệu tour
+                Video này hiển thị ở đầu trang chi tiết tour
+              </p>
+            </div>
+
+            {/* Video giới thiệu hướng dẫn viên */}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-text-secondary uppercase">
+                Video giới thiệu hướng dẫn viên (YouTube/Vimeo URL)
+              </label>
+              <input
+                type="url"
+                placeholder="https://www.youtube.com/watch?v=... hoặc https://vimeo.com/..."
+                value={formData.guide_video_url}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    guide_video_url: e.target.value,
+                  }))
+                }
+                className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none transition-all"
+              />
+              <p className="text-xs text-text-secondary">
+                Video giới thiệu về bạn (HDV), hiển thị bên cạnh phần tiện ích
               </p>
             </div>
 
@@ -1368,6 +1384,100 @@ export default function CreateTour() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* Tiện ích */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-text-secondary uppercase flex items-center gap-1.5">
+                  🎁 Tiện ích tour
+                </label>
+                <button
+                  type="button"
+                  onClick={() => addListItem(setAmenities)}
+                  className="text-xs text-primary font-medium hover:underline"
+                >
+                  + Thêm
+                </button>
+              </div>
+              <p className="text-xs text-text-secondary">
+                Các tiện ích đi kèm: Wi-Fi, nước uống, bảo hiểm, hướng dẫn viên...
+              </p>
+              <div className="space-y-2">
+                {amenities.map((item) => (
+                  <div key={item.id} className="flex items-center gap-2">
+                    <IconCheck className="w-4 h-4 text-primary shrink-0" />
+                    <input
+                      type="text"
+                      value={item.text}
+                      onChange={(e) =>
+                        updateListItem(setAmenities, item.id, e.target.value)
+                      }
+                      placeholder="VD: Hướng dẫn viên chuyên nghiệp"
+                      className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none"
+                    />
+                    {amenities.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          removeListItem(setAmenities, amenities, item.id)
+                        }
+                        className="p-1 text-text-secondary hover:text-red-500"
+                      >
+                        <IconX className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quy tắc tour */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-text-secondary uppercase flex items-center gap-1.5">
+                  📋 Quy tắc tour
+                </label>
+                <button
+                  type="button"
+                  onClick={() => addListItem(setRules)}
+                  className="text-xs text-primary font-medium hover:underline"
+                >
+                  + Thêm
+                </button>
+              </div>
+              <p className="text-xs text-text-secondary">
+                Các quy tắc khách cần tuân thủ khi tham gia tour
+              </p>
+              <div className="space-y-2">
+                {rules.map((item, idx) => (
+                  <div key={item.id} className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={item.text}
+                      onChange={(e) =>
+                        updateListItem(setRules, item.id, e.target.value)
+                      }
+                      placeholder="VD: Đến điểm tập trung đúng giờ"
+                      className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none"
+                    />
+                    {rules.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          removeListItem(setRules, rules, item.id)
+                        }
+                        className="p-1 text-text-secondary hover:text-red-500"
+                      >
+                        <IconX className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 

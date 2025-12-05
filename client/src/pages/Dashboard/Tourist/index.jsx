@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useMyBookings } from "../../../features/booking/hooks";
+import { formatPrice } from "../../../lib/formatters";
 import Spinner from "../../../components/Loaders/Spinner";
 import {
   IconClock,
@@ -8,10 +9,13 @@ import {
   IconCalendar,
   IconCheck,
 } from "../../../icons/IconBox";
-import IconArrowRight from "../../../icons/IconArrowRight";
 import { IconUser } from "../../../icons/IconUser";
 import TicketModal from "../../../components/Modals/TicketModal";
-import { IconTicket } from "../../../icons/IconCommon";
+import {
+  IconTicket,
+  IconArrowRight,
+  IconUsersGroup,
+} from "../../../icons/IconCommon";
 
 // Helper to map API status to display status
 const mapBookingStatus = (booking) => {
@@ -141,7 +145,7 @@ export default function TouristDashboard() {
         id: b._id,
         name: b.tour_id?.name || "Chuyến tham quan",
         date: new Date(b.start_date).toLocaleDateString("vi-VN"),
-        price: `${(b.total_price || 0).toLocaleString()}đ`,
+        price: formatPrice(b.total_price),
         status: b.displayStatus,
       })),
     };
@@ -232,20 +236,8 @@ export default function TouristDashboard() {
                         <span>HDV: {upcomingTrip.guide}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-text-secondary">
-                        {/* Guest Icon inline */}
-                        <svg
-                          className="w-4 h-4 text-primary"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                          ></path>
-                        </svg>
+                        {/* Guest Icon */}
+                        <IconUsersGroup className="w-4 h-4 text-primary" />
                         <span>{upcomingTrip.guests} Khách</span>
                       </div>
                     </div>

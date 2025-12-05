@@ -172,12 +172,12 @@ export default function AdminModels3D() {
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      toast.error("Lỗi", "Vui lòng nhập tên mô hình.");
+      toast.error("Thiếu thông tin", "Vui lòng nhập tên mô hình.");
       return;
     }
 
     if (!editingModel && !selectedFile) {
-      toast.error("Lỗi", "Vui lòng chọn file mô hình 3D.");
+      toast.error("Thiếu thông tin", "Vui lòng chọn file mô hình 3D.");
       return;
     }
 
@@ -202,7 +202,7 @@ export default function AdminModels3D() {
       closeModal();
       refetch();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể lưu mô hình 3D.");
+      toast.error("Lỗi lưu mô hình", err.message || "Không thể lưu mô hình 3D.");
     }
   };
 
@@ -219,7 +219,7 @@ export default function AdminModels3D() {
       setDeleteConfirm(null);
       refetch();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể xóa mô hình 3D.");
+      toast.error("Lỗi xóa mô hình", err.message || "Không thể xóa mô hình 3D.");
     }
   };
 
@@ -389,7 +389,7 @@ export default function AdminModels3D() {
 
       {/* UPLOAD/EDIT MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm transition-opacity">
+        <div className="fixed inset-0 z-100 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm transition-opacity">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-6 animate-scale-up relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={closeModal}
@@ -640,7 +640,7 @@ export default function AdminModels3D() {
 
       {/* VIEWER MODAL */}
       {viewingModel && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="relative w-full max-w-5xl aspect-video bg-black rounded-3xl overflow-hidden border border-white/20 flex flex-col shadow-2xl">
             <div className="absolute top-4 right-4 z-50">
               <button
@@ -651,7 +651,7 @@ export default function AdminModels3D() {
               </button>
             </div>
 
-            <div className="flex-1 flex items-center justify-center relative group bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gray-800 via-black to-black">
+            <div className="flex-1 flex items-center justify-center relative group bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-gray-800 via-black to-black">
               {viewingModel.file_type === "panorama" ? (
                 <img
                   src={viewingModel.file_url}

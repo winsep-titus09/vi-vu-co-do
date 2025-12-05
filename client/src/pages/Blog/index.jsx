@@ -30,8 +30,7 @@ export default function BlogPage() {
   const topicRef = useRef(null);
 
   // Fetch categories from API
-  const { categories: apiCategories, isLoading: categoriesLoading } =
-    useArticleCategories();
+  const { categories: apiCategories } = useArticleCategories();
 
   // Build categories array with "all" option
   const categories = useMemo(() => {
@@ -262,7 +261,7 @@ export default function BlogPage() {
             {[...galleryImages, ...galleryImages].map((src, idx) => (
               <div
                 key={idx}
-                className="relative w-64 h-80 rounded-2xl overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
+                className="relative w-64 h-80 rounded-2xl overflow-hidden shrink-0 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
               >
                 <img
                   src={src}
@@ -281,7 +280,7 @@ export default function BlogPage() {
             {[...galleryImages, ...galleryImages].map((src, idx) => (
               <div
                 key={`dup-${idx}`}
-                className="relative w-64 h-80 rounded-2xl overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
+                className="relative w-64 h-80 rounded-2xl overflow-hidden shrink-0 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
               >
                 <img
                   src={src}

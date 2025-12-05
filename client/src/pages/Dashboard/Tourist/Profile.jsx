@@ -223,8 +223,7 @@ export default function ProfilePage() {
       });
 
       // Success - clear token and redirect to login
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("token");
       localStorage.removeItem("user");
 
       setSuccessMessage(

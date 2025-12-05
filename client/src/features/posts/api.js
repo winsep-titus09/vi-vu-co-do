@@ -22,6 +22,19 @@ export const getArticle = async (id) => {
 };
 
 /**
+ * Fetch related articles (same category or author)
+ * @param {string} id - Current article ID
+ * @param {number} limit - Max number of related articles (default: 4)
+ * @returns {Promise<{ items: Array }>} Related articles
+ */
+export const getRelatedArticles = async (id, limit = 4) => {
+  const data = await apiClient.get(`/articles/${id}/related`, {
+    params: { limit },
+  });
+  return data;
+};
+
+/**
  * Fetch single article by ID for guide (own article, any status)
  * @param {string} id - Article ID
  * @returns {Promise<Object>} Article with populated category
@@ -156,9 +169,71 @@ export const adminUpdateArticle = async (id, articleData) => {
   return data;
 };
 
+// ============================================================================
+// ARTICLE COMMENTS API
+// ============================================================================
+
+/**
+ * Fetch comments for an article (public)
+ * @param {string} articleId - Article ID
+ * @param {Object} params - { page, limit }
+ * @returns {Promise<{ items: Array, page: number, limit: number, total: number }>}
+ */
+export const getArticleComments = async (articleId, params = {}) => {
+  const data = await apiClient.get(`/articles/${articleId}/comments`, { params });
+  return data;
+};
+
+/**
+ * Fetch more replies for a comment
+ * @param {string} articleId - Article ID
+ * @param {string} commentId - Comment ID
+ * @param {Object} params - { page, limit }
+ * @returns {Promise<{ items: Array, page: number, limit: number, total: number }>}
+ */
+export const getCommentReplies = async (articleId, commentId, params = {}) => {
+  const data = await apiClient.get(`/articles/${articleId}/comments/${commentId}/replies`, { params });
+  return data;
+};
+
+/**
+ * Create a comment on an article (authenticated)
+ * @param {string} articleId - Article ID
+ * @param {Object} commentData - { content, parentId? }
+ * @returns {Promise<Object>} Created comment
+ */
+export const createComment = async (articleId, commentData) => {
+  const data = await apiClient.post(`/articles/${articleId}/comments`, commentData);
+  return data;
+};
+
+/**
+ * Update own comment
+ * @param {string} articleId - Article ID
+ * @param {string} commentId - Comment ID
+ * @param {Object} commentData - { content }
+ * @returns {Promise<Object>} Updated comment
+ */
+export const updateComment = async (articleId, commentId, commentData) => {
+  const data = await apiClient.put(`/articles/${articleId}/comments/${commentId}`, commentData);
+  return data;
+};
+
+/**
+ * Delete a comment (own comment or admin)
+ * @param {string} articleId - Article ID
+ * @param {string} commentId - Comment ID
+ * @returns {Promise<Object>} Deletion result
+ */
+export const deleteComment = async (articleId, commentId) => {
+  const data = await apiClient.delete(`/articles/${articleId}/comments/${commentId}`);
+  return data;
+};
+
 const postsApi = {
   listArticles,
   getArticle,
+  getRelatedArticles,
   getMyArticle,
   listArticleCategories,
   getArticleCategoryBySlug,
@@ -173,6 +248,12 @@ const postsApi = {
   adminDeleteArticle,
   adminCreateArticle,
   adminUpdateArticle,
+  // Comments
+  getArticleComments,
+  getCommentReplies,
+  createComment,
+  updateComment,
+  deleteComment,
 };
 
 export default postsApi;

@@ -7,11 +7,13 @@ import {
   IconClock,
   IconStar,
   Icon3D,
+  IconCheck,
 } from "../../icons/IconBox.jsx";
 import IconArrowRight from "../../icons/IconArrowRight.jsx";
 
 /**
  * TourCard - Style: Transparent + Border + Artistic Image
+ * Wrapped with React.memo for performance optimization
  */
 
 // Helper to safely convert values to numbers (handle MongoDB Decimal128)
@@ -20,10 +22,31 @@ const toNumber = (val) => {
   return parseFloat(val) || 0;
 };
 
-export default function TourCard({ tour }) {
+const TourCard = React.memo(function TourCard({ tour }) {
   // Safely convert rating and price
   const rating = toNumber(tour.rating);
   const price = toNumber(tour.price);
+  
+  // Format duration: ưu tiên duration_hours, fallback duration (days)
+  const formatDuration = () => {
+    if (tour.duration_hours && tour.duration_hours > 0) {
+      const hours = tour.duration_hours;
+      if (hours < 1) return `${Math.round(hours * 60)} phút`;
+      if (hours % 1 === 0) return `${hours} giờ`;
+      return `${hours.toFixed(1)} giờ`;
+    }
+    if (tour.duration) {
+      if (typeof tour.duration === "number") {
+        return `${tour.duration} ${tour.duration_unit === "hours" ? "giờ" : "ngày"}`;
+      }
+      return tour.duration;
+    }
+    return "N/A";
+  };
+  
+  // Lấy highlights hoặc fallback về description
+  const highlights = tour.highlights || [];
+  const displayHighlights = highlights.slice(0, 2);
 
   return (
     // 1. WRAPPER:
@@ -37,19 +60,20 @@ export default function TourCard({ tour }) {
       {/* 2. ẢNH TOUR: Style nghệ thuật (Phiên bản đầu tiên) */}
       <div className="relative p-3 mb-2">
         {/* Viền brush giả lập (Border không đều, xoay nhẹ) */}
-        <div className="absolute inset-0 border-2 border-text-primary/10 rounded-[2rem] rotate-1 group-hover:rotate-0 group-hover:border-primary/30 transition-all duration-300"></div>
-        <div className="absolute inset-0 border-2 border-text-primary/5 rounded-[2rem] -rotate-1 group-hover:rotate-0 transition-all duration-300"></div>
+        <div className="absolute inset-0 border-2 border-text-primary/10 rounded-4xl rotate-1 group-hover:rotate-0 group-hover:border-primary/30 transition-all duration-300"></div>
+        <div className="absolute inset-0 border-2 border-text-primary/5 rounded-4xl -rotate-1 group-hover:rotate-0 transition-all duration-300"></div>
 
         {/* Ảnh chính */}
-        <div className="aspect-[4/3] rounded-[1.5rem] overflow-hidden relative z-10">
+        <div className="aspect-4/3 rounded-3xl overflow-hidden relative z-10">
           <img
             src={tour.image}
             alt={tour.title}
+            loading="lazy"
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           />
 
           {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+          <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent"></div>
           {/* === CẬP NHẬT: Badge 3D (Góc trên trái) === */}
           {/* Giả sử data tour có trường 'has3D' hoặc ta mặc định hiện để demo */}
           <div className="absolute top-3 left-3 z-20">
@@ -65,7 +89,7 @@ export default function TourCard({ tour }) {
             </span>
             <span className="inline-flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1 border border-white/10">
               <IconClock className="w-3.5 h-3.5" />
-              {tour.duration}
+              {formatDuration()}
             </span>
           </div>
         </div>
@@ -74,22 +98,42 @@ export default function TourCard({ tour }) {
       {/* 3. NỘI DUNG */}
       <div className="flex-1 flex flex-col space-y-3 px-4 pb-5">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="!text-lg font-heading font-bold text-text-primary leading-tight group-hover:text-primary transition-colors">
+          <h3 className="text-lg! font-heading font-bold text-text-primary leading-tight group-hover:text-primary transition-colors">
             {tour.title}
           </h3>
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-[#BC4C00] bg-[#FEFAE0] rounded-full px-2 py-0.5 border border-[#BC4C00]/10 flex-shrink-0">
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-[#BC4C00] bg-[#FEFAE0] rounded-full px-2 py-0.5 border border-[#BC4C00]/10 shrink-0">
             <IconStar className="w-3 h-3" />
             {rating.toFixed(1)}
           </span>
         </div>
 
-        <p className="text-sm text-text-secondary line-clamp-2 flex-1">
-          {tour.description}
-        </p>
+        {/* Hiển thị highlights nếu có, fallback về description */}
+        {displayHighlights.length > 0 ? (
+          <div className="space-y-1.5 flex-1">
+            {displayHighlights.map((highlight, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-1.5 text-sm text-text-secondary"
+              >
+                <IconCheck className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                <span className="line-clamp-1">{highlight}</span>
+              </div>
+            ))}
+            {highlights.length > 2 && (
+              <span className="text-xs text-primary font-medium">
+                +{highlights.length - 2} điểm nổi bật khác
+              </span>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-text-secondary line-clamp-2 flex-1">
+            {tour.description}
+          </p>
+        )}
 
         <div className="flex items-center justify-between pt-3 border-t border-border-light mt-auto">
           <span className="text-base font-bold text-primary">
-            ${price.toFixed(0)}{" "}
+            {price.toLocaleString("vi-VN")}₫{" "}
             <span className="text-xs font-normal text-text-secondary">
               / người
             </span>
@@ -103,4 +147,6 @@ export default function TourCard({ tour }) {
       </div>
     </Link>
   );
-}
+});
+
+export default TourCard;

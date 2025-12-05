@@ -182,12 +182,15 @@ export async function getGuideTours(req, res) {
           .populate("category_id", "name")
           .populate("guides.guideId", "name avatar_url")
           .populate("locations.locationId", "name slug")
+          .populate("itinerary.locationId", "name")
+          .select("+edit_allowed_until +last_approved_edit_request")
           .sort({ createdAt: -1 })
           .lean(),
         TourRequest.find({ created_by: guideId })
           .populate("categories", "name")
           .populate("guides.guideId", "name avatar_url")
           .populate("locations.locationId", "name slug")
+          .populate("itinerary.locationId", "name")
           .sort({ createdAt: -1 })
           .lean(),
       ]);
@@ -234,6 +237,8 @@ export async function getGuideTours(req, res) {
           .populate("category_id", "name")
           .populate("guides.guideId", "name avatar_url")
           .populate("locations.locationId", "name slug")
+          .populate("itinerary.locationId", "name")
+          .select("+edit_allowed_until +last_approved_edit_request")
           .sort({ createdAt: -1 })
           .skip((pg - 1) * lm)
           .limit(lm)
@@ -256,12 +261,15 @@ export async function getGuideTours(req, res) {
           .populate("category_id", "name")
           .populate("guides.guideId", "name avatar_url")
           .populate("locations.locationId", "name slug")
+          .populate("itinerary.locationId", "name")
+          .select("+edit_allowed_until +last_approved_edit_request")
           .sort({ createdAt: -1 })
           .lean(),
         TourRequest.find({ created_by: guideId, status: "pending" })
           .populate("categories", "name")
           .populate("guides.guideId", "name avatar_url")
           .populate("locations.locationId", "name slug")
+          .populate("itinerary.locationId", "name")
           .sort({ createdAt: -1 })
           .lean(),
       ]);
@@ -292,12 +300,15 @@ export async function getGuideTours(req, res) {
           .populate("category_id", "name")
           .populate("guides.guideId", "name avatar_url")
           .populate("locations.locationId", "name slug")
+          .populate("itinerary.locationId", "name")
+          .select("+edit_allowed_until +last_approved_edit_request")
           .sort({ createdAt: -1 })
           .lean(),
         TourRequest.find({ created_by: guideId, status: "rejected" })
           .populate("categories", "name")
           .populate("guides.guideId", "name avatar_url")
           .populate("locations.locationId", "name slug")
+          .populate("itinerary.locationId", "name")
           .sort({ createdAt: -1 })
           .lean(),
       ]);
@@ -326,6 +337,8 @@ export async function getGuideTours(req, res) {
           .populate("category_id", "name")
           .populate("guides.guideId", "name avatar_url")
           .populate("locations.locationId", "name slug")
+          .populate("itinerary.locationId", "name")
+          .select("+edit_allowed_until +last_approved_edit_request")
           .sort({ createdAt: -1 })
           .skip((pg - 1) * lm)
           .limit(lm)
@@ -365,11 +378,18 @@ export async function getGuideTours(req, res) {
             booking_count: 0,
             total_revenue: 0,
           };
+          
+          // Kiểm tra quyền chỉnh sửa (có edit_allowed_until và còn hiệu lực)
+          const canEdit = item.edit_allowed_until && new Date(item.edit_allowed_until) > new Date();
+          
           return {
             ...item,
             booking_count: stats.booking_count,
             total_revenue: stats.total_revenue,
             average_rating: item.average_rating || 0,
+            // Thông tin quyền chỉnh sửa
+            canEdit: canEdit || item.displayStatus === "pending",
+            edit_allowed_until: item.edit_allowed_until || null,
           };
         }
         return item;
@@ -507,6 +527,66 @@ export async function getGuideWeeklyStats(req, res) {
     });
   } catch (err) {
     console.error("getGuideWeeklyStats error:", err);
+    return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+  }
+}
+
+/**
+ * GET /api/guides/me/tours/:id
+ * Lấy chi tiết tour của guide với thông tin quyền chỉnh sửa
+ */
+export async function getGuideTourDetail(req, res) {
+  try {
+    const guideId = req.user._id;
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "ID không hợp lệ" });
+    }
+
+    // Thử tìm trong TourRequest trước (pending/rejected)
+    const request = await TourRequest.findOne({ _id: id, created_by: guideId })
+      .populate("categories", "name")
+      .populate("guides.guideId", "name avatar_url")
+      .populate("locations.locationId", "name slug")
+      .populate("itinerary.locationId", "name")
+      .lean();
+
+    if (request) {
+      return res.json({
+        ...request,
+        type: "request",
+        canEdit: request.status === "pending", // Chỉ edit được khi đang pending
+        edit_allowed_until: null,
+      });
+    }
+
+    // Tìm trong Tour
+    const tour = await Tour.findOne({ _id: id, "guides.guideId": guideId })
+      .populate("category_id", "name")
+      .populate("guides.guideId", "name avatar_url")
+      .populate("locations.locationId", "name slug")
+      .populate("itinerary.locationId", "name")
+      .select("+edit_allowed_until +last_approved_edit_request")
+      .lean();
+
+    if (!tour) {
+      return res.status(404).json({ message: "Không tìm thấy tour" });
+    }
+
+    // Kiểm tra quyền chỉnh sửa
+    const isPending = tour.approval?.status === "pending";
+    const hasEditPermission = tour.edit_allowed_until && new Date(tour.edit_allowed_until) > new Date();
+    const canEdit = isPending || hasEditPermission;
+
+    return res.json({
+      ...tour,
+      type: "tour",
+      canEdit,
+      edit_allowed_until: tour.edit_allowed_until || null,
+    });
+  } catch (err) {
+    console.error("getGuideTourDetail error:", err);
     return res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
   }
 }

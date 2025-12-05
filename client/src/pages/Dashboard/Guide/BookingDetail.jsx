@@ -20,40 +20,10 @@ import {
   IconShield,
   IconWallet,
   IconInfo,
+  IconLoader,
+  IconShieldCheck,
 } from "../../../icons/IconCommon";
 import { useToast } from "../../../components/Toast/useToast";
-
-// Inline Icons
-const IconLoader = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
-
-const IconShieldCheck = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    <path d="m9 12 2 2 4-4" />
-  </svg>
-);
 
 // Helper Badge
 const getStatusBadge = (status) => {
@@ -66,9 +36,14 @@ const getStatusBadge = (status) => {
       );
     case "confirmed":
       return (
+        <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-bold flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-orange-500"></span> Chờ thanh toán
+        </span>
+      );
+    case "paid":
+      return (
         <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-green-500"></span> Đã chấp
-          nhận
+          <span className="w-2 h-2 rounded-full bg-green-500"></span> Đã thanh toán
         </span>
       );
     case "completed":
@@ -106,7 +81,7 @@ export default function GuideBookingDetail() {
       toast.success("Thành công!", "Đã chấp nhận yêu cầu đặt tour.");
       refetch();
     } catch (error) {
-      toast.error("Lỗi", error.message || "Không thể chấp nhận yêu cầu");
+      toast.error("Lỗi chấp nhận", error.message || "Không thể chấp nhận yêu cầu");
     }
   };
 
@@ -119,7 +94,19 @@ export default function GuideBookingDetail() {
       toast.success("Thành công!", "Đã từ chối yêu cầu đặt tour.");
       navigate("/dashboard/guide/requests");
     } catch (error) {
-      toast.error("Lỗi", error.message || "Không thể từ chối yêu cầu");
+      toast.error("Lỗi từ chối", error.message || "Không thể từ chối yêu cầu");
+    }
+  };
+
+  // Handle complete tour
+  const handleComplete = async () => {
+    if (!window.confirm("Xác nhận tour này đã hoàn thành?")) return;
+    try {
+      await guidesApi.completeBooking(id);
+      toast.success("Thành công!", "Tour đã được đánh dấu hoàn thành.");
+      refetch();
+    } catch (error) {
+      toast.error("Lỗi hoàn thành", error.message || "Không thể đánh dấu hoàn thành tour");
     }
   };
 
@@ -163,25 +150,26 @@ export default function GuideBookingDetail() {
     bookingData.payment_session?.gateway || bookingData.payment_method;
 
   // Map API data to display format
+  const rawStatus = bookingData.status;
+  const guideDecision = bookingData.guide_decision?.status;
+  
+  // Determine display status
+  const getDisplayStatus = () => {
+    if (rawStatus === "completed") return "completed";
+    if (rawStatus === "paid") return "paid"; // Đã thanh toán - có thể hoàn thành
+    if (rawStatus === "awaiting_payment" || guideDecision === "accepted") return "confirmed";
+    if (rawStatus === "waiting_guide") return "pending";
+    if (rawStatus === "rejected" || rawStatus === "canceled" || guideDecision === "rejected") return "cancelled";
+    return "pending";
+  };
+
   const booking = {
     id: bookingData._id,
     created_at: createdAt
       ? new Date(createdAt).toLocaleString("vi-VN")
       : "Không rõ thời gian",
-    status:
-      bookingData.status === "waiting_guide"
-        ? "pending"
-        : bookingData.status === "awaiting_payment" ||
-          bookingData.status === "paid" ||
-          bookingData.guide_decision?.status === "accepted"
-        ? "confirmed"
-        : bookingData.status === "completed"
-        ? "completed"
-        : bookingData.status === "rejected" ||
-          bookingData.status === "canceled" ||
-          bookingData.guide_decision?.status === "rejected"
-        ? "cancelled"
-        : "pending",
+    status: getDisplayStatus(),
+    rawStatus: rawStatus, // Lưu status gốc để kiểm tra
     tour: {
       id: bookingData.tour_id?._id,
       name: bookingData.tour_id?.name || "Tour",
@@ -261,7 +249,7 @@ export default function GuideBookingDetail() {
 
           {/* Quick Actions (Desktop) */}
           {booking.status === "pending" && (
-            <div className="flex gap-3 hidden md:flex">
+            <div className="hidden md:flex gap-3">
               <button
                 onClick={handleReject}
                 className="px-6 py-2.5 rounded-xl border border-red-100 text-red-600 bg-red-50 hover:bg-red-100 font-bold text-sm flex items-center gap-2 transition-colors"
@@ -492,6 +480,36 @@ export default function GuideBookingDetail() {
                 className="flex-1 py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg"
               >
                 Chấp nhận
+              </button>
+            </div>
+          )}
+
+          {/* Action: Hoàn thành tour (khi đã thanh toán) */}
+          {booking.status === "paid" && (
+            <div className="bg-white p-6 rounded-3xl border border-border-light shadow-sm">
+              <h3 className="font-bold text-text-primary mb-4 flex items-center gap-2">
+                <IconCheck className="w-5 h-5 text-primary" /> Thao tác
+              </h3>
+              <p className="text-sm text-text-secondary mb-4">
+                Sau khi tour kết thúc, bạn hãy đánh dấu hoàn thành để nhận thanh toán.
+              </p>
+              <button
+                onClick={handleComplete}
+                className="w-full py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-colors shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
+              >
+                <IconCheck className="w-4 h-4" /> Hoàn thành tour
+              </button>
+            </div>
+          )}
+
+          {/* Mobile Sticky Action Bar for Complete */}
+          {booking.status === "paid" && (
+            <div className="fixed bottom-0 left-0 w-full bg-white border-t border-border-light p-4 z-40 md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.1)] safe-area-pb">
+              <button
+                onClick={handleComplete}
+                className="w-full py-3 rounded-xl bg-green-600 text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2"
+              >
+                <IconCheck className="w-4 h-4" /> Hoàn thành tour
               </button>
             </div>
           )}

@@ -1,7 +1,6 @@
 // src/features/guides/hooks.js
 import { useState, useEffect } from "react";
 import guidesApi from "./api";
-import apiClient from "../../lib/api-client";
 
 /**
  * Hook to fetch featured guides
@@ -135,6 +134,7 @@ export const useGuideTours = (guideId, options = {}) => {
     };
 
     fetchTours();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guideId, JSON.stringify(options)]);
 
   return { tours, isLoading, error };
@@ -225,6 +225,7 @@ export const useGuideReviews = (guideId, options = {}) => {
     };
 
     fetchReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guideId, JSON.stringify(options)]);
 
   return { reviews, stats, isLoading, error };
@@ -302,6 +303,7 @@ export function useGuideBookings(params = {}) {
 
   useEffect(() => {
     fetchBookings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(params)]);
 
   return { bookings, groups, total, isLoading, error, refetch: fetchBookings };
@@ -455,7 +457,8 @@ export function useBookingById(bookingId) {
       setIsLoading(true);
       setError(null);
       const response = await guidesApi.getBookingById(bookingId);
-      setBooking(response);
+      // Server trả về { booking: doc }, cần extract booking object
+      setBooking(response?.booking || response);
     } catch (err) {
       console.error("Fetch booking error:", err);
       setError(err.message || "Không thể tải thông tin booking");
@@ -468,6 +471,7 @@ export function useBookingById(bookingId) {
     if (bookingId) {
       fetchBooking();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId]);
 
   return { booking, isLoading, error, refetch: fetchBooking };
@@ -505,6 +509,7 @@ export function useMyTours(params = {}) {
 
   useEffect(() => {
     fetchTours();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(params)]);
 
   return { tours, total, isLoading, error, refetch: fetchTours };
@@ -570,6 +575,7 @@ export function useLocations(params = {}) {
     };
 
     fetchLocations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(params)]);
 
   return { locations, isLoading, error };
@@ -626,7 +632,8 @@ export function useCreateTourRequest() {
 }
 
 /**
- * Hook to get a single tour or tour request by ID
+ * Hook to get a single tour or tour request by ID (for guide dashboard)
+ * Uses /guides/me/tours/:id endpoint which includes edit permission info
  */
 export function useTourDetail(id) {
   const [tour, setTour] = useState(null);
@@ -638,17 +645,9 @@ export function useTourDetail(id) {
     try {
       setIsLoading(true);
       setError(null);
-      // Try to get from tour-requests first (for pending/rejected)
-      try {
-        const response = await guidesApi.getTourRequest(id);
-        setTour({ ...response, type: "request" });
-        return;
-      } catch {
-        // If not found in tour-requests, try regular tours API
-      }
-      // Fallback to regular tour
-      const response = await apiClient.get(`/tours/${id}`);
-      setTour({ ...response, type: "tour" });
+      // Use guide's tour detail API which includes canEdit and edit_allowed_until
+      const response = await guidesApi.getMyTourDetail(id);
+      setTour(response);
     } catch (err) {
       console.error("Fetch tour detail error:", err);
       setError(err.message || "Không thể tải thông tin tour");
@@ -659,6 +658,7 @@ export function useTourDetail(id) {
 
   useEffect(() => {
     fetchTour();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   return { tour, isLoading, error, refetch: fetchTour };
@@ -740,6 +740,7 @@ export function useGuideCalendar(year, month) {
 
   useEffect(() => {
     fetchCalendar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month]);
 
   return { calendarData, tours, isLoading, error, refetch: fetchCalendar };
@@ -811,6 +812,7 @@ export function useMyGuideReviews(params = {}) {
 
   useEffect(() => {
     fetchReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, rating]);
 
   return { data, isLoading, error, refetch: fetchReviews };
@@ -962,4 +964,64 @@ export function useApplyToBeGuide() {
   };
 
   return { apply, isSubmitting, error };
+}
+
+// ========== PAYOUT HOOKS (for guides) ==========
+
+/**
+ * Hook to get my payout requests history
+ */
+export function useMyPayoutRequests(params = {}) {
+  const [payouts, setPayouts] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchPayouts = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await guidesApi.getMyPayoutRequests(params);
+      setPayouts(response?.items || response?.payouts || []);
+      setTotal(response?.total || 0);
+    } catch (err) {
+      console.error("Fetch payout requests error:", err);
+      setError(err.message || "Không thể tải lịch sử rút tiền");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPayouts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(params)]);
+
+  return { payouts, total, isLoading, error, refetch: fetchPayouts };
+}
+
+/**
+ * Hook to create payout request
+ */
+export function useCreatePayoutRequest() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const createPayoutRequest = async (amount) => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      const response = await guidesApi.createPayoutRequest(amount);
+      return { success: true, data: response };
+    } catch (err) {
+      console.error("Create payout request error:", err);
+      const message = err.message || "Không thể tạo yêu cầu rút tiền";
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return { createPayoutRequest, isSubmitting, error };
 }

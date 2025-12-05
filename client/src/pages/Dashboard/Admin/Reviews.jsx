@@ -112,7 +112,7 @@ export default function AdminReviews() {
       toast.success("Thành công", "Đã ẩn đánh giá.");
       refetch();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể ẩn đánh giá.");
+      toast.error("Lỗi ẩn đánh giá", err.message || "Không thể ẩn đánh giá.");
     }
   };
 
@@ -122,7 +122,7 @@ export default function AdminReviews() {
       toast.success("Thành công", "Đã duyệt đánh giá.");
       refetch();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể duyệt đánh giá.");
+      toast.error("Lỗi duyệt đánh giá", err.message || "Không thể duyệt đánh giá.");
     }
   };
 
@@ -138,7 +138,7 @@ export default function AdminReviews() {
       setDeleteConfirm(null);
       refetch();
     } catch (err) {
-      toast.error("Lỗi", err.message || "Không thể xóa đánh giá.");
+      toast.error("Lỗi xóa đánh giá", err.message || "Không thể xóa đánh giá.");
     }
   };
 

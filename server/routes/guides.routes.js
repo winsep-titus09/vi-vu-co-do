@@ -21,6 +21,7 @@ import {
   guideDashboard,
   getGuideMonthlyEarnings,
   getGuideTours,
+  getGuideTourDetail,
   deleteGuideTour,
   getGuideWeeklyStats,
 } from "../controllers/guides.dashboard.controller.js";
@@ -96,6 +97,7 @@ router.get(
 );
 router.get("/me/weekly-stats", auth, authorize("guide"), getGuideWeeklyStats);
 router.get("/me/tours", auth, authorize("guide"), getGuideTours);
+router.get("/me/tours/:id", auth, authorize("guide"), getGuideTourDetail);
 router.delete("/me/tours/:id", auth, authorize("guide"), deleteGuideTour);
 
 // Guide reviews management

@@ -88,15 +88,18 @@ const TourSchema = new mongoose.Schema(
     ],
     guide_id: { type: mongoose.Types.ObjectId, ref: "User" },
     cover_image_url: String,
-    video_url: String, // Video giới thiệu tour (YouTube/Vimeo/direct URL)
+    video_url: String, // Video giới thiệu tour (YouTube/Vimeo/direct URL) - hiển thị ở đầu trang
+    guide_video_url: String, // Video giới thiệu hướng dẫn viên (hiển thị ở mục tiện ích)
     gallery: [{ type: String }],
 
     // Thông tin bổ sung cho tour
     highlights: [{ type: String }], // Điểm nổi bật
     includes: [{ type: String }], // Bao gồm
     excludes: [{ type: String }], // Không bao gồm
+    amenities: [{ type: String }], // Tiện ích (Wi-Fi, nước uống, bảo hiểm...)
+    rules: [{ type: String }], // Quy tắc tour
 
-    itinerary: [{ day: Number, title: String, details: String }],
+    itinerary: [ItineraryItemSchema],
     category_id: {
       type: mongoose.Types.ObjectId,
       ref: "TourCategory",
@@ -139,6 +142,11 @@ const TourSchema = new mongoose.Schema(
     closed_weekdays: [{ type: Number, min: 0, max: 6, default: [] }],
     blackout_dates: [{ type: Date, default: [] }],
     per_date_capacity: { type: Number, default: null },
+
+    // Cho phép HDV chỉnh sửa tour trong thời gian giới hạn (sau khi admin duyệt yêu cầu edit)
+    edit_allowed_until: { type: Date, default: null },
+    // Lưu ID của TourEditRequest đã được duyệt (để tracking)
+    last_approved_edit_request: { type: mongoose.Types.ObjectId, ref: "TourEditRequest", default: null },
   },
   { timestamps: true, collection: "tours" }
 );

@@ -1,6 +1,32 @@
 // client/src/features/booking/hooks.js
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { bookingsApi } from "./api";
+
+// ============================================================================
+// HOOK: useCreateBooking - Create a new booking
+// ============================================================================
+
+export function useCreateBooking() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const createBooking = useCallback(async (data) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await bookingsApi.createBooking(data);
+      return { success: true, data: response };
+    } catch (err) {
+      const message = err.message || "Không thể tạo đặt chỗ";
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { createBooking, isLoading, error };
+}
 
 // ============================================================================
 // HOOK: useMyBookings - Get user's bookings

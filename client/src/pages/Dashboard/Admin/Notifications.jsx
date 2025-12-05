@@ -123,7 +123,7 @@ export default function AdminNotifications() {
       refetchStats();
       refetchHistory();
     } else {
-      toast.error("Lỗi", "Không thể gửi thông báo. Vui lòng thử lại.");
+      toast.error("Lỗi gửi thông báo", "Không thể gửi thông báo. Vui lòng thử lại.");
     }
   };
 

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { bookingsApi } from "../../features/booking/api";
+import { useToast } from "../../components/Toast/useToast";
 import IconArrowRight from "../../icons/IconArrowRight";
 import IconChevronLeft from "../../icons/IconChevronLeft";
+import { IconLoader } from "../../icons/IconCommon";
 
 // Helper to get user from localStorage
 const getStoredUser = () => {
@@ -16,7 +19,9 @@ const getStoredUser = () => {
 export default function BookingStepReview() {
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
   const [user] = useState(getStoredUser);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Lấy dữ liệu từ state (được gửi từ trang trước)
   const bookingData = location.state;
@@ -56,18 +61,18 @@ export default function BookingStepReview() {
   return (
     <div className="min-h-screen bg-bg-main py-8 md:py-12">
       <div className="container-main max-w-4xl">
-        {/* Stepper: Step 1 active */}
+        {/* Stepper: Đặt tour → Chờ HDV → Thanh toán → Hoàn tất */}
         <div className="flex justify-center mb-8 md:mb-12">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {/* Step 1: Active */}
             <div className="flex items-center gap-2 text-primary">
               <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
                 1
               </div>
-              <span className="text-sm font-bold">Thông tin</span>
+              <span className="text-sm font-bold">Xác nhận đặt</span>
             </div>
 
-            <div className="w-8 h-[1px] bg-gray-300"></div>
+            <div className="w-6 h-px bg-gray-300"></div>
 
             {/* Step 2: Inactive */}
             <div className="flex items-center gap-2 text-text-secondary opacity-60">
@@ -75,16 +80,28 @@ export default function BookingStepReview() {
                 2
               </div>
               <span className="text-sm font-bold hidden md:block">
-                Thanh toán
+                Chờ HDV duyệt
               </span>
             </div>
 
-            <div className="w-8 h-[1px] bg-gray-300"></div>
+            <div className="w-6 h-px bg-gray-300"></div>
 
             {/* Step 3: Inactive */}
             <div className="flex items-center gap-2 text-text-secondary opacity-60">
               <div className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-bold">
                 3
+              </div>
+              <span className="text-sm font-bold hidden md:block">
+                Thanh toán
+              </span>
+            </div>
+
+            <div className="w-6 h-px bg-gray-300"></div>
+
+            {/* Step 4: Inactive */}
+            <div className="flex items-center gap-2 text-text-secondary opacity-60">
+              <div className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-bold">
+                4
               </div>
               <span className="text-sm font-bold hidden md:block">
                 Hoàn tất
@@ -236,43 +253,135 @@ export default function BookingStepReview() {
               {/* Price display */}
               <div
                 className="text-2xl md:text-3xl font-heading font-bold text-primary mb-6 whitespace-nowrap overflow-hidden text-ellipsis"
-                title={`${bookingData.totalPrice?.toLocaleString()}đ`}
+                title={`${(bookingData.totalPrice || 0).toLocaleString("vi-VN")}đ`}
               >
-                {bookingData.totalPrice?.toLocaleString()}đ
+                {(bookingData.totalPrice || 0).toLocaleString("vi-VN")}đ
               </div>
 
               <button
-                onClick={() => {
+                onClick={async () => {
                   // Validate required fields
                   if (!contactInfo.full_name.trim()) {
-                    alert("Vui lòng nhập họ tên");
+                    toast.warning("Thiếu thông tin", "Vui lòng nhập họ tên");
                     return;
                   }
                   if (!contactInfo.phone.trim()) {
-                    alert("Vui lòng nhập số điện thoại");
+                    toast.warning("Thiếu thông tin", "Vui lòng nhập số điện thoại");
                     return;
                   }
                   if (!contactInfo.email.trim()) {
-                    alert("Vui lòng nhập email");
+                    toast.warning("Thiếu thông tin", "Vui lòng nhập email");
                     return;
                   }
-                  navigate("/booking/payment", {
-                    state: {
-                      ...bookingData,
+
+                  setIsSubmitting(true);
+
+                  try {
+                    // Tạo booking với status waiting_guide
+                    const bookingPayload = {
+                      tour_id: bookingData.tourId,
+                      start_date: bookingData.date,
+                      adults: bookingData.guests.adults,
+                      children: bookingData.guests.children,
+                      guide_id: bookingData.selectedGuideId || undefined,
                       contact: {
-                        ...contactInfo,
-                        note: note.trim(),
+                        full_name: contactInfo.full_name,
+                        email: contactInfo.email,
+                        phone: contactInfo.phone,
+                        note: note.trim() || "",
                       },
-                    },
-                  });
+                    };
+
+                    const response = await bookingsApi.createBooking(bookingPayload);
+                    const booking = response.booking || response;
+
+                    // Thông báo thành công
+                    toast.success(
+                      "Gửi yêu cầu thành công!",
+                      "Yêu cầu đặt tour đã được gửi đến hướng dẫn viên. Bạn sẽ nhận được thông báo khi HDV xác nhận để tiến hành thanh toán."
+                    );
+
+                    // Redirect về trang "Chuyến đi của tôi"
+                    navigate("/dashboard/tourist/history", {
+                      state: {
+                        newBookingId: booking._id,
+                        message: "Yêu cầu đặt tour đã được gửi. Vui lòng chờ HDV xác nhận.",
+                      },
+                    });
+                  } catch (error) {
+                    console.error("Create booking error:", error);
+                    
+                    // Xử lý lỗi chi tiết từ backend
+                    const errorData = error.response?.data;
+                    const errorCode = errorData?.code;
+                    const errorMessage = errorData?.message || error.message;
+                    
+                    // Hiển thị thông báo theo loại lỗi
+                    switch (errorCode) {
+                      case "INSUFFICIENT_SLOTS": {
+                        const meta = errorData?.meta || {};
+                        toast.error(
+                          "Hết chỗ",
+                          `Tour ngày này chỉ còn ${meta.remaining || 0} chỗ trống, không đủ cho ${meta.requested || "số người"} bạn yêu cầu. Vui lòng chọn ngày khác hoặc giảm số lượng khách.`
+                        );
+                        break;
+                      }
+                      case "GUIDE_MARKED_BUSY":
+                        toast.warning(
+                          "HDV không khả dụng",
+                          errorMessage || "Hướng dẫn viên đã bận vào ngày này. Vui lòng chọn ngày khác."
+                        );
+                        break;
+                      case "GUIDE_HAS_BOOKING":
+                        toast.warning(
+                          "HDV đã có lịch",
+                          errorMessage || "Hướng dẫn viên đã có booking khác vào thời gian này."
+                        );
+                        break;
+                      case "ALL_GUIDES_BUSY":
+                        toast.error(
+                          "Không có HDV",
+                          "Tất cả hướng dẫn viên đều bận vào ngày này. Vui lòng chọn ngày khác."
+                        );
+                        break;
+                      case "BLACKOUT_DATE":
+                        toast.error(
+                          "Ngày không khả dụng",
+                          "Tour không hoạt động vào ngày này. Vui lòng chọn ngày khác."
+                        );
+                        break;
+                      case "CLOSED_WEEKDAY":
+                        toast.error(
+                          "Ngày nghỉ",
+                          errorMessage || "Tour không hoạt động vào ngày này trong tuần."
+                        );
+                        break;
+                      default:
+                        toast.error(
+                          "Đặt tour thất bại",
+                          errorMessage || "Có lỗi xảy ra, vui lòng thử lại!"
+                        );
+                    }
+                  } finally {
+                    setIsSubmitting(false);
+                  }
                 }}
-                className="w-full py-4 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-95"
+                disabled={isSubmitting}
+                className="w-full py-4 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Tiến hành Thanh toán <IconArrowRight className="w-5 h-5" />
+                {isSubmitting ? (
+                  <>
+                    <IconLoader className="w-5 h-5 animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    Xác nhận đặt tour <IconArrowRight className="w-5 h-5" />
+                  </>
+                )}
               </button>
               <p className="text-xs text-text-secondary text-center mt-4">
-                Bằng việc tiếp tục, bạn đồng ý với điều khoản sử dụng của Vi Vu
-                Cố Đô.
+                Sau khi HDV xác nhận, bạn sẽ được thông báo để tiến hành thanh toán.
               </p>
             </div>
           </div>

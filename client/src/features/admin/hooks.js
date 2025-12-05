@@ -401,11 +401,11 @@ export function useDeleteTour() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const deleteTour = useCallback(async (id) => {
+  const deleteTour = useCallback(async (id, reason) => {
     try {
       setIsLoading(true);
       setError(null);
-      const result = await adminApi.deleteTour(id);
+      const result = await adminApi.deleteTour(id, reason);
       return result;
     } catch (err) {
       setError(getErrorMessage(err));
@@ -416,6 +416,27 @@ export function useDeleteTour() {
   }, []);
 
   return { deleteTour, isLoading, error };
+}
+
+export function useToggleFeatured() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const toggle = useCallback(async (id) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const result = await adminApi.toggleFeatured(id);
+      return result;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { toggle, isLoading, error };
 }
 
 // ============================================================================
@@ -864,4 +885,66 @@ export function useUpdatePaymentSetting() {
   }, []);
 
   return { update, isLoading, error };
+}
+
+// ============================================================================
+// ADMIN GUIDES HOOKS (for tour assignment)
+// ============================================================================
+
+export function useApprovedGuides() {
+  const [guides, setGuides] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadToken, refetch] = useReloadTrigger();
+
+  useEffect(() => {
+    let ignore = false;
+    async function fetchData() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await adminApi.getApprovedGuides();
+        if (!ignore) setGuides(data.items || []);
+      } catch (err) {
+        if (!ignore) {
+          setError(getErrorMessage(err));
+          setGuides([]);
+        }
+      } finally {
+        if (!ignore) setIsLoading(false);
+      }
+    }
+
+    fetchData();
+    return () => {
+      ignore = true;
+    };
+  }, [reloadToken]);
+
+  return { guides, isLoading, error, refetch };
+}
+
+// ============================================================================
+// ADMIN CREATE TOUR HOOK
+// ============================================================================
+
+export function useAdminCreateTour() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const createTour = useCallback(async (data) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const result = await adminApi.createTour(data);
+      return result;
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { createTour, isLoading, error };
 }

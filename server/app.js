@@ -23,6 +23,7 @@ import payoutsRoutes from "./routes/payouts.routes.js";
 // Blog public
 import articleRoutes from "./routes/articles.routes.js";
 import articleCategoryPublicRoutes from "./routes/articleCategories.routes.js";
+import articleCommentsRoutes from "./routes/articleComments.routes.js";
 
 // admin
 import adminGuideAppRoutes from "./routes/admin/guideApplications.routes.js";
@@ -99,6 +100,7 @@ app.use("/api/payouts", payoutsRoutes);
 
 // blog public
 app.use("/api/articles", articleRoutes);
+app.use("/api/articles/:articleId/comments", articleCommentsRoutes);
 app.use("/api/article-categories", articleCategoryPublicRoutes);
 
 // admin api

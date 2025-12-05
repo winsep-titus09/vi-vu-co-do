@@ -123,7 +123,7 @@ function SearchModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100]">
+    <div className="fixed inset-0 z-100">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -301,7 +301,7 @@ function UserDropdown({ user, onLogout }) {
     <div className="relative group z-50">
       {/* Trigger Button */}
       <button className="flex items-center gap-1.5 p-1 rounded-full border border-transparent hover:bg-gray-100 transition-all group-hover:border-border-light">
-        <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-primary/20 bg-primary-light flex-shrink-0">
+        <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-primary/20 bg-primary-light shrink-0">
           {user.avatar ? (
             <img
               src={user.avatar}
@@ -320,7 +320,7 @@ function UserDropdown({ user, onLogout }) {
       <div className="absolute top-full right-0 w-60 pt-3 opacity-0 pointer-events-none scale-95 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:scale-100 transition-all duration-200 ease-out">
         <div className="bg-white rounded-2xl shadow-xl border border-border-light overflow-hidden">
           {/* User Info Header */}
-          <div className="px-4 py-3 bg-gradient-to-r from-primary/5 to-primary/10 border-b border-border-light">
+          <div className="px-4 py-3 bg-linear-to-r from-primary/5 to-primary/10 border-b border-border-light">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm bg-primary-light">
                 {user.avatar ? (
@@ -471,7 +471,7 @@ export default function Navbar() {
           {/* 1. Logo */}
           <NavLink
             to="/"
-            className="inline-flex items-center gap-3 group flex-shrink-0"
+            className="inline-flex items-center gap-3 group shrink-0"
           >
             <img
               src="/images/uploads/logo-hue.png"

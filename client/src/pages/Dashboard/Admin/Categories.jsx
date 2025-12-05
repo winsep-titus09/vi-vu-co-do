@@ -65,7 +65,7 @@ export default function AdminCategories() {
       setNewCat("");
       refetch();
     } else {
-      toast.error("Lỗi", result.error);
+      toast.error("Lỗi thêm danh mục", result.error);
     }
   };
 
@@ -90,11 +90,11 @@ export default function AdminCategories() {
             toast.success("Thành công!", "Đã xóa danh mục và gỡ liên kết.");
             refetch();
           } else {
-            toast.error("Lỗi", forceResult.error);
+            toast.error("Lỗi xóa danh mục", forceResult.error);
           }
         }
       } else {
-        toast.error("Lỗi", result.error);
+        toast.error("Lỗi xóa danh mục", result.error);
       }
     }
   };
@@ -124,7 +124,7 @@ export default function AdminCategories() {
       setEditValue("");
       refetch();
     } else {
-      toast.error("Lỗi", result.error);
+      toast.error("Lỗi cập nhật danh mục", result.error);
     }
   };
 

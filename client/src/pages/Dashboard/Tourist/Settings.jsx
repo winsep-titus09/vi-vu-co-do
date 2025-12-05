@@ -6,6 +6,7 @@ import {
   IconDisplay,
   IconTrash,
   IconLoader,
+  IconBriefcase,
 } from "../../../icons/IconCommon";
 import { IconCheck } from "../../../icons/IconBox";
 import {
@@ -18,23 +19,6 @@ import {
 } from "../../../features/users/hooks";
 import { useToast } from "../../../components/Toast/useToast";
 import ConfirmModal from "../../../components/Modals/ConfirmModal";
-
-// Icon for guide
-const IconBriefcase = ({ className }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-    />
-  </svg>
-);
 
 // Options cho 3D Quality
 const QUALITY_OPTIONS = [
@@ -172,7 +156,7 @@ export default function SettingsPage() {
     } else {
       // Revert on error
       setNotifications((prev) => ({ ...prev, [key]: !newValue }));
-      toast.error("Lỗi", result.error || "Không thể lưu cài đặt");
+      toast.error("Lỗi lưu cài đặt", result.error || "Không thể lưu cài đặt thông báo");
     }
   };
 
@@ -191,7 +175,7 @@ export default function SettingsPage() {
     } else {
       // Revert on error
       setQuality3D(oldValue);
-      toast.error("Lỗi", result.error || "Không thể lưu cài đặt");
+      toast.error("Lỗi lưu cài đặt", result.error || "Không thể lưu chất lượng 3D");
     }
   };
 
@@ -210,7 +194,7 @@ export default function SettingsPage() {
     } else {
       // Revert on error
       setCurrency(oldValue);
-      toast.error("Lỗi", result.error || "Không thể lưu cài đặt");
+      toast.error("Lỗi lưu cài đặt", result.error || "Không thể lưu đơn vị tiền tệ");
     }
   };
 
@@ -224,7 +208,7 @@ export default function SettingsPage() {
         "Admin sẽ xem xét và phản hồi yêu cầu xóa tài khoản của bạn."
       );
     } else {
-      toast.error("Lỗi", result.error || "Không thể gửi yêu cầu xóa tài khoản");
+      toast.error("Lỗi gửi yêu cầu", result.error || "Không thể gửi yêu cầu xóa tài khoản");
     }
   };
 
@@ -234,7 +218,7 @@ export default function SettingsPage() {
     if (result.success) {
       toast.success("Đã hủy", "Yêu cầu xóa tài khoản đã được hủy.");
     } else {
-      toast.error("Lỗi", result.error || "Không thể hủy yêu cầu");
+      toast.error("Lỗi hủy yêu cầu", result.error || "Không thể hủy yêu cầu xóa tài khoản");
     }
   };
 
@@ -258,7 +242,7 @@ export default function SettingsPage() {
       setShowGuideForm(false);
       refetchApplication();
     } else {
-      toast.error("Lỗi", result.error);
+      toast.error("Lỗi đăng ký HDV", result.error);
     }
   };
 
@@ -286,7 +270,7 @@ export default function SettingsPage() {
       </div>
 
       {/* BECOME A GUIDE SECTION */}
-      <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-6 rounded-3xl border border-primary/20">
+      <div className="bg-linear-to-r from-primary/10 to-secondary/10 p-6 rounded-3xl border border-primary/20">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-white rounded-xl shadow-sm">
             <IconBriefcase className="w-6 h-6 text-primary" />

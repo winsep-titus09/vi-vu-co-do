@@ -21,7 +21,8 @@ export async function createMoMoPayment({
     const partnerCode = cfg.partnerCode;
     const accessKey = cfg.accessKey;
     const secretKey = cfg.secretKey;
-    const requestTypeEnv = cfg.requestType || "captureWallet";
+    // Mặc định dùng payWithCC (thanh toán bằng thẻ) thay vì captureWallet (QR)
+    const requestTypeEnv = cfg.requestType || "payWithCC";
     requestType = requestType || requestTypeEnv;
 
     const requestId = `${partnerCode}-${Date.now()}`;

@@ -16,7 +16,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100
 
 const router = express.Router();
 
-// Tạo location: images[], video, model3d (tùy chọn)
+// Tạo location: images[], video, model3d, panorama (tùy chọn)
 router.post(
     "/",
     auth,
@@ -25,11 +25,12 @@ router.post(
         { name: "images", maxCount: 10 },
         { name: "video", maxCount: 1 },
         { name: "model3d", maxCount: 1 },
+        { name: "panorama", maxCount: 1 },
     ]),
     createLocation
 );
 
-// Cập nhật location: có thể thêm ảnh mới, thay video
+// Cập nhật location: có thể thêm ảnh mới, thay video, panorama
 router.patch(
     "/:id",
     auth,
@@ -37,6 +38,7 @@ router.patch(
     upload.fields([
         { name: "images", maxCount: 10 },
         { name: "video", maxCount: 1 },
+        { name: "panorama", maxCount: 1 },
     ]),
     updateLocation
 );

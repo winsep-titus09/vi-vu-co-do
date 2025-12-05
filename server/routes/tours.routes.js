@@ -16,6 +16,7 @@ import {
   listCategories,
   getCategoryBySlug,
 } from "../controllers/categories.controller.js";
+import { checkTourDate } from "../controllers/tourAvailability.controller.js";
 
 const router = express.Router();
 
@@ -29,6 +30,9 @@ router.get("/available-guides", auth, listAvailableGuides);
 
 // Tour calendar (lấy dữ liệu ngày có booking, ngày guide bận)
 router.get("/:tourId/calendar", getTourCalendar);
+
+// Check availability for a specific date
+router.get("/:tourId/availability", checkTourDate);
 
 // Single tour
 router.get("/:token", getTour);

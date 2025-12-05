@@ -69,9 +69,10 @@ export const createLocation = async (req, res) => {
             category_id: data.category_id,
         });
 
-        // Optional: create one 3D panorama together
+        // Optional: create one 3D panorama together (supports both model3d and panorama fields)
         let createdModel = null;
-        if (req.files?.model3d?.[0]) {
+        const panoramaFile = req.files?.model3d?.[0] || req.files?.panorama?.[0];
+        if (panoramaFile) {
             const rawMeta = req.body?.threeD || {};
             const normalizeMeta = {
                 name: Array.isArray(rawMeta.name) ? rawMeta.name[0] : rawMeta.name,
@@ -81,15 +82,14 @@ export const createLocation = async (req, res) => {
             };
             const meta = createThreeDModelSchema.safeParse(normalizeMeta);
 
-            const mfile = req.files.model3d[0];
-            let buf = mfile.buffer;
+            let buf = panoramaFile.buffer;
 
             // ✅ nén nếu >10MB
             if (buf.length > 10 * 1024 * 1024) buf = await compressToUnder(buf);
 
             const up3d = await uploadBufferToCloudinary(
                 buf,
-                "locations/panorama",
+                "models3d/panorama",
                 { allowed_formats: ["jpg", "jpeg", "png"] }
             );
 
@@ -157,6 +157,37 @@ export const updateLocation = async (req, res) => {
             const v = req.files.video[0];
             const upv = await uploadVideoBufferToCloudinary(v.buffer, "locations/videos");
             loc.video_url = upv.secure_url;
+        }
+
+        // upload new panorama (optional)
+        if (req.files?.panorama?.[0]) {
+            const panoramaFile = req.files.panorama[0];
+            let buf = panoramaFile.buffer;
+            if (buf.length > 10 * 1024 * 1024) buf = await compressToUnder(buf);
+
+            const upPano = await uploadBufferToCloudinary(
+                buf,
+                "models3d/panorama",
+                { allowed_formats: ["jpg", "jpeg", "png"] }
+            );
+
+            // Create or update panorama model for this location
+            const existingPanorama = await ThreeDModel.findOne({ 
+                locationId: loc._id, 
+                file_type: "panorama" 
+            });
+
+            if (existingPanorama) {
+                existingPanorama.file_url = upPano.secure_url;
+                await existingPanorama.save();
+            } else {
+                await ThreeDModel.create({
+                    name: `${loc.name} 360°`,
+                    file_url: upPano.secure_url,
+                    file_type: "panorama",
+                    locationId: loc._id,
+                });
+            }
         }
 
         await loc.save();

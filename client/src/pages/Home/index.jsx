@@ -1,13 +1,16 @@
 // src/pages/Home/index.jsx
 
-import React from "react";
-import Hero from "../../components/Hero/Hero"; // <-- 1. Import lại Hero
-import StatsSection from "./StatsSection"; // <-- 2. Import StatsSection
-import FeaturedTours from "./FeaturedTours";
-import CategoriesSection from "./CategoriesSection";
-import FeaturedGuides from "./FeaturedGuides";
-import Heritage3DSection from "./Heritage3DSection";
-import FeaturedPosts from "./FeaturedPosts";
+import React, { lazy, Suspense } from "react";
+import Hero from "../../components/Hero/Hero";
+import StatsSection from "./StatsSection";
+import LazySection from "../../components/Common/LazySection";
+
+// Lazy load các section không cần thiết ngay lập tức
+const FeaturedTours = lazy(() => import("./FeaturedTours"));
+const CategoriesSection = lazy(() => import("./CategoriesSection"));
+const FeaturedGuides = lazy(() => import("./FeaturedGuides"));
+const Heritage3DSection = lazy(() => import("./Heritage3DSection"));
+const FeaturedPosts = lazy(() => import("./FeaturedPosts"));
 
 /**
  * Trang chủ:
@@ -18,23 +21,36 @@ import FeaturedPosts from "./FeaturedPosts";
 export default function HomePage() {
   return (
     <>
-      {/* 1. Render Hero Section */}
+      {/* 1. Render Hero Section - Load ngay (above the fold) */}
       <Hero />
 
-      {/* 2. CẬP NHẬT: Thêm Stats Section (Section bản đồ & số liệu) */}
+      {/* 2. Stats Section - Load ngay (near fold) */}
       <StatsSection />
 
-      {/* 2. Thêm Categories Section (Grid 01-06) */}
-      <CategoriesSection />
+      {/* 3. Categories Section - Lazy load */}
+      <LazySection minHeight="500px">
+        <CategoriesSection />
+      </LazySection>
 
-      {/* 3. Thay thế section placeholder cũ bằng FeaturedTours */}
-      <FeaturedTours />
+      {/* 4. Featured Tours - Lazy load */}
+      <LazySection minHeight="600px">
+        <FeaturedTours />
+      </LazySection>
 
-      <FeaturedGuides />
+      {/* 5. Featured Guides - Lazy load */}
+      <LazySection minHeight="500px">
+        <FeaturedGuides />
+      </LazySection>
 
-      <Heritage3DSection />
+      {/* 6. Heritage 3D Section - Lazy load (heavy component) */}
+      <LazySection minHeight="700px" rootMargin="300px">
+        <Heritage3DSection />
+      </LazySection>
 
-      <FeaturedPosts />
+      {/* 7. Featured Posts - Lazy load */}
+      <LazySection minHeight="500px">
+        <FeaturedPosts />
+      </LazySection>
     </>
   );
 }

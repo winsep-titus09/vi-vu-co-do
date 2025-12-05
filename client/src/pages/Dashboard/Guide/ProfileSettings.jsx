@@ -13,29 +13,13 @@ import {
   IconFileText,
   IconBank,
   IconUpload,
+  IconShieldCheck,
 } from "../../../icons/IconCommon";
 import {
   useMyGuideProfile,
   useUpdateGuideProfile,
 } from "../../../features/guides/hooks";
 import Spinner from "../../../components/Loaders/Spinner";
-
-// IconShieldCheck component
-const IconShieldCheck = ({ className }) => (
-  <svg
-    className={className}
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-    />
-  </svg>
-);
 
 export default function GuideProfileSettings() {
   const [activeTab, setActiveTab] = useState("public"); // public | identity | finance
@@ -543,7 +527,7 @@ export default function GuideProfileSettings() {
       {activeTab === "finance" && (
         <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
           {/* Card Preview Visual */}
-          <div className="bg-gradient-to-br from-[#2C3E50] to-[#4CA1AF] rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="bg-linear-to-br from-[#2C3E50] to-[#4CA1AF] rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
             <div className="relative z-10 flex justify-between items-start">
               <div>
                 <p className="text-white/70 text-xs font-bold uppercase tracking-widest mb-1">
