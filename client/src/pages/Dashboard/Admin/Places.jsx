@@ -41,6 +41,13 @@ export default function AdminPlaces() {
   const { update } = useUpdateLocation();
   const { remove } = useDeleteLocation();
 
+  const normalizeImage = (url) => {
+    if (!url) return "/images/placeholders/place-placeholder.jpg";
+    const lower = url.toString().toLowerCase();
+    if (lower.startsWith("http") || url.startsWith("/")) return url;
+    return "/images/placeholders/place-placeholder.jpg";
+  };
+
   // Filter categories with "Tất cả" option
   const categoryTabs = useMemo(() => {
     const tabs = [{ _id: "", name: "Tất cả" }];
@@ -113,7 +120,7 @@ export default function AdminPlaces() {
 
   // Get image URL
   const getImageUrl = (place) => {
-    if (place.images?.length > 0) return place.images[0];
+    if (place.images?.length > 0) return normalizeImage(place.images[0]);
     return "/images/placeholders/place-placeholder.jpg";
   };
 
@@ -292,7 +299,7 @@ export default function AdminPlaces() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={() => setIsModalOpen(false)}
           ></div>
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl relative z-10 overflow-hidden animate-scale-up flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl relative z-10 overflow-hidden animate-scale-up flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-border-light bg-bg-main/30 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-lg text-text-primary">
                 {editingPlace ? "Chỉnh sửa địa điểm" : "Thêm địa điểm mới"}

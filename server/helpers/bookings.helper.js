@@ -38,8 +38,10 @@ export function normalizeToMidnight(date) {
     if (!date) return null;
     const d = new Date(date);
     if (isNaN(d.getTime())) return null;
-    d.setHours(0, 0, 0, 0);
-    return d;
+
+    // Normalize using UTC components to avoid timezone drift when comparing
+    // busy dates that are stored as UTC midnight (Date.UTC in guideDates.controller).
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
 }
 
 /**

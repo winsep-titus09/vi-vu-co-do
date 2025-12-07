@@ -10,48 +10,49 @@ import {
   createGuideReviewSchema,
 } from "../utils/validator.js";
 
-// Kiểm tra quyền + điều kiện thời gian
+// Ki?m tra quy?n + di?u ki?n th?i gian
 async function ensureCanReview(req, bookingId) {
   if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-    return { status: 400, json: { message: "bookingId không hợp lệ." } };
+    return { status: 400, json: { message: "bookingId kh�ng h?p l?." } };
   }
+
   const booking = await Booking.findById(bookingId).lean();
-  if (!booking)
-    return { status: 404, json: { message: "Không tìm thấy booking." } };
+  if (!booking) {
+    return { status: 404, json: { message: "Kh�ng t�m th?y booking." } };
+  }
 
   if (String(booking.customer_id) !== String(req.user?._id)) {
     return {
       status: 403,
-      json: { message: "Bạn không có quyền đánh giá booking này." },
+      json: { message: "B?n kh�ng c� quy?n d�nh gi� booking n�y." },
     };
   }
 
   if (!booking.end_date) {
-    return { status: 400, json: { message: "Booking chưa có ngày kết thúc." } };
+    return { status: 400, json: { message: "Booking chua c� ng�y k?t th�c." } };
   }
+
   const now = new Date();
   if (now < new Date(booking.end_date)) {
     return {
       status: 400,
-      json: { message: "Chỉ được đánh giá sau khi tour đã kết thúc." },
+      json: { message: "Ch? du?c d�nh gi� sau khi tour d� k?t th�c." },
     };
   }
 
   return { booking };
 }
 
-// B1: Đánh giá Tour
+// B1: ��nh gi� Tour
 export const createTourReview = async (req, res) => {
   try {
     const parsed = createTourReviewSchema.safeParse(req.body || {});
     if (!parsed.success) {
-      const msg = parsed.error?.issues?.[0]?.message || "Dữ liệu không hợp lệ.";
-      return res
-        .status(400)
-        .json({ message: msg, errors: parsed.error.issues });
+      const msg = parsed.error?.issues?.[0]?.message || "D? li?u kh�ng h?p l?.";
+      return res.status(400).json({ message: msg, errors: parsed.error.issues });
     }
-    const { bookingId, tour_rating, tour_comment } = parsed.data;
 
+    const { bookingId, tour_rating, tour_comment } = parsed.data;
     const check = await ensureCanReview(req, bookingId);
     if (check.status) return res.status(check.status).json(check.json);
     const { booking } = check;
@@ -60,7 +61,7 @@ export const createTourReview = async (req, res) => {
     if (existed?.tour_rating) {
       return res
         .status(409)
-        .json({ message: "Bạn đã đánh giá Tour cho booking này rồi." });
+        .json({ message: "B?n d� d�nh gi� Tour cho booking n�y r?i." });
     }
 
     const review = await Review.findOneAndUpdate(
@@ -80,12 +81,12 @@ export const createTourReview = async (req, res) => {
       { new: true, upsert: true }
     );
 
-    // Nhắc bước 2: đánh giá HDV
+    // Nh?c bu?c 2: d�nh gi� HDV
     try {
       await notifyUser({
         userId: booking.customer_id,
         type: "review:prompt:guide",
-        content: "Bạn đã đánh giá tour. Hãy tiếp tục đánh giá hướng dẫn viên.",
+        content: "B?n d� d�nh gi� tour. H�y ti?p t?c d�nh gi� hu?ng d?n vi�n.",
         url: `/booking/${booking._id}/review/guide`,
         meta: {
           bookingId: booking._id,
@@ -99,25 +100,23 @@ export const createTourReview = async (req, res) => {
 
     return res
       .status(201)
-      .json({ message: "Đã ghi nhận đánh giá Tour.", review });
+      .json({ message: "�� ghi nh?n d�nh gi� Tour.", review });
   } catch (err) {
     console.error("createTourReview error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
-// B2: Đánh giá HDV
+// B2: ��nh gi� HDV
 export const createGuideReview = async (req, res) => {
   try {
     const parsed = createGuideReviewSchema.safeParse(req.body || {});
     if (!parsed.success) {
-      const msg = parsed.error?.issues?.[0]?.message || "Dữ liệu không hợp lệ.";
-      return res
-        .status(400)
-        .json({ message: msg, errors: parsed.error.issues });
+      const msg = parsed.error?.issues?.[0]?.message || "D? li?u kh�ng h?p l?.";
+      return res.status(400).json({ message: msg, errors: parsed.error.issues });
     }
-    const { bookingId, guide_rating, guide_comment } = parsed.data;
 
+    const { bookingId, guide_rating, guide_comment } = parsed.data;
     const check = await ensureCanReview(req, bookingId);
     if (check.status) return res.status(check.status).json(check.json);
 
@@ -125,7 +124,7 @@ export const createGuideReview = async (req, res) => {
     if (existed?.guide_rating) {
       return res
         .status(409)
-        .json({ message: "Bạn đã đánh giá HDV cho booking này rồi." });
+        .json({ message: "B?n d� d�nh gi� HDV cho booking n�y r?i." });
     }
 
     const review = await Review.findOneAndUpdate(
@@ -142,49 +141,49 @@ export const createGuideReview = async (req, res) => {
 
     return res
       .status(201)
-      .json({ message: "Đã ghi nhận đánh giá HDV.", review });
+      .json({ message: "�� ghi nh?n d�nh gi� HDV.", review });
   } catch (err) {
     console.error("createGuideReview error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
-// Xem review theo booking (chủ booking)
+// Xem review theo booking (ch? booking)
 export const getReviewForBooking = async (req, res) => {
   try {
     const { bookingId } = req.params;
 
-    // Kiểm tra quyền xem: bắt buộc booking tồn tại và thuộc user
+    // Ki?m tra quy?n xem: b?t bu?c booking t?n t?i v� thu?c user
     if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-      return res.status(400).json({ message: "bookingId không hợp lệ." });
+      return res.status(400).json({ message: "bookingId kh�ng h?p l?." });
     }
     const booking = await Booking.findById(bookingId).lean();
     if (!booking)
-      return res.status(404).json({ message: "Không tìm thấy booking." });
+      return res.status(404).json({ message: "Kh�ng t�m th?y booking." });
     if (String(booking.customer_id) !== String(req.user?._id)) {
       return res
         .status(403)
-        .json({ message: "Bạn không có quyền xem review của booking này." });
+        .json({ message: "B?n kh�ng c� quy?n xem review c?a booking n�y." });
     }
 
     const review = await Review.findOne({ bookingId }).lean();
     if (!review)
       return res
         .status(404)
-        .json({ message: "Chưa có đánh giá cho booking này." });
+        .json({ message: "Chua c� d�nh gi� cho booking n�y." });
     return res.json({ review });
   } catch (err) {
     console.error("getReviewForBooking error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
-// Stats trung bình cho Tour
+// Stats trung b�nh cho Tour
 export const getTourRatingStats = async (req, res) => {
   try {
     const { tourId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(tourId)) {
-      return res.status(400).json({ message: "tourId không hợp lệ." });
+      return res.status(400).json({ message: "tourId kh�ng h?p l?." });
     }
 
     const [stats] = await Booking.aggregate([
@@ -215,16 +214,16 @@ export const getTourRatingStats = async (req, res) => {
     });
   } catch (err) {
     console.error("getTourRatingStats error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
-// Stats trung bình cho HDV
+// Stats trung b�nh cho HDV
 export const getGuideRatingStats = async (req, res) => {
   try {
     const { guideId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(guideId)) {
-      return res.status(400).json({ message: "guideId không hợp lệ." });
+      return res.status(400).json({ message: "guideId kh�ng h?p l?." });
     }
 
     const [stats] = await Booking.aggregate([
@@ -255,16 +254,16 @@ export const getGuideRatingStats = async (req, res) => {
     });
   } catch (err) {
     console.error("getGuideRatingStats error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
-// PUBLIC: Listing reviews theo Tour (phân trang)
+// PUBLIC: Listing reviews theo Tour (ph�n trang)
 export const listTourReviewsPublic = async (req, res) => {
   try {
     const { tourId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(tourId)) {
-      return res.status(400).json({ message: "tourId không hợp lệ." });
+      return res.status(400).json({ message: "tourId kh�ng h?p l?." });
     }
 
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -274,10 +273,8 @@ export const listTourReviewsPublic = async (req, res) => {
     );
     const sort = (req.query.sort || "newest").toString();
 
-    const now = new Date();
     const matchBooking = {
       tour_id: new mongoose.Types.ObjectId(tourId),
-      end_date: { $lte: now },
       status: { $in: ["paid", "completed"] },
     };
 
@@ -285,8 +282,8 @@ export const listTourReviewsPublic = async (req, res) => {
       sort === "highest"
         ? { rating: -1, createdAt: -1 }
         : sort === "lowest"
-        ? { rating: 1, createdAt: -1 }
-        : { createdAt: -1 };
+          ? { rating: 1, createdAt: -1 }
+          : { createdAt: -1 };
 
     const [result] = await Booking.aggregate([
       { $match: matchBooking },
@@ -299,7 +296,7 @@ export const listTourReviewsPublic = async (req, res) => {
         },
       },
       { $unwind: "$rev" },
-      { $match: { "rev.tour_rating": { $type: "number" } } },
+      { $match: { "rev.tour_rating": { $type: "number" } } }, // Ch? l?y review c� tour_rating
       {
         $lookup: {
           from: "users",
@@ -349,16 +346,16 @@ export const listTourReviewsPublic = async (req, res) => {
     });
   } catch (err) {
     console.error("listTourReviewsPublic error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
-// PUBLIC: Listing reviews theo HDV (phân trang)
+// PUBLIC: Listing reviews theo HDV (ph�n trang)
 export const listGuideReviewsPublic = async (req, res) => {
   try {
     const { guideId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(guideId)) {
-      return res.status(400).json({ message: "guideId không hợp lệ." });
+      return res.status(400).json({ message: "guideId kh�ng h?p l?." });
     }
 
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -368,10 +365,8 @@ export const listGuideReviewsPublic = async (req, res) => {
     );
     const sort = (req.query.sort || "newest").toString();
 
-    const now = new Date();
     const matchBooking = {
       intended_guide_id: new mongoose.Types.ObjectId(guideId),
-      end_date: { $lte: now },
       status: { $in: ["paid", "completed"] },
     };
 
@@ -379,8 +374,8 @@ export const listGuideReviewsPublic = async (req, res) => {
       sort === "highest"
         ? { rating: -1, createdAt: -1 }
         : sort === "lowest"
-        ? { rating: 1, createdAt: -1 }
-        : { createdAt: -1 };
+          ? { rating: 1, createdAt: -1 }
+          : { createdAt: -1 };
 
     const [result] = await Booking.aggregate([
       { $match: matchBooking },
@@ -407,8 +402,14 @@ export const listGuideReviewsPublic = async (req, res) => {
         $project: {
           rating: "$rev.guide_rating",
           comment: "$rev.guide_comment",
+          reply: "$rev.guide_reply",
+          replyAt: "$rev.guide_reply_at",
           createdAt: "$rev.createdAt",
-          reviewer: { name: "$user.name", avatar_url: "$user.avatar_url" },
+          reviewer: {
+            _id: "$user._id",
+            name: "$user.name",
+            avatar_url: "$user.avatar_url",
+          },
         },
       },
       {
@@ -443,7 +444,7 @@ export const listGuideReviewsPublic = async (req, res) => {
     });
   } catch (err) {
     console.error("listGuideReviewsPublic error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
@@ -459,29 +460,29 @@ export const createLocationReview = async (req, res) => {
     const userId = req.user?._id;
 
     if (!userId) {
-      return res.status(401).json({ message: "Chưa đăng nhập." });
+      return res.status(401).json({ message: "Chua dang nh?p." });
     }
 
     if (!mongoose.Types.ObjectId.isValid(locationId)) {
-      return res.status(400).json({ message: "Location ID không hợp lệ." });
+      return res.status(400).json({ message: "Location ID kh�ng h?p l?." });
     }
 
     // Validation
     if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "Rating phải từ 1-5 sao." });
+      return res.status(400).json({ message: "Rating ph?i t? 1-5 sao." });
     }
 
     if (comment && comment.length > 1000) {
       return res
         .status(400)
-        .json({ message: "Comment không được vượt quá 1000 ký tự." });
+        .json({ message: "Comment kh�ng du?c vu?t qu� 1000 k� t?." });
     }
 
     // Check if location exists
     const Location = mongoose.model("Location");
     const location = await Location.findById(locationId);
     if (!location) {
-      return res.status(404).json({ message: "Không tìm thấy địa điểm." });
+      return res.status(404).json({ message: "Kh�ng t�m th?y d?a di?m." });
     }
 
     // Check if user already reviewed this location
@@ -492,8 +493,7 @@ export const createLocationReview = async (req, res) => {
 
     if (existingReview) {
       return res.status(400).json({
-        message:
-          "Bạn đã đánh giá địa điểm này rồi. Vui lòng cập nhật đánh giá cũ.",
+        message: "B?n d� d�nh gi� d?a di?m n�y r?i. Vui l�ng c?p nh?t d�nh gi� cu.",
       });
     }
 
@@ -511,7 +511,7 @@ export const createLocationReview = async (req, res) => {
     await review.populate("user_id", "name avatar_url");
 
     return res.status(201).json({
-      message: "Đánh giá thành công!",
+      message: "��nh gi� th�nh c�ng!",
       review,
     });
   } catch (err) {
@@ -519,9 +519,9 @@ export const createLocationReview = async (req, res) => {
     if (err.code === 11000) {
       return res
         .status(400)
-        .json({ message: "Bạn đã đánh giá địa điểm này rồi." });
+        .json({ message: "B?n d� d�nh gi� d?a di?m n�y r?i." });
     }
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
@@ -532,13 +532,12 @@ export const listLocationReviews = async (req, res) => {
     const { page = 1, limit = 10, sort = "-createdAt" } = req.query;
 
     if (!mongoose.Types.ObjectId.isValid(locationId)) {
-      return res.status(400).json({ message: "Location ID không hợp lệ." });
+      return res.status(400).json({ message: "Location ID kh�ng h?p l?." });
     }
 
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
-    const sortStage =
-      sort === "createdAt" ? { createdAt: 1 } : { createdAt: -1 };
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const sortStage = sort === "createdAt" ? { createdAt: 1 } : { createdAt: -1 };
 
     const result = await LocationReview.aggregate([
       {
@@ -599,13 +598,11 @@ export const listLocationReviews = async (req, res) => {
       page: pageNum,
       limit: limitNum,
       total: meta.count || 0,
-      avg_rating: meta.avg_rating
-        ? Math.round(meta.avg_rating * 10) / 10
-        : null,
+      avg_rating: meta.avg_rating ? Math.round(meta.avg_rating * 10) / 10 : null,
     });
   } catch (err) {
     console.error("listLocationReviews error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
@@ -615,7 +612,7 @@ export const getLocationRatingStats = async (req, res) => {
     const { locationId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(locationId)) {
-      return res.status(400).json({ message: "Location ID không hợp lệ." });
+      return res.status(400).json({ message: "Location ID kh�ng h?p l?." });
     }
 
     const stats = await LocationReview.aggregate([
@@ -667,7 +664,7 @@ export const getLocationRatingStats = async (req, res) => {
     });
   } catch (err) {
     console.error("getLocationRatingStats error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
@@ -677,7 +674,7 @@ export const getLocationRatingStats = async (req, res) => {
 
 /**
  * GET /api/guides/me/reviews
- * Lấy danh sách reviews của HDV đang đăng nhập
+ * L?y danh s�ch reviews c?a HDV dang dang nh?p
  */
 export const getMyGuideReviews = async (req, res) => {
   try {
@@ -689,10 +686,8 @@ export const getMyGuideReviews = async (req, res) => {
     );
     const ratingFilter = req.query.rating; // "all", "5", "4", etc.
 
-    const now = new Date();
     const matchBooking = {
       intended_guide_id: new mongoose.Types.ObjectId(guideId),
-      end_date: { $lte: now },
       status: { $in: ["paid", "completed"] },
     };
 
@@ -807,13 +802,13 @@ export const getMyGuideReviews = async (req, res) => {
     });
   } catch (err) {
     console.error("getMyGuideReviews error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };
 
 /**
  * POST /api/guides/me/reviews/:reviewId/reply
- * HDV phản hồi một review
+ * HDV ph?n h?i m?t review
  */
 export const replyToReview = async (req, res) => {
   try {
@@ -824,28 +819,28 @@ export const replyToReview = async (req, res) => {
     if (!reply || typeof reply !== "string" || reply.trim().length === 0) {
       return res
         .status(400)
-        .json({ message: "Nội dung phản hồi không được để trống." });
+        .json({ message: "N?i dung ph?n h?i kh�ng du?c d? tr?ng." });
     }
 
     if (!mongoose.Types.ObjectId.isValid(reviewId)) {
-      return res.status(400).json({ message: "reviewId không hợp lệ." });
+      return res.status(400).json({ message: "reviewId kh�ng h?p l?." });
     }
 
-    // Tìm review và kiểm tra quyền
+    // T�m review v� ki?m tra quy?n
     const review = await Review.findById(reviewId).lean();
     if (!review) {
-      return res.status(404).json({ message: "Không tìm thấy đánh giá." });
+      return res.status(404).json({ message: "Kh�ng t�m th?y d�nh gi�." });
     }
 
-    // Kiểm tra booking thuộc về guide này
+    // Ki?m tra booking thu?c v? guide n�y
     const booking = await Booking.findById(review.bookingId).lean();
     if (!booking || String(booking.intended_guide_id) !== String(guideId)) {
       return res
         .status(403)
-        .json({ message: "Bạn không có quyền phản hồi đánh giá này." });
+        .json({ message: "B?n kh�ng c� quy?n ph?n h?i d�nh gi� n�y." });
     }
 
-    // Cập nhật reply
+    // C?p nh?t reply
     const updated = await Review.findByIdAndUpdate(
       reviewId,
       {
@@ -858,7 +853,7 @@ export const replyToReview = async (req, res) => {
     );
 
     return res.json({
-      message: "Đã gửi phản hồi thành công.",
+      message: "�� g?i ph?n h?i th�nh c�ng.",
       review: {
         _id: updated._id,
         reply: updated.guide_reply,
@@ -867,6 +862,6 @@ export const replyToReview = async (req, res) => {
     });
   } catch (err) {
     console.error("replyToReview error:", err);
-    return res.status(500).json({ message: "Lỗi máy chủ." });
+    return res.status(500).json({ message: "L?i m�y ch?." });
   }
 };

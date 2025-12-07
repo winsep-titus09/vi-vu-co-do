@@ -48,18 +48,23 @@ export default function GuideProfile() {
     limit: 2,
   });
 
-  // Fetch guide's busy dates for next 7 days
-  const today = useMemo(() => new Date(), []);
+  // Fetch guide's busy dates for next 7 days (use midnight ISO to avoid TZ drift)
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
   const nextWeek = useMemo(() => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + 7);
-    return date;
+    const d = new Date(today);
+    d.setDate(d.getDate() + 7);
+    d.setHours(23, 59, 59, 999);
+    return d;
   }, [today]);
 
   const { busyDates } = useGuideBusyDates(
     id,
-    today.toISOString().split("T")[0],
-    nextWeek.toISOString().split("T")[0]
+    today.toISOString(),
+    nextWeek.toISOString()
   );
 
   // Fetch guide's reviews
@@ -73,19 +78,36 @@ export default function GuideProfile() {
   const guideDetail = useMemo(() => {
     if (!apiGuide) return null;
 
+    const expYears = Number.parseInt(apiGuide.experience, 10);
+    const experienceYears = Number.isFinite(expYears) ? expYears : 0;
+
+    const rawVideoUrl = apiGuide.bio_video_url || "";
+    const videoEmbedUrl = (() => {
+      if (!rawVideoUrl) return "";
+      if (rawVideoUrl.includes("youtube.com/watch"))
+        return rawVideoUrl.replace("watch?v=", "embed/");
+      if (rawVideoUrl.includes("youtu.be"))
+        return `https://www.youtube.com/embed/${rawVideoUrl.split("/").pop()}`;
+      if (rawVideoUrl.includes("vimeo.com"))
+        return rawVideoUrl.replace("vimeo.com", "player.vimeo.com/video");
+      return rawVideoUrl;
+    })();
+
     return {
       id: apiGuide._id,
       name: apiGuide.user_id?.name || "Guide",
-      role: apiGuide.introduction || "",
+      role: apiGuide.expertise || apiGuide.introduction || "Hướng dẫn viên",
+      expertise: apiGuide.expertise || "",
       avatar:
         apiGuide.user_id?.avatar_url ||
         "/images/placeholders/avatar-placeholder.jpg",
       cover:
+        apiGuide.cover_image_url ||
         apiGuide.user_id?.cover_image_url ||
         "/images/placeholders/cover-placeholder.jpg",
       rating: apiGuide.rating || 5.0,
       reviews: apiGuide.reviewCount || 0,
-      experience: parseInt(apiGuide.experience) || 5,
+      experienceYears,
       languages: (apiGuide.languages || []).map((l) =>
         l === "vi"
           ? "Tiếng Việt"
@@ -96,9 +118,12 @@ export default function GuideProfile() {
           : l.toUpperCase()
       ),
       cert: apiGuide.certificates?.[0]?.name || "",
-      bio: apiGuide.user_id?.bio || apiGuide.experience || "",
-      videoIntro:
-        apiGuide.bio_video_url || "/images/placeholders/video-thumbnail.jpg",
+      bio: apiGuide.introduction || apiGuide.user_id?.bio || "",
+      phone: apiGuide.user_id?.phone_number || apiGuide.phone || "",
+      email: apiGuide.user_id?.email || apiGuide.email || "",
+      videoEmbedUrl,
+      videoThumb:
+        rawVideoUrl || "/images/placeholders/video-thumbnail.jpg",
     };
   }, [apiGuide]);
 
@@ -129,12 +154,14 @@ export default function GuideProfile() {
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
+      date.setHours(0, 0, 0, 0);
       const dayOfWeek = date.getDay();
       const dateStr = date.toISOString().split("T")[0];
 
       const isBusy = busyDates.some((bd) => {
-        const busyDate = new Date(bd.date).toISOString().split("T")[0];
-        return busyDate === dateStr;
+        const busyDate = new Date(bd.date);
+        busyDate.setHours(0, 0, 0, 0);
+        return busyDate.toISOString().split("T")[0] === dateStr;
       });
 
       calendar.push({
@@ -150,17 +177,22 @@ export default function GuideProfile() {
   // Map reviews from API
   const reviews = useMemo(() => {
     if (!apiReviews?.length) return [];
-    return apiReviews.slice(0, 2).map((review) => ({
-      id: review._id,
-      userName: review.user_id?.name || "",
-      userInitial: (review.user_id?.name || "D")?.[0]?.toUpperCase(),
-      date: new Date(review.createdAt).toLocaleDateString("vi-VN", {
-        month: "long",
-        year: "numeric",
-      }),
-      rating: review.rating,
-      comment: review.comment,
-    }));
+    return apiReviews.slice(0, 2).map((review) => {
+      const reviewerName = review.reviewer?.name || review.user?.name || "";
+      return {
+        id: review._id,
+        userName: reviewerName,
+        userInitial: (reviewerName || "D")?.[0]?.toUpperCase(),
+        date: new Date(review.createdAt).toLocaleDateString("vi-VN", {
+          month: "long",
+          year: "numeric",
+        }),
+        rating: review.rating,
+        comment: review.comment,
+        reply: review.reply,
+        replyAt: review.replyAt,
+      };
+    });
   }, [apiReviews]);
 
   if (isLoading) {
@@ -257,7 +289,7 @@ export default function GuideProfile() {
                 </div>
                 <div className="text-center border-l border-border-light">
                   <span className="block text-2xl font-bold text-text-primary">
-                    {guideDetail.experience}+
+                    {guideDetail.experienceYears || 0}+
                   </span>
                   <span className="text-xs text-text-secondary">Năm KN</span>
                 </div>
@@ -265,12 +297,20 @@ export default function GuideProfile() {
 
               {/* Desktop CTA */}
               <div className="hidden md:block space-y-3">
-                <button className="w-full py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/30 hover:bg-primary/90 transition-all active:scale-95">
+                <a
+                  href={guideDetail.phone ? `tel:${guideDetail.phone}` : undefined}
+                  className={`w-full inline-flex justify-center py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/30 hover:bg-primary/90 transition-all active:scale-95 ${guideDetail.phone ? "" : "opacity-50 cursor-not-allowed"}`}
+                  aria-disabled={!guideDetail.phone}
+                >
                   Liên hệ ngay
-                </button>
-                <button className="w-full py-2.5 rounded-xl border border-border-light text-text-secondary hover:text-primary hover:border-primary transition-all flex items-center justify-center gap-2 bg-white">
+                </a>
+                <a
+                  href={guideDetail.email ? `mailto:${guideDetail.email}?subject=Li%C3%AAn%20h%E1%BB%87%20h%C6%B0%E1%BB%9Bng%20d%E1%BA%ABn%20vi%C3%AAn` : undefined}
+                  className={`w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border-light text-text-secondary hover:text-primary hover:border-primary transition-all bg-white ${guideDetail.email ? "" : "opacity-50 cursor-not-allowed"}`}
+                  aria-disabled={!guideDetail.email}
+                >
                   <IconMail className="w-4 h-4" /> Nhắn tin
-                </button>
+                </a>
               </div>
             </div>
 
@@ -308,6 +348,7 @@ export default function GuideProfile() {
                   <div className="w-2 h-2 rounded-full bg-gray-300"></div> Bận
                 </span>
               </div>
+
             </div>
 
             {/* Certifications */}
@@ -342,18 +383,30 @@ export default function GuideProfile() {
                 </p>
 
                 {/* Video Embed */}
-                <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black group cursor-pointer">
-                  <img
-                    src={guideDetail.videoIntro}
-                    className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity"
-                    alt="Video thumb"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur border border-white/50 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-                      <IconPlay className="w-8 h-8 fill-current ml-1" />
+                {guideDetail.videoEmbedUrl ? (
+                  <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black">
+                    <iframe
+                      src={guideDetail.videoEmbedUrl}
+                      title="Video giới thiệu"
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black group cursor-pointer">
+                    <img
+                      src={guideDetail.videoThumb}
+                      className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity"
+                      alt="Video thumb"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur border border-white/50 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                        <IconPlay className="w-8 h-8 fill-current ml-1" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </section>
 
@@ -386,19 +439,9 @@ export default function GuideProfile() {
                   Đánh giá từ du khách
                 </h2>
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => {
-                      if (!isAuthenticated) {
-                        toast.warning("Yêu cầu đăng nhập", "Vui lòng đăng nhập để viết đánh giá");
-                        navigate("/sign-in", { state: { from: `/guides/${id}` } });
-                        return;
-                      }
-                      setIsReviewModalOpen(true);
-                    }}
-                    className="px-4 py-2 rounded-full border border-primary text-primary text-sm font-bold hover:bg-primary hover:text-white transition-all"
-                  >
-                    Viết đánh giá
-                  </button>
+                  <span className="text-sm text-text-secondary">
+                    Chỉ đánh giá sau khi hoàn thành tour.
+                  </span>
                   {reviewStats && reviewStats.totalReviews > 2 && (
                     <button className="px-4 py-2 rounded-full border border-border-light text-sm font-bold hover:bg-white hover:border-primary transition-all">
                       Xem tất cả {reviewStats.totalReviews} đánh giá
@@ -447,6 +490,12 @@ export default function GuideProfile() {
                       <p className="text-sm text-text-secondary italic leading-relaxed">
                         "{review.comment}"
                       </p>
+                      {review.reply && (
+                        <div className="mt-4 p-3 rounded-2xl bg-bg-main text-sm text-text-primary border border-border-light">
+                          <p className="font-bold text-text-primary mb-1">Phản hồi từ hướng dẫn viên</p>
+                          <p className="text-text-secondary">{review.reply}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

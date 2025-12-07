@@ -210,7 +210,7 @@ export default function Hero() {
                     </h2>
                   </div>
                   <span className="inline-flex items-center rounded-full bg-[#FEFAE0] text-[#BC4C00] text-xs font-bold px-2.5 py-1 border border-[#BC4C00]/10 shrink-0">
-                    <IconStar className="w-3 h-3 mr-1" />
+                    <IconStar filled className="w-3 h-3 mr-1 text-[#BC4C00]" />
                     {featuredTour.rating?.toFixed(1) || "5.0"}
                   </span>
                 </div>

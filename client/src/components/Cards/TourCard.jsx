@@ -25,6 +25,10 @@ const toNumber = (val) => {
 const TourCard = React.memo(function TourCard({ tour }) {
   // Safely convert rating and price
   const rating = toNumber(tour.rating);
+  // Fallback to average rating fields if rating missing
+  const ratingValue = toNumber(
+    tour.rating ?? tour.average_rating ?? tour.avgRating ?? tour.avg_rating ?? 0
+  );
   const price = toNumber(tour.price);
   
   // Format duration: ưu tiên duration_hours, fallback duration (days)
@@ -102,8 +106,8 @@ const TourCard = React.memo(function TourCard({ tour }) {
             {tour.title}
           </h3>
           <span className="inline-flex items-center gap-1 text-xs font-bold text-[#BC4C00] bg-[#FEFAE0] rounded-full px-2 py-0.5 border border-[#BC4C00]/10 shrink-0">
-            <IconStar className="w-3 h-3" />
-            {rating.toFixed(1)}
+            <IconStar filled className="w-3 h-3 text-[#BC4C00]" />
+            {ratingValue.toFixed(1)}
           </span>
         </div>
 

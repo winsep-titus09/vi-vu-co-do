@@ -26,6 +26,22 @@ export const updateLocationCategorySchema = z.object({
 });
 
 // ----- Location -----
+const toNumberLike = (v) => {
+  if (typeof v === "string" && v.trim() === "") return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : v;
+};
+
+const highlightItemSchema = z.object({
+  name: z.string().min(1, "Highlight cần tên"),
+  description: z.string().optional(),
+  duration: z.string().optional(),
+  tip: z.string().optional(),
+  // Chấp nhận cả URL tuyệt đối và đường dẫn tương đối để tránh lỗi khi dùng placeholder
+  image_url: z.string().optional(),
+  order: z.preprocess(toNumberLike, z.number().int().nonnegative()).optional(),
+});
+
 export const createLocationSchema = z.object({
   name: z.string().min(2).max(200),
   description: z.string().optional(),
@@ -38,6 +54,13 @@ export const createLocationSchema = z.object({
   category_id: z
     .string()
     .regex(/^[0-9a-fA-F]{24}$/, "category_id không hợp lệ"),
+  opening_hours: z.string().optional(),
+  ticket_price: z
+    .preprocess(toNumberLike, z.number().nonnegative())
+    .optional(),
+  ticket_price_currency: z.enum(["VND", "USD"]).optional(),
+  best_visit_time: z.string().optional(),
+  highlights: z.array(highlightItemSchema).optional(),
   // media upload xử lý qua file, các field dưới đây optional khi update
   video_url: z.string().url().nullable().optional(),
   images: z.array(z.string().url()).optional().default([]),

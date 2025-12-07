@@ -158,8 +158,7 @@ export default function AdminFinance() {
 
   // THÊM: Modal state cho approve/reject
   const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
-  const [showApproveModal, setShowApproveModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showWithdrawalDetail, setShowWithdrawalDetail] = useState(false);
   const [externalTxId, setExternalTxId] = useState("");
   const [rejectReason, setRejectReason] = useState("");
 
@@ -266,15 +265,27 @@ export default function AdminFinance() {
     }
   };
 
+  const openWithdrawalDetail = (req) => {
+    setSelectedWithdrawal(req);
+    setExternalTxId(req?.externalTransactionId || "");
+    setRejectReason("");
+    setShowWithdrawalDetail(true);
+  };
+
+  const resetWithdrawalDetail = () => {
+    setSelectedWithdrawal(null);
+    setExternalTxId("");
+    setRejectReason("");
+    setShowWithdrawalDetail(false);
+  };
+
   // THÊM: Handle approve withdrawal
   const handleApproveWithdrawal = async () => {
     if (!selectedWithdrawal) return;
     try {
-      await approveWithdrawal(selectedWithdrawal._id, { externalTxId, note: "" });
+      await approveWithdrawal(selectedWithdrawal._id, { externalTxId: externalTxId || undefined, note: "" });
       toast.success("Thành công!", "Đã duyệt yêu cầu rút tiền.");
-      setShowApproveModal(false);
-      setSelectedWithdrawal(null);
-      setExternalTxId("");
+      resetWithdrawalDetail();
       refetchWithdrawals();
       refetchStats();
     } catch (err) {
@@ -290,12 +301,11 @@ export default function AdminFinance() {
       return;
     }
     try {
-      await rejectWithdrawal(selectedWithdrawal._id, { reason: rejectReason });
+      await rejectWithdrawal(selectedWithdrawal._id, { reason: rejectReason.trim() });
       toast.success("Thành công!", "Đã từ chối yêu cầu rút tiền.");
-      setShowRejectModal(false);
-      setSelectedWithdrawal(null);
-      setRejectReason("");
+      resetWithdrawalDetail();
       refetchWithdrawals();
+      refetchStats();
     } catch (err) {
       toast.error("Lỗi!", err?.message || "Không thể từ chối yêu cầu.");
     }
@@ -1099,34 +1109,14 @@ export default function AdminFinance() {
                         {req.adminNote || "-"}
                       </td>
                       <td className="px-4 py-4">
-                        {req.status === "pending" ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => {
-                                setSelectedWithdrawal(req);
-                                setShowApproveModal(true);
-                              }}
-                              disabled={approvingWithdrawal}
-                              className="px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
-                            >
-                              Duyệt
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedWithdrawal(req);
-                                setShowRejectModal(true);
-                              }}
-                              disabled={rejectingWithdrawal}
-                              className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
-                            >
-                              Từ chối
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-text-secondary text-center block">
-                            {req.processedAt ? formatDate(req.processedAt) : "-"}
-                          </span>
-                        )}
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={() => openWithdrawalDetail(req)}
+                            className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition-colors"
+                          >
+                            Xem chi tiết
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1165,102 +1155,156 @@ export default function AdminFinance() {
         </div>
       )}
 
-      {/* Modal: Approve Withdrawal */}
-      {showApproveModal && selectedWithdrawal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-scale-in">
-            <h3 className="text-lg font-bold text-text-primary mb-4">
-              Xác nhận duyệt yêu cầu rút tiền
-            </h3>
-            <div className="space-y-3 mb-4">
-              <p className="text-sm text-text-secondary">
-                HDV: <strong>{selectedWithdrawal.guide?.name}</strong>
-              </p>
-              <p className="text-sm text-text-secondary">
-                Số tiền: <strong className="text-primary">{formatCurrency(selectedWithdrawal.amount)}</strong>
-              </p>
+      {/* Modal: Withdrawal Detail & Actions */}
+      {showWithdrawalDetail && selectedWithdrawal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in px-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-4xl shadow-2xl animate-scale-in space-y-6">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-1">
-                  Mã giao dịch ngân hàng (tùy chọn)
-                </label>
-                <input
-                  type="text"
-                  value={externalTxId}
-                  onChange={(e) => setExternalTxId(e.target.value)}
-                  placeholder="VD: VCB123456789"
-                  className="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:border-primary outline-none"
-                />
+                <p className="text-xs uppercase text-text-secondary font-bold">Yêu cầu rút tiền</p>
+                <h3 className="text-2xl font-bold text-text-primary mt-1">
+                  {formatCurrency(selectedWithdrawal.amount)}
+                </h3>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary mt-2">
+                  <span>{formatDate(selectedWithdrawal.createdAt)}</span>
+                  <span className="inline-flex items-center gap-2">
+                    Trạng thái: {getWithdrawalStatusBadge(selectedWithdrawal.status)}
+                  </span>
+                  {selectedWithdrawal.processedAt && (
+                    <span>Đã xử lý: {formatDate(selectedWithdrawal.processedAt)}</span>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="flex gap-3">
               <button
-                onClick={() => {
-                  setShowApproveModal(false);
-                  setSelectedWithdrawal(null);
-                  setExternalTxId("");
-                }}
-                className="flex-1 px-4 py-2.5 border border-border-light rounded-xl font-bold text-sm hover:bg-bg-main transition-colors"
+                onClick={resetWithdrawalDetail}
+                className="p-2 rounded-full border border-border-light text-text-secondary hover:bg-bg-main"
               >
-                Hủy
-              </button>
-              <button
-                onClick={handleApproveWithdrawal}
-                disabled={approvingWithdrawal}
-                className="flex-1 px-4 py-2.5 bg-green-500 text-white rounded-xl font-bold text-sm hover:bg-green-600 transition-colors disabled:opacity-50"
-              >
-                {approvingWithdrawal ? "Đang xử lý..." : "Xác nhận duyệt"}
+                <IconX className="w-4 h-4" />
               </button>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Modal: Reject Withdrawal */}
-      {showRejectModal && selectedWithdrawal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-scale-in">
-            <h3 className="text-lg font-bold text-text-primary mb-4">
-              Từ chối yêu cầu rút tiền
-            </h3>
-            <div className="space-y-3 mb-4">
-              <p className="text-sm text-text-secondary">
-                HDV: <strong>{selectedWithdrawal.guide?.name}</strong>
-              </p>
-              <p className="text-sm text-text-secondary">
-                Số tiền: <strong className="text-primary">{formatCurrency(selectedWithdrawal.amount)}</strong>
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-1">
-                  Lý do từ chối <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="Nhập lý do từ chối..."
-                  rows={3}
-                  className="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:border-primary outline-none resize-none"
-                />
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl border border-border-light bg-bg-main/40">
+                <p className="text-xs uppercase font-bold text-text-secondary">Hướng dẫn viên</p>
+                <div className="flex items-center gap-3 mt-3">
+                  <img
+                    src={selectedWithdrawal.guide?.avatar || "/images/default-avatar.png"}
+                    alt=""
+                    className="w-12 h-12 rounded-full object-cover border border-border-light"
+                  />
+                  <div>
+                    <p className="font-bold text-text-primary">{selectedWithdrawal.guide?.name || "N/A"}</p>
+                    <p className="text-sm text-text-secondary">{selectedWithdrawal.guide?.email || "Chưa có email"}</p>
+                    {selectedWithdrawal.guide?.phone && (
+                      <p className="text-sm text-text-secondary">{selectedWithdrawal.guide.phone}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl border border-border-light bg-bg-main/40">
+                <p className="text-xs uppercase font-bold text-text-secondary">Tài khoản nhận</p>
+                <div className="mt-3 space-y-2 text-sm text-text-secondary">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-text-primary">Ngân hàng</span>
+                    <span>{selectedWithdrawal.bankAccount?.bank_name || "Chưa cập nhật"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-text-primary">Số tài khoản</span>
+                    <span className="font-mono">
+                      {selectedWithdrawal.bankAccount?.account_number || "Chưa cập nhật"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-text-primary">Chủ tài khoản</span>
+                    <span>{selectedWithdrawal.bankAccount?.account_holder || "Chưa cập nhật"}</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowRejectModal(false);
-                  setSelectedWithdrawal(null);
-                  setRejectReason("");
-                }}
-                className="flex-1 px-4 py-2.5 border border-border-light rounded-xl font-bold text-sm hover:bg-bg-main transition-colors"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleRejectWithdrawal}
-                disabled={rejectingWithdrawal}
-                className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
-              >
-                {rejectingWithdrawal ? "Đang xử lý..." : "Xác nhận từ chối"}
-              </button>
+
+            <div className="p-4 rounded-xl border border-border-light bg-bg-main/20">
+              <p className="text-xs uppercase font-bold text-text-secondary">Ghi chú</p>
+              <p className="mt-2 text-sm text-text-primary">
+                {selectedWithdrawal.adminNote || "Không có ghi chú."}
+              </p>
+              {selectedWithdrawal.externalTransactionId && (
+                <p className="mt-2 text-sm text-text-secondary">
+                  Mã giao dịch: <span className="font-mono">{selectedWithdrawal.externalTransactionId}</span>
+                </p>
+              )}
             </div>
+
+            {selectedWithdrawal.status === "pending" ? (
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl border border-border-light bg-white shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-text-primary">Duyệt yêu cầu</h4>
+                    <IconCheck className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1">
+                      Mã giao dịch ngân hàng (tùy chọn)
+                    </label>
+                    <input
+                      type="text"
+                      value={externalTxId}
+                      onChange={(e) => setExternalTxId(e.target.value)}
+                      placeholder="VD: VCB123456789"
+                      className="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:border-primary outline-none"
+                    />
+                  </div>
+                  <button
+                    onClick={handleApproveWithdrawal}
+                    disabled={approvingWithdrawal}
+                    className="w-full px-4 py-2.5 bg-green-500 text-white rounded-xl font-bold text-sm hover:bg-green-600 transition-colors disabled:opacity-50"
+                  >
+                    {approvingWithdrawal ? "Đang xử lý..." : "Xác nhận duyệt"}
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-xl border border-border-light bg-white shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-text-primary">Từ chối yêu cầu</h4>
+                    <IconX className="w-4 h-4 text-red-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1">
+                      Lý do từ chối <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="Nhập lý do từ chối (sẽ lưu vào ghi chú thu nhập của HDV)"
+                      rows={3}
+                      className="w-full px-4 py-2.5 border border-border-light rounded-xl text-sm focus:border-primary outline-none resize-none"
+                    />
+                  </div>
+                  <button
+                    onClick={handleRejectWithdrawal}
+                    disabled={!rejectReason.trim() || rejectingWithdrawal}
+                    className="w-full px-4 py-2.5 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
+                  >
+                    {rejectingWithdrawal ? "Đang xử lý..." : "Xác nhận từ chối"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl border border-border-light bg-white shadow-sm grid md:grid-cols-3 gap-4 text-sm text-text-secondary">
+                <div>
+                  <p className="text-xs uppercase font-bold">Trạng thái</p>
+                  <div className="mt-1">{getWithdrawalStatusBadge(selectedWithdrawal.status)}</div>
+                </div>
+                <div>
+                  <p className="text-xs uppercase font-bold">Người xử lý</p>
+                  <p className="mt-1 text-text-primary font-semibold">{selectedWithdrawal.processedBy?.name || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase font-bold">Thời gian</p>
+                  <p className="mt-1">{selectedWithdrawal.processedAt ? formatDate(selectedWithdrawal.processedAt) : "-"}</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

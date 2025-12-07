@@ -160,12 +160,16 @@ export const useGuideBusyDates = (guideId, startDate, endDate) => {
         setIsLoading(true);
         setError(null);
         const params = {};
-        if (startDate) params.startDate = startDate;
-        if (endDate) params.endDate = endDate;
+        if (startDate) params.from = startDate;
+        if (endDate) params.to = endDate;
 
         const response = await guidesApi.getGuideBusyDates(guideId, params);
         const dates =
-          response?.items || response?.data?.items || response?.data || [];
+          response?.busyDates ||
+          response?.data?.busyDates ||
+          response?.items ||
+          response?.data?.items ||
+          response?.data || [];
         setBusyDates(dates);
       } catch (err) {
         console.error("Error fetching busy dates:", err);

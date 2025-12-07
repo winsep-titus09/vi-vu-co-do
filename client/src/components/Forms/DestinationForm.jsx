@@ -7,11 +7,19 @@ import {
   IconBox3D,
   IconUpload,
   IconLoader,
+  IconPlus,
+  IconTrash,
 } from "../../icons/IconCommon";
 import Icon360 from "../../icons/Icon360";
 
 // Default coords for Hue city center
 const DEFAULT_COORDS = [107.5901, 16.4637]; // [lng, lat]
+
+const toNumber = (val) => {
+  if (val?.$numberDecimal) return Number(val.$numberDecimal);
+  const parsed = Number(val);
+  return Number.isFinite(parsed) ? parsed : "";
+};
 
 export default function DestinationForm({
   initialData,
@@ -34,6 +42,11 @@ export default function DestinationForm({
         existingImages: initialData.images || [],
         has3D: initialData.threeDModels?.length > 0 || false,
         modelFile: null,
+        opening_hours: initialData.opening_hours || "",
+        ticket_price: toNumber(initialData.ticket_price),
+        ticket_price_currency: initialData.ticket_price_currency || "VND",
+        best_visit_time: initialData.best_visit_time || "",
+        highlights: initialData.highlights || [],
         // Panorama fields
         hasPanorama: initialData.threeDModels?.some(m => m.file_type === "panorama") || false,
         panoramaFile: null,
@@ -50,6 +63,11 @@ export default function DestinationForm({
       existingImages: [],
       has3D: false,
       modelFile: null,
+      opening_hours: "",
+      ticket_price: "",
+      ticket_price_currency: "VND",
+      best_visit_time: "",
+      highlights: [],
       hasPanorama: false,
       panoramaFile: null,
       existingPanorama: null,
@@ -151,6 +169,31 @@ export default function DestinationForm({
 
   const toast = useToast();
 
+  const addHighlight = () => {
+    setFormData((prev) => ({
+      ...prev,
+      highlights: [
+        ...prev.highlights,
+        { name: "", description: "", duration: "", tip: "", image_url: "", order: prev.highlights.length },
+      ],
+    }));
+  };
+
+  const updateHighlight = (index, field, value) => {
+    setFormData((prev) => {
+      const next = [...prev.highlights];
+      next[index] = { ...next[index], [field]: value };
+      return { ...prev, highlights: next };
+    });
+  };
+
+  const removeHighlight = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      highlights: prev.highlights.filter((_, i) => i !== index).map((h, i) => ({ ...h, order: i })),
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -171,6 +214,18 @@ export default function DestinationForm({
     if (formData.address) fd.append("address", formData.address.trim());
     if (formData.description)
       fd.append("description", formData.description.trim());
+
+    if (formData.opening_hours)
+      fd.append("opening_hours", formData.opening_hours.trim());
+
+    const priceVal = toNumber(formData.ticket_price);
+    if (priceVal !== "" && !Number.isNaN(priceVal)) {
+      fd.append("ticket_price", Number(priceVal));
+      fd.append("ticket_price_currency", formData.ticket_price_currency || "VND");
+    }
+
+    if (formData.best_visit_time)
+      fd.append("best_visit_time", formData.best_visit_time.trim());
 
     // Coords as JSON string
     fd.append(
@@ -194,6 +249,14 @@ export default function DestinationForm({
     // Panorama file
     if (formData.hasPanorama && formData.panoramaFile) {
       fd.append("panorama", formData.panoramaFile);
+    }
+
+    const cleanedHighlights = (formData.highlights || [])
+      .map((h, idx) => ({ ...h, order: h.order ?? idx }))
+      .filter((h) => h.name && h.name.trim());
+
+    if (cleanedHighlights.length) {
+      fd.append("highlights", JSON.stringify(cleanedHighlights));
     }
 
     try {
@@ -301,6 +364,65 @@ export default function DestinationForm({
           </div>
         </div>
 
+          {/* Row 2b: Visit info */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-text-secondary uppercase">
+                Giờ mở cửa
+              </label>
+              <select
+                value={formData.opening_hours}
+                onChange={(e) => handleChange("opening_hours", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary outline-none text-sm transition-all"
+              >
+                <option value="">Chọn giờ mở cửa</option>
+                <option value="06:00 - 18:00">06:00 - 18:00</option>
+                <option value="07:00 - 17:30">07:00 - 17:30</option>
+                <option value="07:00 - 19:00">07:00 - 19:00</option>
+                <option value="08:00 - 17:00">08:00 - 17:00</option>
+                <option value="08:00 - 20:00">08:00 - 20:00</option>
+                <option value="Cả ngày">Cả ngày</option>
+                <option value="Đóng cửa">Đóng cửa</option>
+                <option value="Khác">Khác</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-text-secondary uppercase">
+                Giá vé (số)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.ticket_price}
+                  onChange={(e) => handleChange("ticket_price", e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary outline-none text-sm transition-all"
+                  placeholder="VD: 50000"
+                />
+                <select
+                  value={formData.ticket_price_currency}
+                  onChange={(e) => handleChange("ticket_price_currency", e.target.value)}
+                  className="px-3 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary outline-none text-sm transition-all min-w-[96px]"
+                >
+                  <option value="VND">VND</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-text-secondary uppercase">
+                Thời điểm lý tưởng
+              </label>
+              <input
+                type="text"
+                value={formData.best_visit_time}
+                onChange={(e) => handleChange("best_visit_time", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary outline-none text-sm transition-all"
+                placeholder="VD: Sáng sớm / Hoàng hôn"
+              />
+            </div>
+          </div>
+
         {/* Row 3: Description */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-text-secondary uppercase">
@@ -313,6 +435,89 @@ export default function DestinationForm({
             className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary outline-none text-sm resize-none transition-all"
             placeholder="Giới thiệu tóm tắt về địa điểm, lịch sử hình thành..."
           ></textarea>
+        </div>
+
+        {/* Row 3b: Highlights / visiting route */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-xs font-bold text-text-secondary uppercase block">
+                Lộ trình gợi ý / Điểm nổi bật
+              </label>
+              <p className="text-[11px] text-text-secondary">Thêm các điểm chính: tên, thời lượng, mẹo, hình ảnh.</p>
+            </div>
+            <button
+              type="button"
+              onClick={addHighlight}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border-light text-sm font-bold text-primary hover:bg-primary/5 transition-colors"
+            >
+              <IconPlus className="w-4 h-4" /> Thêm điểm
+            </button>
+          </div>
+
+          {formData.highlights.length === 0 && (
+            <p className="text-sm text-text-secondary italic">Chưa có điểm nào, nhấn "Thêm điểm" để bắt đầu.</p>
+          )}
+
+          <div className="space-y-4">
+            {formData.highlights.map((item, idx) => (
+              <div
+                key={idx}
+                className="p-4 rounded-2xl border border-border-light bg-bg-main/20 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-text-primary">Điểm #{idx + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeHighlight(idx)}
+                    className="p-2 rounded-full text-red-500 hover:bg-red-50 transition-colors"
+                    title="Xóa điểm này"
+                  >
+                    <IconTrash className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    value={item.name}
+                    onChange={(e) => updateHighlight(idx, "name", e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
+                    placeholder="Tên điểm (bắt buộc)"
+                  />
+                  <input
+                    type="text"
+                    value={item.duration}
+                    onChange={(e) => updateHighlight(idx, "duration", e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
+                    placeholder="Thời lượng ~30 phút"
+                  />
+                </div>
+                <textarea
+                  rows="2"
+                  value={item.description}
+                  onChange={(e) => updateHighlight(idx, "description", e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm resize-none"
+                  placeholder="Mô tả ngắn"
+                ></textarea>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    value={item.tip}
+                    onChange={(e) => updateHighlight(idx, "tip", e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
+                    placeholder="Mẹo nhỏ"
+                  />
+                  <input
+                    type="text"
+                    value={item.image_url}
+                    onChange={(e) => updateHighlight(idx, "image_url", e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
+                    placeholder="Link ảnh minh họa"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Row 4: Image Upload (Improved with Drag & Drop) */}

@@ -44,8 +44,13 @@ export const guidesApi = {
 
   // Get guide's busy dates
   getGuideBusyDates: async (guideId, params = {}) => {
+    const { startDate, endDate, from, to, ...rest } = params;
     const response = await apiClient.get(`/guides/${guideId}/busy-dates`, {
-      params,
+      params: {
+        from: startDate || from,
+        to: endDate || to,
+        ...rest,
+      },
     });
     return response;
   },

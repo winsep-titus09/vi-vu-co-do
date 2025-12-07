@@ -22,7 +22,9 @@ const normalizeTour = (tour) => ({
   title: tour.name || tour.title,
   location: tour.locations?.[0]?.locationId?.name || tour.location || "Huế",
   duration: tour.duration || "N/A",
-  rating: toNumber(tour.average_rating || tour.rating || 0),
+  rating: toNumber(
+    tour.average_rating || tour.avgRating || tour.avg_rating || tour.rating || 0
+  ),
   price: toNumber(tour.price || 0),
   category: tour.category_id?.slug || tour.category,
   description: tour.description || "",

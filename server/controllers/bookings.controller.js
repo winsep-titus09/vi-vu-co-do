@@ -787,16 +787,13 @@ export const getMyBookings = async (req, res) => {
         const userId = req.user?._id;
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-        // query params
         const { status, page = 1, limit = 50, grouped = "false" } = req.query;
         const pg = Math.max(Number(page) || 1, 1);
         const lm = Math.min(Math.max(Number(limit) || 50, 1), 500);
 
-        // base condition: bookings belonging to current user
         const cond = { customer_id: userId };
         if (status) cond.status = status;
 
-        // prepare population for tour -> also populate nested locations.locationId
         const tourPopulate = {
             path: "tour_id",
             select: "name slug cover_image_url locations",
@@ -807,14 +804,41 @@ export const getMyBookings = async (req, res) => {
         };
         const guidePopulate = { path: "intended_guide_id", select: "name avatar_url" };
 
-        // if grouped -> return grouped buckets (cap to reasonable amount)
         if (String(grouped).toLowerCase() === "true") {
-            const items = await Booking.find(cond)
-                .populate(tourPopulate)
-                .populate(guidePopulate)
-                .sort({ start_date: 1, createdAt: -1 })
-                .limit(1000)
-                .lean();
+            const items = await Booking.aggregate([
+                { $match: cond },
+                {
+                    $lookup: {
+                        from: "reviews",
+                        localField: "_id",
+                        foreignField: "bookingId",
+                        as: "review"
+                    }
+                },
+                { $unwind: { path: "$review", preserveNullAndEmptyArrays: true } },
+                {
+                    $addFields: {
+                        isTourRated: {
+                            $cond: {
+                                if: { $gt: [{ $ifNull: ["$review.tour_rating", null] }, null] },
+                                then: true,
+                                else: false
+                            }
+                        },
+                        isGuideRated: {
+                            $cond: {
+                                if: { $gt: [{ $ifNull: ["$review.guide_rating", null] }, null] },
+                                then: true,
+                                else: false
+                            }
+                        }
+                    }
+                },
+                { $sort: { start_date: 1, createdAt: -1 } },
+                { $limit: 1000 }
+            ]);
+
+            await Booking.populate(items, [tourPopulate, guidePopulate]);
 
             const now = new Date();
             const groups = { upcoming: [], canceled: [], completed: [], others: [] };
@@ -831,7 +855,6 @@ export const getMyBookings = async (req, res) => {
                     continue;
                 }
 
-                // Decide upcoming: has start_date in the future and not canceled/rejected/completed
                 let isUpcoming = false;
                 try {
                     const start = toDateOrNull(b.start_date);
@@ -857,13 +880,41 @@ export const getMyBookings = async (req, res) => {
 
         // Normal (paginated) listing
         const total = await Booking.countDocuments(cond);
-        const items = await Booking.find(cond)
-            .populate(tourPopulate)
-            .populate(guidePopulate)
-            .sort({ createdAt: -1 })
-            .skip((pg - 1) * lm)
-            .limit(lm)
-            .lean();
+        const items = await Booking.aggregate([
+            { $match: cond },
+            {
+                $lookup: {
+                    from: "reviews",
+                    localField: "_id",
+                    foreignField: "bookingId",
+                    as: "review"
+                }
+            },
+            { $unwind: { path: "$review", preserveNullAndEmptyArrays: true } },
+            {
+                $addFields: {
+                    isTourRated: {
+                        $cond: {
+                            if: { $gt: [{ $ifNull: ["$review.tour_rating", null] }, null] },
+                            then: true,
+                            else: false
+                        }
+                    },
+                    isGuideRated: {
+                        $cond: {
+                            if: { $gt: [{ $ifNull: ["$review.guide_rating", null] }, null] },
+                            then: true,
+                            else: false
+                        }
+                    }
+                }
+            },
+            { $sort: { createdAt: -1 } },
+            { $skip: (pg - 1) * lm },
+            { $limit: lm }
+        ]);
+
+        await Booking.populate(items, [tourPopulate, guidePopulate]);
 
         return res.json({
             ok: true,

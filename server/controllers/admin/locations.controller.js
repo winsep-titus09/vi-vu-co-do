@@ -19,15 +19,21 @@ import { compressToUnder } from "../../services/imageCompressor.js"; // ✅ help
 /** Tạo Location (ảnh/video/3D là tùy chọn) */
 export const createLocation = async (req, res) => {
     try {
-        // parse body
-        const parsed = createLocationSchema.safeParse({
+        const normalizeBody = {
             ...req.body,
             coords: req.body.coords
                 ? (typeof req.body.coords === "string"
                     ? JSON.parse(req.body.coords)
                     : req.body.coords)
                 : undefined,
-        });
+            highlights: req.body.highlights
+                ? (typeof req.body.highlights === "string"
+                    ? JSON.parse(req.body.highlights)
+                    : req.body.highlights)
+                : undefined,
+        };
+        // parse body
+        const parsed = createLocationSchema.safeParse(normalizeBody);
         if (!parsed.success) {
             const msg = parsed.error.issues.map(i => i.message).join("; ");
             return res.status(400).json({ message: msg });
@@ -67,6 +73,11 @@ export const createLocation = async (req, res) => {
             images: imageUrls,
             video_url: videoUrl,
             category_id: data.category_id,
+            opening_hours: data.opening_hours,
+            ticket_price: data.ticket_price,
+            ticket_price_currency: data.ticket_price_currency,
+            best_visit_time: data.best_visit_time,
+            highlights: data.highlights,
         });
 
         // Optional: create one 3D panorama together (supports both model3d and panorama fields)
@@ -115,14 +126,21 @@ export const createLocation = async (req, res) => {
 export const updateLocation = async (req, res) => {
     try {
         const { id } = req.params;
-        const parsed = updateLocationSchema.safeParse({
+        const normalizeBody = {
             ...req.body,
             coords: req.body.coords
                 ? (typeof req.body.coords === "string"
                     ? JSON.parse(req.body.coords)
                     : req.body.coords)
                 : undefined,
-        });
+            highlights: req.body.highlights
+                ? (typeof req.body.highlights === "string"
+                    ? JSON.parse(req.body.highlights)
+                    : req.body.highlights)
+                : undefined,
+        };
+
+        const parsed = updateLocationSchema.safeParse(normalizeBody);
         if (!parsed.success) {
             const msg = parsed.error.issues.map(i => i.message).join("; ");
             return res.status(400).json({ message: msg });
@@ -143,6 +161,11 @@ export const updateLocation = async (req, res) => {
         if (data.coords?.coordinates) {
             loc.coords = { type: "Point", coordinates: data.coords.coordinates };
         }
+        if (data.opening_hours !== undefined) loc.opening_hours = data.opening_hours;
+        if (data.ticket_price !== undefined) loc.ticket_price = data.ticket_price;
+        if (data.ticket_price_currency !== undefined) loc.ticket_price_currency = data.ticket_price_currency;
+        if (data.best_visit_time !== undefined) loc.best_visit_time = data.best_visit_time;
+        if (data.highlights !== undefined) loc.highlights = data.highlights;
 
         // append new images
         if (req.files?.images?.length) {
@@ -172,9 +195,9 @@ export const updateLocation = async (req, res) => {
             );
 
             // Create or update panorama model for this location
-            const existingPanorama = await ThreeDModel.findOne({ 
-                locationId: loc._id, 
-                file_type: "panorama" 
+            const existingPanorama = await ThreeDModel.findOne({
+                locationId: loc._id,
+                file_type: "panorama"
             });
 
             if (existingPanorama) {

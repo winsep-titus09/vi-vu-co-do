@@ -14,7 +14,7 @@ export default function FeaturedGuides() {
   // Map API guides to GuideCard format
   const guides = useMemo(() => {
     return (apiGuides || []).map((guide) => ({
-      id: guide._id || guide.user_id?._id,
+      id: guide.user_id?._id || guide.user_id || guide._id,
       name: guide.user_id?.name || "Guide",
       specialty: guide.introduction || "Hướng dẫn viên",
       rating: guide.rating || 5.0,

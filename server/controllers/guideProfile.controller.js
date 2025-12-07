@@ -37,6 +37,7 @@ export const getMyGuideProfile = async (req, res) => {
       profile = await GuideProfile.create({
         user_id: req.user._id,
         introduction: "",
+        cover_image_url: "",
         experience: "",
         languages: ["Tiếng Việt"],
         bank_account: {
@@ -58,6 +59,7 @@ export const getMyGuideProfile = async (req, res) => {
       email: user.email,
       phone: user.phone_number || "",
       avatar_url: user.avatar_url || "",
+      cover_image_url: profile.cover_image_url || "",
       balance: user.balance || 0,
       // Từ GuideProfile model
       introduction: profile.introduction || "",
@@ -114,6 +116,8 @@ export const updateMyGuideProfile = async (req, res) => {
       profileUpdateData.introduction = body.introduction;
     if (body.experience !== undefined)
       profileUpdateData.experience = body.experience;
+    if (body.cover_image_url !== undefined)
+      profileUpdateData.cover_image_url = body.cover_image_url;
     if (body.bio_video_url !== undefined)
       profileUpdateData.bio_video_url = body.bio_video_url;
     if (body.languages !== undefined)
@@ -173,6 +177,7 @@ export const updateMyGuideProfile = async (req, res) => {
       email: user.email,
       phone: user.phone_number || "",
       avatar_url: user.avatar_url || "",
+      cover_image_url: profile.cover_image_url || "",
       balance: user.balance || 0,
       introduction: profile.introduction || "",
       bio_video_url: profile.bio_video_url || "",
@@ -207,7 +212,7 @@ export const getPublicGuideProfile = async (req, res) => {
     // Loại trừ các trường nhạy cảm: bank_account, __v
     const profile = await GuideProfile.findOne({ user_id: guideId })
       .select("-bank_account -__v")
-      .populate("user_id", "name avatar_url bio cover_image_url")
+      .populate("user_id", "name avatar_url bio cover_image_url email phone_number")
       .lean();
 
     if (!profile) {
@@ -228,19 +233,25 @@ export const getPublicGuideProfile = async (req, res) => {
 export const listFeaturedGuides = async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 3, 1), 50);
-    const items = await GuideProfile.find({
-      status: "approved",
-      is_featured: true,
-    })
+
+    // Cho phép FE lấy tất cả HDV đã duyệt; nếu muốn chỉ lấy nổi bật truyền featuredOnly=true
+    const featuredOnly = String(req.query.featuredOnly || "false") === "true";
+
+    const filter = { status: "approved" };
+    if (featuredOnly) {
+      filter.is_featured = true;
+    }
+
+    const items = await GuideProfile.find(filter)
       .select(
         "user_id introduction bio_video_url experience languages is_featured createdAt"
       )
       .populate("user_id", "name avatar_url")
-      .sort({ createdAt: -1 })
+      .sort({ is_featured: -1, createdAt: -1 })
       .limit(limit)
       .lean();
 
-    return res.json({ items, limit });
+    return res.json({ items, limit, featuredOnly });
   } catch (err) {
     console.error("listFeaturedGuides error:", err);
     return res

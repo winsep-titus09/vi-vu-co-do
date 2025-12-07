@@ -15,6 +15,7 @@ const GuideProfileSchema = new mongoose.Schema(
     {
         user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, unique: true },
         introduction: { type: String },           // mô tả giới thiệu
+        cover_image_url: { type: String, default: null }, // ảnh cover cá nhân hóa
         bio_video_url: { type: String },          // video giới thiệu
         experience: { type: String },             // kinh nghiệm mô tả
         languages: [{ type: String }],            // ["vi", "en"]

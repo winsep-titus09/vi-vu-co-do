@@ -52,6 +52,13 @@ const formatTicketPrice = (price, currency = "VND") => {
   return `${amount} ${currency}`;
 };
 
+const normalizeImage = (url) => {
+  if (!url) return "/images/placeholders/place-placeholder.jpg";
+  const lower = url.toString().toLowerCase();
+  if (lower.startsWith("http") || url.startsWith("/")) return url;
+  return "/images/placeholders/place-placeholder.jpg";
+};
+
 export default function PlaceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -152,7 +159,7 @@ export default function PlaceDetail() {
         description: location.description || "",
         images:
           location.images?.length > 0
-            ? location.images
+            ? location.images.map(normalizeImage)
             : ["/images/placeholders/place-placeholder.jpg"],
         info: {
           openTime: location.opening_hours || "Liên hệ",
@@ -177,8 +184,10 @@ export default function PlaceDetail() {
       description: h.description || "",
       duration: h.duration || "",
       tip: h.tip || "",
-      image: h.image_url || "",
+      image: normalizeImage(h.image_url),
     })) || [];
+
+  const secondaryImage = placeDetail?.images?.[1] || placeDetail?.images?.[0];
 
   if (isLoading) {
     return (
@@ -258,7 +267,7 @@ export default function PlaceDetail() {
           <div className="hidden md:flex flex-col gap-4 h-full">
             <div className="flex-1 overflow-hidden rounded-2xl">
               <img
-                src={placeDetail.images[1]}
+                src={secondaryImage}
                 className="w-full h-full object-cover hover:scale-110 transition-transform"
                 alt="Sub"
               />
@@ -274,7 +283,7 @@ export default function PlaceDetail() {
               <img
                 src={
                   placeDetail.threeDModels?.[0]?.thumbnail_url ||
-                  placeDetail.images[1] ||
+                  secondaryImage ||
                   placeDetail.images[0]
                 }
                 className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay"
@@ -331,14 +340,14 @@ export default function PlaceDetail() {
                         <div className="flex-1 order-2 md:order-1">
                           <div className="flex items-center gap-2 mb-1">
                             <h4 className="text-xl font-bold text-text-primary">
-                              {point.name}
+                              {point.title}
                             </h4>
                             <span className="text-xs font-bold text-text-secondary bg-bg-main px-2 py-0.5 rounded border border-border-light">
-                              ~{point.time}
+                              ~{point.duration}
                             </span>
                           </div>
                           <p className="text-text-secondary text-sm mb-3 leading-relaxed">
-                            {point.desc}
+                            {point.description}
                           </p>
                           <div className="bg-primary/5 border border-primary/10 p-3 rounded-xl flex gap-3 items-start">
                             <IconStar className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
@@ -697,7 +706,7 @@ export default function PlaceDetail() {
             </div>
             <div className="flex-1 relative flex items-center justify-center group">
               <img
-                src={placeDetail.images[1]}
+                src={secondaryImage}
                 className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-[20s]"
                 alt="3D Placeholder"
               />

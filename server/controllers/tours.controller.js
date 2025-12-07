@@ -50,6 +50,46 @@ function escapeRegex(str = "") {
   return str.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&");
 }
 
+// Helper: fetch average tour ratings from reviews/bookings
+async function fetchTourRatingStats(tourIds = []) {
+  const ids = (tourIds || [])
+    .filter((id) => mongoose.isValidObjectId(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+  if (!ids.length) return {};
+
+  const stats = await Review.aggregate([
+    { $match: { tour_rating: { $type: "number" } } },
+    {
+      $lookup: {
+        from: "bookings",
+        localField: "bookingId",
+        foreignField: "_id",
+        as: "booking",
+      },
+    },
+    { $unwind: "$booking" },
+    { $match: { "booking.tour_id": { $in: ids } } },
+    {
+      $group: {
+        _id: "$booking.tour_id",
+        avgRating: { $avg: "$tour_rating" },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const map = {};
+  for (const s of stats) {
+    map[s._id.toString()] = {
+      average_rating: Math.round((s.avgRating || 0) * 10) / 10,
+      review_count: s.count || 0,
+    };
+  }
+
+  return map;
+}
+
 // helper: parse danh sách id từ string CSV hoặc array
 const toArrayIds = (v) => {
   if (!v) return [];
@@ -164,11 +204,22 @@ export const listTours = async (req, res) => {
         .populate("itinerary.locationId", "name")
         .sort(sortObj)
         .skip((pg - 1) * lm)
-        .limit(lm),
+        .limit(lm)
+        .lean(),
       Tour.countDocuments(filter),
     ]);
 
-    return res.json({ items, total, page: pg, pageSize: lm });
+    const statsMap = await fetchTourRatingStats(items.map((t) => t?._id));
+    const itemsWithRatings = items.map((t) => {
+      const stat = statsMap[t?._id?.toString()] || {};
+      return {
+        ...t,
+        average_rating: stat.average_rating ?? null,
+        review_count: stat.review_count ?? 0,
+      };
+    });
+
+    return res.json({ items: itemsWithRatings, total, page: pg, pageSize: lm });
   } catch (err) {
     console.error("listTours error:", err);
     return res.status(500).json({ message: "Lỗi máy chủ." });
@@ -240,7 +291,14 @@ export const getTour = async (req, res) => {
     // Thêm mảng threeDModels tổng hợp vào tour để dễ truy cập
     tour.threeDModels = threeDModels;
 
-    return res.json(tour);
+    const statsMap = await fetchTourRatingStats([tour._id]);
+    const stat = statsMap[tour._id?.toString()] || {};
+
+    return res.json({
+      ...tour,
+      average_rating: stat.average_rating ?? null,
+      review_count: stat.review_count ?? 0,
+    });
   } catch (err) {
     console.error("getTour error:", err);
     return res.status(500).json({ message: "Lỗi máy chủ." });
@@ -295,8 +353,8 @@ export const createTour = async (req, res) => {
       data.categories && data.categories.length
         ? data.categories
         : data.category_id
-        ? [data.category_id]
-        : [];
+          ? [data.category_id]
+          : [];
     if (categories.length) {
       const catCount = await TourCategory.countDocuments({
         _id: { $in: categories },
@@ -367,27 +425,27 @@ export const createTour = async (req, res) => {
       approval:
         roleName === "admin"
           ? {
-              status: "approved",
-              reviewed_by: req.user._id,
-              reviewed_at: new Date(),
-              notes: null,
-            }
+            status: "approved",
+            reviewed_by: req.user._id,
+            reviewed_at: new Date(),
+            notes: null,
+          }
           : {
-              status: "pending",
-              reviewed_by: null,
-              reviewed_at: null,
-              notes: null,
-            },
+            status: "pending",
+            reviewed_by: null,
+            reviewed_at: null,
+            notes: null,
+          },
 
       // Nếu guide tạo, đảm bảo guide là người dẫn chính
       guides:
         roleName === "guide"
           ? [
-              { guideId: req.user._id, isMain: true, percentage: 0.15 },
-              ...(data.guides || []).filter(
-                (g) => g.guideId?.toString() !== req.user._id.toString()
-              ),
-            ]
+            { guideId: req.user._id, isMain: true, percentage: 0.15 },
+            ...(data.guides || []).filter(
+              (g) => g.guideId?.toString() !== req.user._id.toString()
+            ),
+          ]
           : data.guides || [],
       locations: normalizedLocations,
 
@@ -455,22 +513,22 @@ export const updateTour = async (req, res) => {
 
     if (roleName === "guide") {
       // Kiểm tra quyền sở hữu tour
-      const isOwner = 
+      const isOwner =
         tour.created_by?.toString() === req.user._id.toString() ||
         tour.guide_id?.toString() === req.user._id.toString() ||
         tour.guides?.some((g) => g.guideId?.toString() === req.user._id.toString());
-      
+
       const isPending = tour.approval?.status === "pending";
-      
+
       // Kiểm tra có đang trong thời gian được phép edit không
       const hasEditPermission = tour.edit_allowed_until && new Date(tour.edit_allowed_until) > new Date();
-      
+
       if (!isOwner) {
         return res.status(403).json({
           message: "Bạn không có quyền sửa tour này.",
         });
       }
-      
+
       if (!isPending && !hasEditPermission) {
         return res.status(403).json({
           message: "Tour đã được duyệt. Bạn cần gửi yêu cầu chỉnh sửa cho admin để được cấp quyền.",
@@ -635,7 +693,17 @@ export const listFeaturedTours = async (req, res) => {
       .limit(limit)
       .lean();
 
-    return res.json({ items, limit });
+    const statsMap = await fetchTourRatingStats(items.map((t) => t?._id));
+    const itemsWithRatings = items.map((t) => {
+      const stat = statsMap[t?._id?.toString()] || {};
+      return {
+        ...t,
+        average_rating: stat.average_rating ?? null,
+        review_count: stat.review_count ?? 0,
+      };
+    });
+
+    return res.json({ items: itemsWithRatings, limit });
   } catch (err) {
     console.error("listFeaturedTours error:", err);
     return res.status(500).json({ message: "Lỗi máy chủ." });

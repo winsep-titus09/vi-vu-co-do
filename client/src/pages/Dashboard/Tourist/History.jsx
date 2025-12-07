@@ -41,6 +41,7 @@ export default function HistoryPage() {
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [isGuideReviewModalOpen, setIsGuideReviewModalOpen] = useState(false);
 
   const navigate = useNavigate();
   const toast = useToast();
@@ -65,7 +66,6 @@ export default function HistoryPage() {
         status === "rejected"
       )
         return "cancelled";
-      // Thêm trạng thái awaiting_payment
       if (status === "awaiting_payment") return "awaiting_payment";
       if (status === "paid" || guideDecision === "accepted") return "confirmed";
       if (status === "waiting_guide") return "pending";
@@ -74,7 +74,7 @@ export default function HistoryPage() {
 
     return apiBookings.map((b) => ({
       id: b._id,
-      rawStatus: b.status, // Lưu status gốc để gọi API thanh toán
+      rawStatus: b.status,
       tourId: b.tour_id?._id,
       tourName: b.tour_id?.name || "Chuyến tham quan",
       image:
@@ -100,6 +100,8 @@ export default function HistoryPage() {
       status: mapStatus(b),
       guideDecision: b.guide_decision?.status,
       paymentDueAt: b.payment_due_at,
+      isTourRated: b.isTourRated || false,     // THÊM DÒNG NÀY
+      isGuideRated: b.isGuideRated || false,   // THÊM DÒNG NÀY
     }));
   }, [apiBookings]);
 
@@ -154,6 +156,30 @@ export default function HistoryPage() {
       window.location.reload();
     } catch (error) {
       console.error("Submit review error:", error);
+      toast.error(
+        "Lỗi gửi đánh giá",
+        error.message ||
+          error.response?.data?.message ||
+          "Không thể gửi đánh giá. Vui lòng thử lại."
+      );
+    }
+  };
+
+  // Thêm handler cho guide review
+  const handleSubmitGuideReview = async (reviewData) => {
+    try {
+      await apiClient.post("/reviews/guide", {
+        bookingId: selectedBooking.id,
+        guide_rating: reviewData.rating,
+        guide_comment: reviewData.comment,
+      });
+
+      setIsGuideReviewModalOpen(false);
+      setSelectedBooking(null);
+      toast.success("Cảm ơn bạn!", "Đã gửi đánh giá hướng dẫn viên!");
+      window.location.reload();
+    } catch (error) {
+      console.error("Submit guide review error:", error);
       toast.error(
         "Lỗi gửi đánh giá",
         error.message ||
@@ -340,7 +366,7 @@ export default function HistoryPage() {
                     </span>
                   </div>
 
-                  <div className="flex gap-3 w-full md:w-auto justify-end">
+                  <div className="flex gap-3 w-full md:w-auto justify-end relative z-10">
                     {/* Chờ HDV duyệt */}
                     {item.status === "pending" && (
                       <>
@@ -412,20 +438,36 @@ export default function HistoryPage() {
                         >
                           Đặt lại
                         </button>
-                        {!item.isRated ? (
+
+                        {/* Nút đánh giá Tour */}
+                        {!item.isTourRated ? (
                           <button
-                            onClick={() => {
-                              setSelectedBooking(item);
-                              setIsReviewModalOpen(true);
-                            }}
-                            className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-secondary text-white text-sm font-bold hover:bg-secondary/90 transition-colors shadow-lg flex items-center justify-center gap-2 whitespace-nowrap"
+                            onClick={() => { setSelectedBooking(item); setIsReviewModalOpen(true); }}
+                            className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-secondary text-white text-sm font-bold hover:bg-secondary/90 transition-colors shadow-lg flex items-center justify-center gap-2 whitespace-nowrap relative z-10 pointer-events-auto"
+                            type="button"
                           >
-                            <IconStar className="w-4 h-4" /> Viết đánh giá
+                            <IconStar className="w-4 h-4" /> Đánh giá Tour
                           </button>
                         ) : (
                           <span className="flex items-center justify-center gap-1 text-sm font-bold text-secondary px-4 py-2 bg-secondary/10 rounded-xl whitespace-nowrap flex-1 md:flex-none">
-                            <IconStar className="w-4 h-4 fill-current" /> Đã
+                            <IconStar className="w-4 h-4 fill-current" /> Tour đã
                             đánh giá
+                          </span>
+                        )}
+
+                        {/* Nút đánh giá HDV */}
+                        {/* Nút đánh giá HDV */}
+                        {!item.isGuideRated ? (
+                          <button
+                            onClick={() => { setSelectedBooking(item); setIsGuideReviewModalOpen(true); }}
+                            className="flex-1 md:flex-none px-5 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-lg flex items-center justify-center gap-2 whitespace-nowrap relative z-10 pointer-events-auto"
+                            type="button"
+                          >
+                            <IconUser className="w-4 h-4" /> Đánh giá HDV
+                          </button>
+                        ) : (
+                          <span className="flex items-center justify-center gap-1 text-sm font-bold text-primary px-4 py-2 bg-primary/10 rounded-xl whitespace-nowrap flex-1 md:flex-none">
+                            <IconUser className="w-4 h-4" /> HDV đã đánh giá
                           </span>
                         )}
                       </>
@@ -522,6 +564,22 @@ export default function HistoryPage() {
         }}
         booking={selectedBooking}
       />
+
+      {/* Guide Review Modal */}
+      {isGuideReviewModalOpen && selectedBooking && (
+        <ReviewModal
+          isOpen={isGuideReviewModalOpen}
+          onClose={() => {
+            setIsGuideReviewModalOpen(false);
+            setSelectedBooking(null);
+          }}
+          onSubmit={handleSubmitGuideReview}
+          booking={selectedBooking}
+          subjectName={`Hướng dẫn viên: ${selectedBooking.guide || "HDV"}`}
+          subjectImage={selectedBooking.image}
+          title="Đánh giá hướng dẫn viên"
+        />
+      )}
     </div>
   );
 }

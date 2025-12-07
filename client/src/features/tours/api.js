@@ -44,11 +44,15 @@ export const toursApi = {
     });
     return response;
   },
-  
+
   // Check availability for a specific date
-  checkAvailability: async (tourId, date, guests = 1) => {
+  checkAvailability: async (tourId, date, guests = 1, guideId = null) => {
     const response = await apiClient.get(`/tours/${tourId}/availability`, {
-      params: { date, guests },
+      params: {
+        date,
+        guests,
+        ...(guideId ? { guideId } : {}),
+      },
     });
     return response;
   },

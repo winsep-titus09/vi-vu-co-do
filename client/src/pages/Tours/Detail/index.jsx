@@ -11,6 +11,7 @@ import "react-day-picker/dist/style.css";
 import Breadcrumbs from "../../../components/Breadcrumbs/Breadcrumbs";
 import { toursApi } from "../../../features/tours/api";
 import { reviewsApi } from "../../../features/reviews/api";
+import guidesApi from "../../../features/guides/api";
 import { IconLoader } from "../../../icons/IconCommon";
 import { IconX } from "../../../icons/IconX";
 // Removed: import TourCard from "../../../components/Cards/TourCard"; // Không dùng TourCard trong gợi ý mới này
@@ -77,6 +78,9 @@ export default function TourDetailPage() {
   const [selectedGuide, setSelectedGuide] = useState(defaultGuideOption);
   const [note, setNote] = useState("");
 
+  const [busyDates, setBusyDates] = useState([]);
+  const [busyDatesLoading, setBusyDatesLoading] = useState(false);
+
   // UI state
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
@@ -136,6 +140,28 @@ export default function TourDetailPage() {
   const BASE_PRICE = tour ? toNumber(tour.price) : 42;
   const CHILD_PRICE = Math.round(BASE_PRICE / 2); // Trẻ em giảm 50%
   const totalPrice = adults * BASE_PRICE + children * CHILD_PRICE;
+
+  // Determine the active guide (selected or main) for availability and busy-date checks
+  const mainGuide =
+    tour?.guides?.find((g) => g.isMain || g.isPrimary) ||
+    tour?.guides?.[0] ||
+    tour?.guide_id;
+
+  const mainGuideId = useMemo(() => {
+    const g = mainGuide;
+    if (!g) return null;
+    if (g.guideId?._id) return g.guideId._id;
+    if (g._id) return g._id;
+    if (typeof g === "string") return g;
+    return null;
+  }, [mainGuide]);
+
+  const activeGuideId = useMemo(() => {
+    if (selectedGuide?.value && selectedGuide.value !== "random") {
+      return selectedGuide.value;
+    }
+    return mainGuideId;
+  }, [selectedGuide, mainGuideId]);
   
   // Check availability when date/guests change
   const checkAvailability = useCallback(async (date, numAdults, numChildren) => {
@@ -145,7 +171,12 @@ export default function TourDetailPage() {
       setAvailabilityLoading(true);
       const dateStr = format(date, "yyyy-MM-dd");
       const totalGuests = numAdults + numChildren;
-      const response = await toursApi.checkAvailability(tour._id, dateStr, totalGuests);
+      const response = await toursApi.checkAvailability(
+        tour._id,
+        dateStr,
+        totalGuests,
+        activeGuideId
+      );
       setAvailabilityStatus(response);
     } catch (error) {
       console.error("Check availability error:", error);
@@ -153,7 +184,7 @@ export default function TourDetailPage() {
     } finally {
       setAvailabilityLoading(false);
     }
-  }, [tour?._id]);
+  }, [tour?._id, activeGuideId]);
   
   // Re-check when guests change
   useEffect(() => {
@@ -164,6 +195,60 @@ export default function TourDetailPage() {
       return () => clearTimeout(timer);
     }
   }, [adults, children, selectedDate, checkAvailability]);
+
+  // Fetch busy dates for the active guide (runs every render to keep hook order stable)
+  useEffect(() => {
+    let ignore = false;
+    const fetchBusy = async () => {
+      if (!activeGuideId) {
+        setBusyDates([]);
+        return;
+      }
+      try {
+        setBusyDatesLoading(true);
+        const from = new Date();
+        from.setHours(0, 0, 0, 0);
+        const to = new Date(from);
+        to.setMonth(to.getMonth() + 6);
+
+        const response = await guidesApi.getGuideBusyDates(activeGuideId, {
+          from: from.toISOString(),
+          to: to.toISOString(),
+        });
+
+        const items =
+          response?.busyDates ||
+          response?.data?.busyDates ||
+          response?.items ||
+          response?.data || [];
+
+        if (!ignore) setBusyDates(items);
+      } catch (err) {
+        console.error("Fetch guide busy dates error:", err);
+        if (!ignore) setBusyDates([]);
+      } finally {
+        if (!ignore) setBusyDatesLoading(false);
+      }
+    };
+
+    fetchBusy();
+    return () => {
+      ignore = true;
+    };
+  }, [activeGuideId]);
+
+  const busyDateSet = useMemo(() => {
+    try {
+      return new Set(
+        (busyDates || []).map((bd) => {
+          const d = new Date(bd.date);
+          return format(d, "yyyy-MM-dd");
+        })
+      );
+    } catch {
+      return new Set();
+    }
+  }, [busyDates]);
 
   // Click Outside
   useEffect(() => {
@@ -384,12 +469,6 @@ export default function TourDetailPage() {
     tour.gallery?.[0] ||
     "/images/placeholders/tour-placeholder.jpg";
 
-  // Main guide (người đầu tiên có isMain hoặc isPrimary)
-  const mainGuide =
-    tour.guides?.find((g) => g.isMain || g.isPrimary) ||
-    tour.guides?.[0] ||
-    tour.guide_id;
-
   // Build guide options from tour.guides
   const guideOptions = [
     defaultGuideOption,
@@ -468,7 +547,7 @@ export default function TourDetailPage() {
                   </span>
                   <span className="w-1 h-1 rounded-full bg-border-light"></span>
                   <span className="inline-flex items-center gap-1.5 text-[#BC4C00]">
-                    <IconStar className="w-4 h-4" />
+                    <IconStar filled className="w-4 h-4 text-[#BC4C00]" />
                     <span className="underline decoration-[#BC4C00]/30 underline-offset-2">
                       {tourRating.toFixed(1)} ({tourReviewCount} đánh giá)
                     </span>
@@ -706,6 +785,12 @@ export default function TourDetailPage() {
                 if (!displayGuide) return null;
 
                 const guideData = displayGuide.guideId || displayGuide;
+                const guideProfileId =
+                  guideData?.user_id?._id ||
+                  guideData?.user_id ||
+                  guideData?._id ||
+                  guideData ||
+                  displayGuide?._id;
                 const isMain = displayGuide.isMain || displayGuide.isPrimary;
 
                 return (
@@ -719,12 +804,14 @@ export default function TourDetailPage() {
                           </span>
                         )}
                       </h3>
-                      <Link
-                        to={`/guides/${guideData?._id || displayGuide._id}`}
-                        className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
-                      >
-                        Xem hồ sơ <IconArrowRight className="w-3 h-3" />
-                      </Link>
+                      {guideProfileId ? (
+                        <Link
+                          to={`/guides/${guideProfileId}`}
+                          className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
+                        >
+                          Xem hồ sơ <IconArrowRight className="w-3 h-3" />
+                        </Link>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
@@ -807,7 +894,10 @@ export default function TourDetailPage() {
                               selected={selectedDate}
                               onSelect={handleSelectDate}
                               locale={vi}
-                              disabled={{ before: new Date() }}
+                              disabled={[
+                                { before: new Date() },
+                                (date) => busyDateSet.has(format(date, "yyyy-MM-dd")),
+                              ]}
                               fromDate={new Date()}
                               modifiersClassNames={{
                                 selected:
@@ -815,6 +905,16 @@ export default function TourDetailPage() {
                                 today: "text-primary font-bold",
                               }}
                             />
+                            {busyDatesLoading && (
+                              <p className="text-[11px] text-text-secondary mt-2">
+                                Đang tải ngày bận của HDV...
+                              </p>
+                            )}
+                            {!busyDatesLoading && busyDates.length > 0 && (
+                              <p className="text-[11px] text-text-secondary mt-2">
+                                Ngày gạch xám là HDV đã đánh dấu bận.
+                              </p>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1168,8 +1268,11 @@ export default function TourDetailPage() {
                         {Array.from({ length: 5 }).map((_, i) => (
                           <IconStar
                             key={i}
+                            filled={i < (review.rating || 0)}
                             className={`w-3.5 h-3.5 ${
-                              i < review.rating ? "" : "opacity-30"
+                              i < (review.rating || 0)
+                                ? "text-[#BC4C00]"
+                                : "text-[#BC4C00] opacity-30"
                             }`}
                           />
                         ))}

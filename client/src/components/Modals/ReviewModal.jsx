@@ -1,17 +1,39 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useToast } from "../Toast/useToast";
 import { IconStar, IconCheck } from "../../icons/IconBox";
 import { IconX } from "../../icons/IconX";
 import { IconUpload } from "../../icons/IconCommon";
 
-export default function ReviewModal({ isOpen, onClose, booking, onSubmit }) {
+export default function ReviewModal({
+  isOpen,
+  onClose,
+  booking,
+  onSubmit,
+  title = "Viết đánh giá",
+  subjectName,
+  subjectImage,
+}) {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState("");
   const [images, setImages] = useState([]);
   const toast = useToast();
 
+  // Reset state when modal opens or booking changes
+  useEffect(() => {
+    if (isOpen && booking) {
+      setRating(0);
+      setHoverRating(0);
+      setComment("");
+      setImages([]);
+    }
+  }, [isOpen, booking?.id]);
+
   if (!isOpen || !booking) return null;
+
+  const headingTitle = title || "Viết đánh giá";
+  const displayName = subjectName || booking.tourName;
+  const displayImage = subjectImage || booking.image;
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -49,7 +71,7 @@ export default function ReviewModal({ isOpen, onClose, booking, onSubmit }) {
         {/* Header */}
         <div className="px-6 py-4 border-b border-border-light flex justify-between items-center bg-bg-main/30">
           <h3 className="text-lg font-heading font-bold text-text-primary">
-            Viết đánh giá
+            {headingTitle}
           </h3>
           <button
             onClick={onClose}
@@ -64,8 +86,8 @@ export default function ReviewModal({ isOpen, onClose, booking, onSubmit }) {
           {/* Tour Info Summary */}
           <div className="flex gap-4 items-center">
             <img
-              src={booking.image}
-              alt={booking.tourName}
+              src={displayImage}
+              alt={displayName}
               className="w-16 h-16 rounded-xl object-cover"
             />
             <div>
@@ -73,7 +95,7 @@ export default function ReviewModal({ isOpen, onClose, booking, onSubmit }) {
                 Bạn đang đánh giá
               </p>
               <h4 className="text-sm font-bold text-text-primary line-clamp-2">
-                {booking.tourName}
+                {displayName}
               </h4>
             </div>
           </div>
@@ -81,7 +103,7 @@ export default function ReviewModal({ isOpen, onClose, booking, onSubmit }) {
           {/* Star Rating */}
           <div className="flex flex-col items-center gap-2">
             <p className="text-sm font-medium text-text-secondary">
-              Bạn cảm thấy chuyến đi thế nào?
+              Bạn cảm thấy trải nghiệm thế nào?
             </p>
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map((star) => (

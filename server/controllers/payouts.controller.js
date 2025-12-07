@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import PayoutRequest from "../models/PayoutRequest.js";
 import User from "../models/User.js";
 import Transaction from "../models/Transaction.js";
+import GuideProfile from "../models/GuideProfile.js";
 import { notifyUser, notifyAdmins } from "../services/notify.js";
 
 /**
@@ -176,6 +177,25 @@ export const adminListPayoutRequests = async (req, res) => {
             PayoutRequest.countDocuments({ status: "pending" })
         ]);
 
+        // Fetch guide bank accounts in bulk to avoid per-row lookups
+        const guideIds = items
+            .map(item => item.guide?._id)
+            .filter(Boolean)
+            .map(id => id.toString());
+
+        let bankAccountMap = {};
+        if (guideIds.length > 0) {
+            const profiles = await GuideProfile
+                .find({ user_id: { $in: guideIds } })
+                .select("user_id bank_account")
+                .lean();
+
+            bankAccountMap = (profiles || []).reduce((acc, profile) => {
+                acc[String(profile.user_id)] = profile.bank_account || null;
+                return acc;
+            }, {});
+        }
+
         // Filter by search if provided (search in guide name/email)
         let filteredItems = items;
         if (search) {
@@ -186,9 +206,16 @@ export const adminListPayoutRequests = async (req, res) => {
             );
         }
 
+        const itemsWithBank = filteredItems.map(item => {
+            const obj = item.toObject();
+            const guideId = item.guide?._id ? String(item.guide._id) : null;
+            obj.bankAccount = guideId ? bankAccountMap[guideId] || null : null;
+            return obj;
+        });
+
         return res.json({
             ok: true,
-            items: filteredItems,
+            items: itemsWithBank,
             total,
             pendingCount,
             page: parseInt(page),
