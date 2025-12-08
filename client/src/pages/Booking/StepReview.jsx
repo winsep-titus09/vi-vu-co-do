@@ -260,6 +260,14 @@ export default function BookingStepReview() {
 
               <button
                 onClick={async () => {
+                  // Nếu chưa đăng nhập, chuyển sang trang đăng nhập và giữ lại bookingData
+                  if (!user) {
+                    navigate("/auth/signin", {
+                      state: { redirectTo: location.pathname, bookingData },
+                    });
+                    return;
+                  }
+
                   // Validate required fields
                   if (!contactInfo.full_name.trim()) {
                     toast.warning("Thiếu thông tin", "Vui lòng nhập họ tên");

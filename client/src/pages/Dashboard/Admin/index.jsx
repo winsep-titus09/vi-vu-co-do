@@ -251,7 +251,8 @@ export default function AdminDashboard() {
   const revenueChartData = useMemo(
     () =>
       (revenues || []).map((item, index) => {
-        const raw = Number(item?.totalRevenue || 0);
+        // convert Decimal128 or string to number to avoid NaN in chart
+        const raw = decimalToNumber(item?.totalRevenue || item?.total_revenue || 0);
         return {
           id: item?.tourId || index,
           name:

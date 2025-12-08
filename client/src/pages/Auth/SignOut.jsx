@@ -8,11 +8,15 @@ export default function SignOut() {
 
   useEffect(() => {
     const handleLogout = async () => {
+      const token = localStorage.getItem("token");
       try {
-        // Call logout API
-        await authApi.logout();
+        // Chỉ gọi API khi còn token để tránh 404/401 không cần thiết
+        if (token) {
+          await authApi.logout();
+        }
       } catch (error) {
-        console.error("Logout error:", error);
+        // Nuốt lỗi để không chặn luồng đăng xuất; backend có thể trả 404/401 khi token đã hết hạn
+        console.warn("Logout warning:", error?.response?.status || error?.message);
       } finally {
         // Clear local storage regardless of API response
         localStorage.removeItem("token");

@@ -23,11 +23,11 @@ function buildTourIdMatch(tourIdObj) {
 function buildPaidMatch() {
     return {
         $or: [
-            { payment_status: "paid" },
-            { status: "paid" },
-            { "payment.session.status": "paid" },
-            { "payment.status": "paid" },
-            { payment_state: "paid" }
+            { payment_status: { $in: ["paid", "completed"] } },
+            { status: { $in: ["paid", "completed"] } },
+            { "payment.session.status": { $in: ["paid", "completed"] } },
+            { "payment.status": { $in: ["paid", "completed"] } },
+            { payment_state: { $in: ["paid", "completed"] } }
         ]
     };
 }
@@ -134,7 +134,14 @@ export const listToursRevenue = async (req, res) => {
         ];
 
         const results = await Booking.aggregate(pipeline);
-        return res.json({ ok: true, data: results });
+        // ensure numbers are plain JS numbers (Decimal128 -> Number)
+        const normalized = results.map((item) => ({
+            ...item,
+            totalRevenue: Number(item.totalRevenue || 0),
+            bookingsCount: Number(item.bookingsCount || 0)
+        }));
+
+        return res.json({ ok: true, data: normalized });
     } catch (err) {
         console.error("listToursRevenue error:", err);
         return res.status(500).json({ ok: false, message: "Server error", error: err.message });
@@ -190,8 +197,8 @@ export const getTourRevenue = async (req, res) => {
             }
         ];
         const totalRes = await Booking.aggregate(totalPipeline);
-        const totalRevenue = (totalRes[0] && totalRes[0].totalRevenue) || 0;
-        const bookingsCount = (totalRes[0] && totalRes[0].bookingsCount) || 0;
+        const totalRevenue = Number((totalRes[0] && totalRes[0].totalRevenue) || 0);
+        const bookingsCount = Number((totalRes[0] && totalRes[0].bookingsCount) || 0);
 
         let byDate = [];
         if (groupBy === "date") {
@@ -207,6 +214,11 @@ export const getTourRevenue = async (req, res) => {
                 { $sort: { "_id": 1 } }
             ];
             byDate = await Booking.aggregate(byDatePipeline);
+            byDate = byDate.map((item) => ({
+                ...item,
+                revenue: Number(item.revenue || 0),
+                bookingsCount: Number(item.bookingsCount || 0)
+            }));
         }
 
         return res.json({
