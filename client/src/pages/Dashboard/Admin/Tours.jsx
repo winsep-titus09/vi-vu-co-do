@@ -31,6 +31,25 @@ import {
 } from "../../../features/admin/hooks";
 import { formatCurrency, formatDate, formatTourDuration } from "../../../lib/formatters";
 
+const getTourImage = (tour) => {
+  const candidate =
+    tour.cover_image_url ||
+    tour.cover_image ||
+    tour.image_url ||
+    tour.image ||
+    tour.thumbnail ||
+    (Array.isArray(tour.images) && tour.images[0]) ||
+    (Array.isArray(tour.gallery) && tour.gallery[0]) ||
+    null;
+
+  if (!candidate) return "/images/placeholders/tour-placeholder.jpg";
+  if (typeof candidate === "string") return candidate;
+  if (candidate.url) return candidate.url;
+  if (candidate.src) return candidate.src;
+  if (candidate.path) return candidate.path;
+  return "/images/placeholders/tour-placeholder.jpg";
+};
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -112,6 +131,7 @@ export default function Tours() {
     open: false,
     request: null,
   });
+  const [previewTour, setPreviewTour] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
 
   // Get status filter for API
@@ -710,14 +730,24 @@ export default function Tours() {
                         </td>
                         <td className="p-4 pr-6 text-right">
                           <div className="flex justify-end gap-2">
-                            <Link
-                              to={`/tours/${tour._id}`}
-                              target="_blank"
-                              className="p-2 rounded-lg bg-gray-50 text-text-secondary hover:bg-gray-100 transition-colors"
-                              title="Xem chi tiết"
-                            >
-                              <IconEye className="w-4 h-4" />
-                            </Link>
+                            {getTourStatus(tour) === "pending" ? (
+                              <button
+                                onClick={() => setPreviewTour(tour)}
+                                className="p-2 rounded-lg bg-gray-50 text-text-secondary hover:bg-gray-100 transition-colors"
+                                title="Xem trước"
+                              >
+                                <IconEye className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <Link
+                                to={`/tours/${tour.slug || tour._id}`}
+                                target="_blank"
+                                className="p-2 rounded-lg bg-gray-50 text-text-secondary hover:bg-gray-100 transition-colors"
+                                title="Xem chi tiết"
+                              >
+                                <IconEye className="w-4 h-4" />
+                              </Link>
+                            )}
                             {/* Nút đánh dấu tiêu biểu */}
                             {getTourStatus(tour) === "active" && (
                               <button
@@ -1034,6 +1064,156 @@ export default function Tours() {
               >
                 {rejectTourLoading ? "Đang xử lý..." : "Từ chối"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Tour Modal */}
+      {previewTour && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setPreviewTour(null)}
+          ></div>
+
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden z-10 animate-fade-in-up">
+            <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-border-light bg-gray-50">
+              <div className="min-w-0">
+                <p className="text-xs text-text-secondary uppercase font-bold">
+                  Xem trước tour
+                </p>
+                <h3 className="text-xl font-heading font-bold text-text-primary truncate">
+                  {previewTour.name}
+                </h3>
+                <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-text-secondary">
+                  <span className="px-2 py-0.5 rounded-full bg-bg-main text-text-primary font-bold">
+                    Giá: {formatCurrency(previewTour.price || 0)} / khách
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-bg-main text-text-primary font-bold flex items-center gap-1">
+                    <IconClock className="w-3 h-3" />
+                    {formatTourDuration(previewTour)}
+                  </span>
+                  {previewTour.category_id?.name && (
+                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+                      {previewTour.category_id.name}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewTour(null)}
+                className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                title="Đóng"
+              >
+                <IconX className="w-5 h-5 text-text-secondary" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto max-h-[calc(90vh-140px)] px-6 py-5 space-y-5">
+              <div className="rounded-2xl overflow-hidden border border-border-light">
+                <img
+                  src={getTourImage(previewTour)}
+                  alt={previewTour.name}
+                  className="w-full h-64 object-cover"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="p-4 bg-bg-main rounded-xl border border-border-light">
+                  <p className="text-text-secondary text-xs font-bold uppercase mb-1">Giá</p>
+                  <p className="text-text-primary font-bold">{formatCurrency(previewTour.price || 0)} / khách</p>
+                </div>
+                <div className="p-4 bg-bg-main rounded-xl border border-border-light">
+                  <p className="text-text-secondary text-xs font-bold uppercase mb-1">Thời lượng</p>
+                  <p className="text-text-primary font-bold">{formatTourDuration(previewTour)}</p>
+                </div>
+                <div className="p-4 bg-bg-main rounded-xl border border-border-light">
+                  <p className="text-text-secondary text-xs font-bold uppercase mb-1">Số khách tối đa</p>
+                  <p className="text-text-primary font-bold">{previewTour.max_guests || "—"}</p>
+                </div>
+              </div>
+
+              {previewTour.description && (
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-text-primary">Mô tả</p>
+                  <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
+                    {previewTour.description}
+                  </p>
+                </div>
+              )}
+
+              {Array.isArray(previewTour.highlights) && previewTour.highlights.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-text-primary">Điểm nổi bật</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-text-secondary">
+                    {previewTour.highlights.map((h, idx) => (
+                      <li key={idx}>{h}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {Array.isArray(previewTour.locations) && previewTour.locations.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-text-primary">Địa điểm</p>
+                  <div className="flex flex-wrap gap-2 text-sm">
+                    {previewTour.locations.map((loc, idx) => (
+                      <span
+                        key={loc._id || loc.locationId || idx}
+                        className="px-3 py-1 rounded-full bg-primary/10 text-primary font-bold"
+                      >
+                        {loc.locationId?.name || loc.name || loc.title || "Địa điểm"}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {Array.isArray(previewTour.itinerary) && previewTour.itinerary.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm font-bold text-text-primary">Lịch trình</p>
+                  <div className="space-y-2 text-sm text-text-secondary">
+                    {previewTour.itinerary.slice(0, 6).map((item, idx) => (
+                      <div
+                        key={item.id || idx}
+                        className="p-3 rounded-xl border border-border-light bg-bg-main flex items-start gap-3"
+                      >
+                        <span className="text-xs font-bold text-primary w-12 shrink-0">
+                          {item.time || `#${idx + 1}`}
+                        </span>
+                        <div>
+                          <p className="font-bold text-text-primary">{item.title || "Hoạt động"}</p>
+                          <p className="text-sm text-text-secondary">
+                            {item.details || item.description || ""}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    {previewTour.itinerary.length > 6 && (
+                      <p className="text-xs text-text-secondary italic">
+                        … {previewTour.itinerary.length - 6} mục lịch trình khác
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-border-light bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={() => setPreviewTour(null)}
+                className="px-4 py-2 rounded-xl border border-border-light text-sm font-bold text-text-secondary hover:bg-gray-100"
+              >
+                Đóng
+              </button>
+              <Link
+                to={`/tours/${previewTour.slug || previewTour._id}`}
+                target="_blank"
+                className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90"
+              >
+                Xem trang tour
+              </Link>
             </div>
           </div>
         </div>

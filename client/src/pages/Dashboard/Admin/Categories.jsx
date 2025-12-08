@@ -3,6 +3,10 @@ import { useToast } from "../../../components/Toast/useToast";
 import {
   useCategories,
   useCategoryActions,
+  useLocationCategories,
+  useLocationCategoryActions,
+  useArticleCategories,
+  useArticleCategoryActions,
 } from "../../../features/categories/hooks";
 import Spinner from "../../../components/Loaders/Spinner";
 import { IconCheck } from "../../../icons/IconBox";
@@ -30,14 +34,79 @@ const createSlug = (text) =>
 export default function AdminCategories() {
   const toast = useToast();
 
-  // API hooks
-  const { categories, isLoading, error, refetch } = useCategories();
+  const [activeType, setActiveType] = useState("tour"); // "tour" | "location" | "article"
+
+  // API hooks - tour categories
   const {
-    createCategory,
-    updateCategory,
-    deleteCategory,
-    isLoading: isActionLoading,
+    categories: tourCategories,
+    isLoading: tourLoading,
+    error: tourError,
+    refetch: refetchTour,
+  } = useCategories();
+  const {
+    createCategory: createTourCategory,
+    updateCategory: updateTourCategory,
+    deleteCategory: deleteTourCategory,
+    isLoading: isTourActionLoading,
   } = useCategoryActions();
+
+  // API hooks - location categories
+  const {
+    categories: locationCategories,
+    isLoading: locationLoading,
+    error: locationError,
+    refetch: refetchLocation,
+  } = useLocationCategories();
+  const {
+    createCategory: createLocationCategory,
+    updateCategory: updateLocationCategory,
+    deleteCategory: deleteLocationCategory,
+    isLoading: isLocationActionLoading,
+  } = useLocationCategoryActions();
+
+  // API hooks - article categories
+  const {
+    categories: articleCategories,
+    isLoading: articleLoading,
+    error: articleError,
+    refetch: refetchArticle,
+  } = useArticleCategories();
+  const {
+    createCategory: createArticleCategory,
+    updateCategory: updateArticleCategory,
+    deleteCategory: deleteArticleCategory,
+    isLoading: isArticleActionLoading,
+  } = useArticleCategoryActions();
+
+  const isTour = activeType === "tour";
+  const isLocation = activeType === "location";
+  const isArticle = activeType === "article";
+
+  const categories = isTour
+    ? tourCategories
+    : isLocation
+    ? locationCategories
+    : articleCategories;
+
+  const isLoading = isTour
+    ? tourLoading
+    : isLocation
+    ? locationLoading
+    : articleLoading;
+
+  const error = isTour
+    ? tourError
+    : isLocation
+    ? locationError
+    : articleError;
+
+  const refetch = isTour ? refetchTour : isLocation ? refetchLocation : refetchArticle;
+
+  const isActionLoading = isTour
+    ? isTourActionLoading
+    : isLocation
+    ? isLocationActionLoading
+    : isArticleActionLoading;
 
   // Local state
   const [newCat, setNewCat] = useState("");
@@ -54,12 +123,17 @@ export default function AdminCategories() {
       return;
     }
 
-    const data = {
-      name: newCat.trim(),
-      slug: createSlug(newCat),
-    };
+    const data = isTour
+      ? { name: newCat.trim(), slug: createSlug(newCat) }
+      : isLocation
+      ? { name: newCat.trim() }
+      : { name: newCat.trim(), slug: createSlug(newCat) };
 
-    const result = await createCategory(data);
+    const result = isTour
+      ? await createTourCategory(data)
+      : isLocation
+      ? await createLocationCategory(data)
+      : await createArticleCategory(data);
     if (result.success) {
       toast.success("Thành công!", "Đã thêm danh mục mới.");
       setNewCat("");
@@ -73,19 +147,23 @@ export default function AdminCategories() {
   const handleDelete = async (id, name) => {
     if (!window.confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) return;
 
-    const result = await deleteCategory(id);
+    const result = isTour
+      ? await deleteTourCategory(id)
+      : isLocation
+      ? await deleteLocationCategory(id)
+      : await deleteArticleCategory(id);
     if (result.success) {
       toast.success("Thành công!", "Đã xóa danh mục.");
       refetch();
     } else {
       // If category is in use, ask to force delete
-      if (result.error?.includes("đang được dùng")) {
+      if (isTour && result.error?.includes("đang được dùng")) {
         if (
           window.confirm(
             `${result.error}\n\nBạn có muốn gỡ liên kết và xóa không?`
           )
         ) {
-          const forceResult = await deleteCategory(id, true);
+          const forceResult = await deleteTourCategory(id, true);
           if (forceResult.success) {
             toast.success("Thành công!", "Đã xóa danh mục và gỡ liên kết.");
             refetch();
@@ -114,10 +192,14 @@ export default function AdminCategories() {
 
     const data = {
       name: editValue.trim(),
-      slug: createSlug(editValue),
+      ...((isTour || isArticle) ? { slug: createSlug(editValue) } : {}),
     };
 
-    const result = await updateCategory(id, data);
+    const result = isTour
+      ? await updateTourCategory(id, data)
+      : isLocation
+      ? await updateLocationCategory(id, data)
+      : await updateArticleCategory(id, data);
     if (result.success) {
       toast.success("Thành công!", "Đã cập nhật danh mục.");
       setEditingId(null);
@@ -138,12 +220,14 @@ export default function AdminCategories() {
   const filteredCats = useMemo(() => {
     if (!search.trim()) return categories;
     const searchLower = search.toLowerCase();
-    return categories.filter(
-      (c) =>
-        c.name?.toLowerCase().includes(searchLower) ||
-        c.slug?.toLowerCase().includes(searchLower)
-    );
-  }, [categories, search]);
+    return categories.filter((c) => {
+      const nameMatch = c.name?.toLowerCase().includes(searchLower);
+      const slugMatch = (isTour || isArticle)
+        ? c.slug?.toLowerCase().includes(searchLower)
+        : false;
+      return nameMatch || slugMatch;
+    });
+  }, [categories, search, isTour, isArticle]);
 
   // Handle Enter Key
   const handleKeyDown = (e, action) => {
@@ -184,7 +268,7 @@ export default function AdminCategories() {
             Quản lý Danh mục
           </h1>
           <p className="text-text-secondary text-sm mt-1">
-            Phân loại Tour và Địa điểm để người dùng dễ tìm kiếm.
+            Phân loại Tour, Địa điểm và Bài viết để người dùng dễ tìm kiếm.
           </p>
         </div>
 
@@ -192,7 +276,13 @@ export default function AdminCategories() {
         <div className="relative w-full md:w-64">
           <input
             type="text"
-            placeholder="Tìm danh mục..."
+            placeholder={
+              isTour
+                ? "Tìm danh mục tour..."
+                : isLocation
+                ? "Tìm danh mục địa điểm..."
+                : "Tìm danh mục bài viết..."
+            }
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -203,23 +293,57 @@ export default function AdminCategories() {
 
       <div className="bg-white rounded-3xl border border-border-light shadow-sm overflow-hidden">
         {/* Add New Row */}
-        <div className="p-4 md:p-6 border-b border-border-light bg-bg-main/30 flex flex-col md:flex-row gap-3">
-          <input
-            type="text"
-            placeholder="Nhập tên danh mục mới..."
-            className="flex-1 px-4 py-3 rounded-xl border border-border-light focus:border-primary outline-none text-sm"
-            value={newCat}
-            onChange={(e) => setNewCat(e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, handleAdd)}
-            disabled={isActionLoading}
-          />
-          <button
-            onClick={handleAdd}
-            disabled={!newCat.trim() || isActionLoading}
-            className="px-6 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 shadow-lg shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
-          >
-            <IconPlus className="w-4 h-4" /> Thêm mới
-          </button>
+        <div className="p-4 md:p-6 border-b border-border-light bg-bg-main/30 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: "tour", label: "Danh mục Tour" },
+              { key: "location", label: "Danh mục Địa điểm" },
+              { key: "article", label: "Danh mục Bài viết" },
+            ].map(
+              (tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => {
+                    setActiveType(tab.key);
+                    setEditingId(null);
+                    setEditValue("");
+                  }}
+                  className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors border ${
+                    activeType === tab.key
+                      ? "bg-primary text-white border-primary"
+                      : "text-text-secondary border-border-light hover:border-primary"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              )
+            )}
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-3">
+            <input
+              type="text"
+              placeholder={
+                isTour
+                  ? "Nhập tên danh mục tour mới..."
+                  : isLocation
+                  ? "Nhập tên danh mục địa điểm mới..."
+                  : "Nhập tên danh mục bài viết mới..."
+              }
+              className="flex-1 px-4 py-3 rounded-xl border border-border-light focus:border-primary outline-none text-sm"
+              value={newCat}
+              onChange={(e) => setNewCat(e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, handleAdd)}
+              disabled={isActionLoading}
+            />
+            <button
+              onClick={handleAdd}
+              disabled={!newCat.trim() || isActionLoading}
+              className="px-6 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 shadow-lg shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+            >
+              <IconPlus className="w-4 h-4" /> Thêm mới
+            </button>
+          </div>
         </div>
 
         {/* List */}
@@ -260,22 +384,24 @@ export default function AdminCategories() {
                       <p className="font-bold text-text-primary truncate">
                         {cat.name}
                       </p>
-                      <p className="text-xs text-text-secondary flex items-center gap-2">
-                        <span className="bg-gray-100 px-1.5 rounded text-[10px] font-mono">
-                          /{cat.slug}
-                        </span>
-                        {cat.status && (
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              cat.status === "active"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-600"
-                            }`}
-                          >
-                            {cat.status === "active" ? "Hoạt động" : "Ẩn"}
+                      {(isTour || isArticle) && (
+                        <p className="text-xs text-text-secondary flex items-center gap-2">
+                          <span className="bg-gray-100 px-1.5 rounded text-[10px] font-mono">
+                            /{cat.slug}
                           </span>
-                        )}
-                      </p>
+                          {isTour && cat.status && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                cat.status === "active"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              {cat.status === "active" ? "Hoạt động" : "Ẩn"}
+                            </span>
+                          )}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

@@ -140,9 +140,13 @@ export const applyGuide = async (req, res) => {
         applicantId: user._id,
         applicantName: user.name,
         applicantEmail: user.email,
-        adminUrl: `${process.env.APP_BASE_URL || ""}/admin/guide-applications/${
-          appDoc._id
-        }`,
+        applicantPhone: user.phone_number || user.phone || "",
+        guideName: user.name,
+        guideEmail: user.email,
+        guidePhone: user.phone_number || user.phone || "",
+        applicationDate: (appDoc.createdAt || new Date()).toLocaleString("vi-VN"),
+        adminUrl: `${process.env.APP_BASE_URL || ""}/admin/guide-applications/${appDoc._id
+          }`,
       },
     });
 

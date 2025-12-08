@@ -236,6 +236,14 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                     data: baseMeta
                 });
                 break;
+            case "booking:paid_guide":
+                await sendTemplateEmail({
+                    to,
+                    subject: "Khách đã thanh toán tour",
+                    templateKey: "bookingPaidGuide",
+                    data: baseMeta
+                });
+                break;
             case "booking:refund_requested":
             case "booking:refund_requested:confirm":
                 await sendTemplateEmail({
@@ -276,6 +284,14 @@ async function maybeSendEmail({ audience, recipientId, type, content, url, meta 
                 await sendTemplateEmail({
                     to,
                     subject: "Payout đã được thực hiện",
+                    templateKey: "payoutPaid",
+                    data: baseMeta
+                });
+                break;
+            case "payout:approved":
+                await sendTemplateEmail({
+                    to,
+                    subject: "Rút tiền đã được chuyển",
                     templateKey: "payoutPaid",
                     data: baseMeta
                 });

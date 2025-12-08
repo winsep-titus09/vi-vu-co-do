@@ -366,7 +366,7 @@ export default function GuideBookingDetail() {
                   {booking.tour.location}
                 </p>
                 <Link
-                  to={`/tours/${booking.tour.id}`}
+                  to={`/tours/${booking.tour.slug || booking.tour.id}`}
                   className="text-sm font-bold text-primary hover:underline mt-2 inline-block"
                 >
                   Xem chi tiết tour

@@ -7,7 +7,7 @@ import {
   extractImageUrls,
 } from "../utils/html.js";
 import { notifyUser, notifyAdmins } from "../services/notify.js";
-import { toSlug } from "../utils/slug.js";
+import { ensureUniqueSlug } from "../utils/slug.js";
 
 /* Allowed tags/attrs for sanitizer */
 const DEFAULT_ALLOWED_TAGS = sanitizeHtml.defaults.allowedTags.concat([
@@ -189,7 +189,7 @@ export const getRelatedArticles = async (req, res) => {
         .populate("authorId", "name avatar_url")
         .populate("categoryId", "name slug")
         .lean();
-      
+
       relatedArticles = [...relatedArticles, ...byAuthor];
     }
 
@@ -205,7 +205,7 @@ export const getRelatedArticles = async (req, res) => {
         .populate("authorId", "name avatar_url")
         .populate("categoryId", "name slug")
         .lean();
-      
+
       relatedArticles = [...relatedArticles, ...latest];
     }
 
@@ -231,9 +231,16 @@ export const createArticle = async (req, res) => {
     const excerpt = excerptText(excerptRaw, 300);
     const images = extractImageUrls(content);
 
+    const title = String(body.title || "").trim();
+    const slugBase =
+      (body.slug && String(body.slug).trim()) ||
+      title ||
+      `article-${Date.now()}`;
+    const slug = await ensureUniqueSlug(Article, slugBase);
+
     const doc = await Article.create({
-      title: String(body.title || "").trim(),
-      slug: body.slug ? String(body.slug).trim() : undefined,
+      title,
+      slug,
       summary: body.summary ? String(body.summary).trim() : undefined,
       content_html: content,
       excerpt,
@@ -350,7 +357,12 @@ export const updateMyArticle = async (req, res) => {
 
     // update allowed fields only
     doc.title = body.title ? String(body.title).trim() : doc.title;
-    doc.slug = body.slug ? String(body.slug).trim() : doc.slug;
+    const slugBase =
+      (body.slug && String(body.slug).trim()) ||
+      doc.slug ||
+      doc.title ||
+      `article-${doc._id}`;
+    doc.slug = await ensureUniqueSlug(Article, slugBase, doc._id);
     doc.summary = body.summary ? String(body.summary).trim() : doc.summary;
     doc.content_html = content;
     doc.excerpt = excerpt;
@@ -424,7 +436,7 @@ export const deleteArticle = async (req, res) => {
           type: "article:deleted",
           content: `Bài viết "${doc.title}" đã bị xóa bởi quản trị viên.`,
           url: "/guide/articles",
-          meta: { articleId: doc._id },
+          meta: { articleId: doc._id, articleTitle: doc.title, slug: doc.slug },
         });
       }
     } catch (e) {
@@ -485,9 +497,9 @@ export const deleteFeatureImage = async (req, res) => {
           () => null
         );
         if (uploader && typeof uploader.deleteFileByUrl === "function") {
-          await uploader.deleteFileByUrl(imageUrl).catch(() => {});
+          await uploader.deleteFileByUrl(imageUrl).catch(() => { });
         }
-      } catch (e) {}
+      } catch (e) { }
 
       return res.json({ message: "Đã xóa ảnh khỏi bài viết.", data: doc });
     }
@@ -512,9 +524,9 @@ export const deleteFeatureImage = async (req, res) => {
         () => null
       );
       if (uploader && typeof uploader.deleteFileByUrl === "function") {
-        await uploader.deleteFileByUrl(removedUrl).catch(() => {});
+        await uploader.deleteFileByUrl(removedUrl).catch(() => { });
       }
-    } catch (e) {}
+    } catch (e) { }
 
     return res.json({ message: "Đã xóa ảnh bìa.", data: doc });
   } catch (err) {
@@ -554,11 +566,11 @@ export const adminListArticles = async (req, res) => {
       ...doc,
       author: doc.authorId
         ? {
-            _id: doc.authorId._id,
-            name: doc.authorId.name,
-            email: doc.authorId.email,
-            role: doc.authorId.role_id?.name || null,
-          }
+          _id: doc.authorId._id,
+          name: doc.authorId.name,
+          email: doc.authorId.email,
+          role: doc.authorId.role_id?.name || null,
+        }
         : null,
       category: doc.categoryId || null,
     }));
@@ -605,8 +617,8 @@ export const adminApproveArticle = async (req, res) => {
         userId: doc.authorId,
         type: "article:approved",
         content: `Bài viết "${doc.title}" đã được duyệt.`,
-        url: `/articles/${doc._id}`,
-        meta: { articleId: doc._id, articleTitle: doc.title },
+        url: `/blog/${doc.slug || doc._id}`,
+        meta: { articleId: doc._id, articleTitle: doc.title, slug: doc.slug },
       });
     } catch (e) {
       console.warn("notifyUser article approved failed:", e);
@@ -651,7 +663,7 @@ export const adminRejectArticle = async (req, res) => {
           type: "article:rejected",
           content: `Bài viết "${doc.title}" đã bị từ chối.`,
           url: `/guide/articles/${doc._id}`,
-          meta: { articleId: doc._id, reason: notes || "" },
+          meta: { articleId: doc._id, articleTitle: doc.title, slug: doc.slug, notes: notes || "" },
         });
       }
     } catch (e) {
@@ -680,16 +692,16 @@ export const adminCreateArticle = async (req, res) => {
     const excerpt = excerptText(excerptRaw, 300);
     const images = extractImageUrls(content);
 
-    // Generate unique slug from title
     const title = String(body.title || "").trim();
-    const baseSlug = body.slug ? String(body.slug).trim() : toSlug(title);
-    const uniqueSlug = baseSlug
-      ? `${baseSlug}-${Date.now()}`
-      : `article-${Date.now()}`;
+    const slugBase =
+      (body.slug && String(body.slug).trim()) ||
+      title ||
+      `article-${Date.now()}`;
+    const slug = await ensureUniqueSlug(Article, slugBase);
 
     const doc = await Article.create({
       title,
-      slug: uniqueSlug,
+      slug,
       summary: body.summary ? String(body.summary).trim() : undefined,
       content_html: content,
       excerpt,
@@ -742,7 +754,12 @@ export const adminUpdateArticle = async (req, res) => {
 
     // update fields
     doc.title = body.title ? String(body.title).trim() : doc.title;
-    doc.slug = body.slug ? String(body.slug).trim() : doc.slug;
+    const slugBase =
+      (body.slug && String(body.slug).trim()) ||
+      doc.slug ||
+      doc.title ||
+      `article-${doc._id}`;
+    doc.slug = await ensureUniqueSlug(Article, slugBase, doc._id);
     doc.summary = body.summary ? String(body.summary).trim() : doc.summary;
     doc.content_html = content;
     doc.excerpt = excerpt;

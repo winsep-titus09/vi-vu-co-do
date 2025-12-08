@@ -315,33 +315,6 @@ export const getAvailableGuides = async (req, res) => {
     }
     targetDate.setHours(0, 0, 0, 0);
 
-    // Lấy tất cả guideIds bị bận ngày này
-    const busyGuideRecords = await GuideBusyDate.find({
-      date: targetDate,
-      is_full_day: true,
-    }).select("guide_id");
-    const busyGuideIds = busyGuideRecords.map((r) => r.guide_id.toString());
-
-    // Lấy guideIds có booking đã accept vào ngày này
-    const busyBookings = await Booking.find({
-      "guide_decision.status": "accepted",
-      status: { $in: ["awaiting_payment", "paid", "completed"] },
-      $or: [
-        { start_date: { $lte: targetDate }, end_date: { $gte: targetDate } },
-        {
-          start_date: {
-            $gte: targetDate,
-            $lt: new Date(targetDate.getTime() + 24 * 60 * 60 * 1000),
-          },
-        },
-      ],
-    }).select("intended_guide_id");
-    const bookingBusyIds = busyBookings
-      .filter((b) => b.intended_guide_id)
-      .map((b) => b.intended_guide_id.toString());
-
-    const allBusyIds = [...new Set([...busyGuideIds, ...bookingBusyIds])];
-
     // Nếu có tour_id, lấy các guide gắn với tour đó
     let tourGuideIds = null;
     if (tour_id && mongoose.Types.ObjectId.isValid(tour_id)) {
@@ -359,6 +332,42 @@ export const getAvailableGuides = async (req, res) => {
         tourGuideIds = [...new Set(tourGuideIds)];
       }
     }
+
+    // Xác định tập guide cần xét bận (nếu có tour_id thì chỉ xét những guide của tour)
+    const candidateGuideIds = tourGuideIds && tourGuideIds.length ? tourGuideIds : null;
+
+    // Lấy tất cả guideIds bị bận ngày này (chỉ trong candidate nếu có)
+    const busyGuideQuery = {
+      date: targetDate,
+      is_full_day: true,
+    };
+    if (candidateGuideIds) busyGuideQuery.guide_id = { $in: candidateGuideIds };
+
+    const busyGuideRecords = await GuideBusyDate.find(busyGuideQuery).select("guide_id");
+    const busyGuideIds = busyGuideRecords.map((r) => r.guide_id.toString());
+
+    // Lấy guideIds có booking đã accept vào ngày này (chỉ trong candidate nếu có)
+    const bookingQuery = {
+      "guide_decision.status": "accepted",
+      status: { $in: ["awaiting_payment", "paid", "completed"] },
+      $or: [
+        { start_date: { $lte: targetDate }, end_date: { $gte: targetDate } },
+        {
+          start_date: {
+            $gte: targetDate,
+            $lt: new Date(targetDate.getTime() + 24 * 60 * 60 * 1000),
+          },
+        },
+      ],
+    };
+    if (candidateGuideIds) bookingQuery.intended_guide_id = { $in: candidateGuideIds };
+
+    const busyBookings = await Booking.find(bookingQuery).select("intended_guide_id");
+    const bookingBusyIds = busyBookings
+      .filter((b) => b.intended_guide_id)
+      .map((b) => b.intended_guide_id.toString());
+
+    const allBusyIds = [...new Set([...busyGuideIds, ...bookingBusyIds])];
 
     // Import User model để lấy thông tin guides
     const User = (await import("../models/User.js")).default;

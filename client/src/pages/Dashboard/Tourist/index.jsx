@@ -213,7 +213,7 @@ export default function TouristDashboard() {
                         {upcomingTrip.tourName}
                       </h3>
                       <Link
-                        to={`/tours/${upcomingTrip.id}`}
+                        to={`/tours/${upcomingTrip.slug || upcomingTrip.id}`}
                         className="bg-primary/5 text-primary p-2 rounded-lg hover:bg-primary hover:text-white transition-colors cursor-pointer"
                       >
                         <IconArrowRight className="w-5 h-5" />

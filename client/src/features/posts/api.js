@@ -12,23 +12,23 @@ export const listArticles = async (params = {}) => {
 };
 
 /**
- * Fetch single article by ID (public - only approved articles)
- * @param {string} id - Article ID
+ * Fetch single article by slug or ID (public - only approved articles)
+ * @param {string} idOrSlug - Article slug or Mongo ID
  * @returns {Promise<Object>} Article with populated author
  */
-export const getArticle = async (id) => {
-  const data = await apiClient.get(`/articles/${id}`);
+export const getArticle = async (idOrSlug) => {
+  const data = await apiClient.get(`/articles/${idOrSlug}`);
   return data;
 };
 
 /**
  * Fetch related articles (same category or author)
- * @param {string} id - Current article ID
+ * @param {string} idOrSlug - Current article slug or ID
  * @param {number} limit - Max number of related articles (default: 4)
  * @returns {Promise<{ items: Array }>} Related articles
  */
-export const getRelatedArticles = async (id, limit = 4) => {
-  const data = await apiClient.get(`/articles/${id}/related`, {
+export const getRelatedArticles = async (idOrSlug, limit = 4) => {
+  const data = await apiClient.get(`/articles/${idOrSlug}/related`, {
     params: { limit },
   });
   return data;

@@ -599,25 +599,56 @@ export default function AdminUsers() {
                           <IconFileText className="w-3 h-3" /> Ảnh thẻ HDV /
                           CCCD
                         </p>
-                        <div
-                          className="h-32 rounded-xl overflow-hidden border border-border-light bg-gray-100 relative group cursor-zoom-in"
-                          onClick={() =>
-                            setLightboxImg(
-                              guide.id_cards[0]?.url || guide.id_cards[0]
-                            )
-                          }
-                        >
-                          <img
-                            src={guide.id_cards[0]?.url || guide.id_cards[0]}
-                            className="w-full h-full object-cover"
-                            alt="ID Card"
-                          />
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <IconEye className="w-6 h-6 text-white" />
-                          </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          {guide.id_cards.map((card, idx) => {
+                            const url = card?.url || card;
+                            return (
+                              <div
+                                key={url || idx}
+                                className="h-32 rounded-xl overflow-hidden border border-border-light bg-gray-100 relative group cursor-zoom-in"
+                                onClick={() => setLightboxImg(url)}
+                                title={`CCCD ${idx + 1}`}
+                              >
+                                <img
+                                  src={url}
+                                  className="w-full h-full object-cover"
+                                  alt={`ID Card ${idx + 1}`}
+                                />
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <IconEye className="w-6 h-6 text-white" />
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
+
+                    {guide.certificates?.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-text-secondary uppercase flex items-center gap-1">
+                          <IconFileText className="w-3 h-3" /> Chứng chỉ
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {guide.certificates.map((file, idx) => {
+                            const url = file?.url || file;
+                            return (
+                              <a
+                                key={url || idx}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="h-28 rounded-xl border border-border-light bg-white hover:border-primary hover:shadow-md transition-all flex items-center justify-center text-xs font-bold text-primary text-center px-2"
+                                title={file?.name || `Chứng chỉ ${idx + 1}`}
+                              >
+                                Xem chứng chỉ {idx + 1} ↗
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {guide.intro_video?.url && (
                       <div className="space-y-2">
                         <p className="text-xs font-bold text-text-secondary uppercase flex items-center gap-1">

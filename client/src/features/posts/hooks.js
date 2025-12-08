@@ -53,8 +53,8 @@ export const useArticles = (params = {}) => {
           console.error("Error fetching articles:", err);
           setError(
             err.response?.data?.message ||
-              err.message ||
-              "Failed to load articles"
+            err.message ||
+            "Failed to load articles"
           );
           setArticles([]);
           setPagination({ page: 1, limit: 10, total: 0 });
@@ -78,16 +78,16 @@ export const useArticles = (params = {}) => {
 };
 
 /**
- * Hook to fetch single article by ID (public - only approved articles)
- * @param {string} id - Article ID
+ * Hook to fetch single article by slug or ID (public - only approved articles)
+ * @param {string} idOrSlug - Article slug or ID
  */
-export const useArticle = (id) => {
+export const useArticle = (idOrSlug) => {
   const [article, setArticle] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!id) return;
+    if (!idOrSlug) return;
 
     let isMounted = true;
 
@@ -95,7 +95,7 @@ export const useArticle = (id) => {
       try {
         setIsLoading(true);
         setError(null);
-        const response = await postsApi.getArticle(id);
+        const response = await postsApi.getArticle(idOrSlug);
 
         if (isMounted) {
           setArticle(response);
@@ -118,7 +118,7 @@ export const useArticle = (id) => {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [idOrSlug]);
 
   return { article, isLoading, error };
 };
@@ -201,8 +201,8 @@ export const useArticleCategories = () => {
           console.error("Error fetching categories:", err);
           setError(
             err.response?.data?.message ||
-              err.message ||
-              "Failed to load categories"
+            err.message ||
+            "Failed to load categories"
           );
           setCategories([]);
         }
@@ -431,8 +431,8 @@ export const useAdminArticleActions = () => {
       console.error("Error approving article:", err);
       setError(
         err.response?.data?.message ||
-          err.message ||
-          "Failed to approve article"
+        err.message ||
+        "Failed to approve article"
       );
       return null;
     } finally {

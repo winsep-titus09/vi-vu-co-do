@@ -65,6 +65,7 @@ export default function AdminPosts() {
     type: "",
     data: null,
   });
+  const [previewPost, setPreviewPost] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const toast = useToast();
 
@@ -630,6 +631,7 @@ export default function AdminPosts() {
                                 <IconX className="w-4 h-4" />
                               </button>
                               <button
+                                onClick={() => setPreviewPost(post)}
                                 className="p-2 rounded-lg bg-gray-50 text-text-secondary hover:bg-gray-100 transition-colors"
                                 title="Xem trước"
                               >
@@ -683,6 +685,79 @@ export default function AdminPosts() {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Preview Modal */}
+      {previewPost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setPreviewPost(null)}
+          ></div>
+
+          <div className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden z-10 animate-fade-in-up">
+            <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-border-light bg-gray-50">
+              <div className="min-w-0">
+                <p className="text-xs text-text-secondary uppercase font-bold">
+                  Xem trước bài viết
+                </p>
+                <h3 className="text-xl font-heading font-bold text-text-primary truncate">
+                  {previewPost.title}
+                </h3>
+                <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-text-secondary">
+                  <span>
+                    Tác giả: {previewPost.author?.name || previewPost.author?.email || "Ẩn danh"}
+                  </span>
+                  {previewPost.category?.name && (
+                    <span className="px-2 py-0.5 rounded-full bg-bg-main text-text-primary font-bold">
+                      {previewPost.category.name}
+                    </span>
+                  )}
+                  {getStatusBadge(previewPost.status || previewPost.approvalStatus)}
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewPost(null)}
+                className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                title="Đóng"
+              >
+                <IconX className="w-5 h-5 text-text-secondary" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto max-h-[calc(90vh-140px)] px-6 py-5 space-y-4">
+              {previewPost.cover_image && (
+                <div className="rounded-2xl overflow-hidden border border-border-light">
+                  <img
+                    src={previewPost.cover_image}
+                    alt={previewPost.title}
+                    className="w-full h-64 object-cover"
+                  />
+                </div>
+              )}
+
+              <div className="prose prose-sm max-w-none">
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      previewPost.content_html ||
+                      previewPost.content ||
+                      "<p>Không có nội dung để hiển thị.</p>",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-border-light bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setPreviewPost(null)}
+                className="px-4 py-2 rounded-xl border border-border-light font-bold text-sm text-text-secondary hover:bg-gray-100 transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

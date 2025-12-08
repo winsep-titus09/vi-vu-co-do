@@ -216,11 +216,30 @@ export const ipnHandler = async (req, res) => {
 
             let customerName = "";
             let customerEmail = "";
+            let customerPhone = "";
             try {
                 const u = await User.findById(booking.customer_id).lean();
                 customerName = u?.name || "";
                 customerEmail = u?.email || "";
+                customerPhone = u?.phone_number || u?.phone || "";
             } catch { /* ignore */ }
+
+            let guideName = "";
+            try {
+                const g = await User.findById(booking.intended_guide_id).lean();
+                guideName = g?.name || "";
+            } catch { /* ignore */ }
+
+            const totalAmountNumber = Number(booking.total_price || 0);
+            const totalAmountText = `${totalAmountNumber.toLocaleString("vi-VN")} đ`;
+            const numberOfPeople = Array.isArray(booking.participants)
+                ? booking.participants.filter(p => p?.count_slot !== false).length || booking.participants.length
+                : undefined;
+            const tourDate = booking.start_date
+                ? new Date(booking.start_date).toLocaleDateString("vi-VN")
+                : "";
+            const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
+            const bookingCode = String(booking._id);
 
             if (success) {
                 // Notify user
@@ -231,10 +250,13 @@ export const ipnHandler = async (req, res) => {
                     url: `/booking/${booking._id}`,
                     meta: {
                         bookingId: booking._id,
+                        bookingCode,
                         tourId: booking.tour_id,
                         tourName,
+                        tourDate: booking.start_date ? new Date(booking.start_date).toLocaleDateString("vi-VN") : "",
                         startDate: booking.start_date ? new Date(booking.start_date).toLocaleDateString("vi-VN") : "",
-                        bookingUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}`,
+                        amount: totalAmountText,
+                        bookingUrl,
                         customerName,
                         customerEmail
                     },
@@ -251,7 +273,11 @@ export const ipnHandler = async (req, res) => {
                         tourName,
                         bookingCode: booking._id,
                         customerName,
-                        customerEmail
+                        customerEmail,
+                        guideName,
+                        amount: totalAmountText,
+                        paymentDate: new Date().toLocaleString("vi-VN"),
+                        adminUrl: `${process.env.APP_BASE_URL}/admin/bookings/${booking._id}`,
                     },
                 }).catch(() => { });
 
@@ -262,7 +288,20 @@ export const ipnHandler = async (req, res) => {
                         type: "booking:paid_guide",
                         content: `Đơn của khách đã thanh toán: "${tourName}".`,
                         url: `/guide/bookings/${booking._id}`,
-                        meta: { bookingId: booking._id, tourId: booking.tour_id, tourName },
+                        meta: {
+                            bookingId: booking._id,
+                            bookingCode: booking._id,
+                            tourId: booking.tour_id,
+                            tourName,
+                            tourDate,
+                            numberOfPeople,
+                            totalAmount: totalAmountText,
+                            customerName,
+                            customerEmail,
+                            customerPhone: customerPhone || booking?.contact?.phone || booking?.contact?.phone_number || "",
+                            bookingUrl,
+                            guideName,
+                        },
                     }).catch(() => { });
                 }
             } else {

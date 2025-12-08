@@ -24,8 +24,39 @@ import BlogCard from "../../components/Cards/BlogCard";
 import TourCard from "../../components/Cards/TourCard";
 import { CommentSection } from "../../components/Comments";
 
+// Helper: normalize tour image field across different shapes
+const getTourImage = (tour) => {
+  const candidate =
+    tour.image ||
+    tour.cover_image ||
+    tour.coverImage ||
+    tour.cover_image_url ||
+    tour.image_url ||
+    tour.thumbnail ||
+    tour.feature_image ||
+    (Array.isArray(tour.images) && tour.images[0]) ||
+    (Array.isArray(tour.media) && tour.media[0]) ||
+    null;
+
+  if (!candidate) return "/images/placeholders/hero_slide_1.jpg";
+
+  if (typeof candidate === "string") return candidate;
+
+  // If it's an object with url or src
+  if (candidate.url) return candidate.url;
+  if (candidate.src) return candidate.src;
+
+  // If it is an array item with nested url
+  if (candidate[0]?.url) return candidate[0].url;
+
+  // If object has nested asset
+  if (candidate.path) return candidate.path;
+
+  return "/images/placeholders/hero_slide_1.jpg";
+};
+
 export default function PostDetail() {
-  const { slug } = useParams(); // slug is actually the article ID from routes
+  const { slug } = useParams(); // article slug from route param
   const [scrollProgress, setScrollProgress] = useState(0);
   const [relatedTours, setRelatedTours] = useState([]);
   const [toursLoading, setToursLoading] = useState(false);
@@ -41,8 +72,15 @@ export default function PostDetail() {
       try {
         setToursLoading(true);
         const response = await toursApi.getFeaturedTours(3);
-        const tours = response?.items || response || [];
-        setRelatedTours(tours.slice(0, 3));
+        const tours = (response?.items || response || [])
+          .slice(0, 3)
+          .map((tour) => ({
+            ...tour,
+            id: tour._id || tour.id,
+            image: getTourImage(tour),
+            location: tour.location?.name || tour.locationName || tour.location || "Huế",
+          }));
+        setRelatedTours(tours);
       } catch (err) {
         console.error("Error fetching related tours:", err);
       } finally {
@@ -55,12 +93,13 @@ export default function PostDetail() {
 
   // Fetch related articles when article is loaded
   useEffect(() => {
-    if (!article?._id) return;
+    const identifier = article?.slug || article?._id;
+    if (!identifier) return;
 
     const fetchRelatedArticles = async () => {
       try {
         setArticlesLoading(true);
-        const response = await getRelatedArticles(article._id, 3);
+        const response = await getRelatedArticles(identifier, 3);
         setRelatedArticles(response?.items || []);
       } catch (err) {
         console.error("Error fetching related articles:", err);
@@ -70,7 +109,7 @@ export default function PostDetail() {
     };
 
     fetchRelatedArticles();
-  }, [article?._id]);
+  }, [article?.slug, article?._id]);
 
   // Logic tính toán thanh tiến trình đọc
   useEffect(() => {
@@ -363,11 +402,12 @@ export default function PostDetail() {
                           id: tour._id || tour.id,
                           title: tour.title,
                           description: tour.description,
-                          image:
-                            tour.cover_image ||
-                            tour.images?.[0] ||
-                            "/images/placeholders/hero_slide_1.jpg",
-                          location: tour.location?.name || "Huế",
+                          image: getTourImage(tour),
+                          location:
+                            tour.location?.name ||
+                            tour.locationName ||
+                            tour.location ||
+                            "Huế",
                           duration: tour.duration || "1 ngày",
                           rating: tour.rating || 5,
                           price: tour.price || 0,

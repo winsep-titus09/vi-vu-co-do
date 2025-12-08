@@ -318,8 +318,6 @@ export default function ProfilePage() {
             <h2 className="text-xl font-bold text-text-primary mb-1">
               {formData.lastName} {formData.firstName}
             </h2>
-            <p className="text-sm text-text-secondary mb-6">Tham gia từ 2023</p>
-
             <div className="grid grid-cols-2 gap-4 border-t border-border-light pt-6">
               <div className="text-center">
                 <span className="block text-2xl font-bold text-primary">

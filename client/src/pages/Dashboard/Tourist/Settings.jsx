@@ -337,7 +337,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Guide Application Form */}
-        {showGuideForm && !hasApplication && (
+        {showGuideForm && (!hasApplication || applicationStatus === "rejected") && (
           <div className="mt-6 pt-6 border-t border-primary/20 space-y-4 animate-fade-in">
             <h4 className="font-bold text-text-primary">
               Điền thông tin hồ sơ

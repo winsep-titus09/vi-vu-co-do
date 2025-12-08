@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bài viết đã được duyệt</title>
+</head>
+
+<body style="font-family: Arial, sans-serif; color: #1f2937; background: #f7f7f7; padding: 24px;">
+    <div
+        style="max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 24px; border: 1px solid #e5e7eb;">
+        <h2 style="margin-top: 0; color: #111827;">🎉 Bài viết của bạn đã được duyệt</h2>
+        <p>Xin chào <strong>{{userName}}</strong>,</p>
+        <p>Bài viết <strong>{{articleTitle}}</strong> đã được admin phê duyệt và sẽ hiển thị công khai.</p>
+        <p style="margin: 16px 0;">Bạn có thể xem bài viết tại: <a href="{{appBaseUrl}}/blog/{{slug}}"
+                style="color: #2563eb;">{{appBaseUrl}}/blog/{{slug}}</a></p>
+        <p style="color:#6b7280; font-size: 14px;">Nếu có thắc mắc, hãy liên hệ hỗ trợ: {{supportEmail}}</p>
+    </div>
+</body>
+
+</html>

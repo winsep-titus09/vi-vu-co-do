@@ -58,7 +58,7 @@ const TourCard = React.memo(function TourCard({ tour }) {
     // - Bỏ bg-white (để trùng màu nền section)
     // - Bỏ shadow mặc định (giữ cho nhẹ nhàng)
     <Link
-      to={`/tours/${tour.id}`}
+      to={`/tours/${tour.slug || tour.id || tour._id}`}
       className="group flex flex-col h-full rounded-2xl border border-border-light hover:border-primary/50 transition-all duration-300"
     >
       {/* 2. ẢNH TOUR: Style nghệ thuật (Phiên bản đầu tiên) */}

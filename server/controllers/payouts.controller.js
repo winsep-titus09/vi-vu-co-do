@@ -84,13 +84,40 @@ export const createPayoutRequest = async (req, res) => {
             status: "pending",
         });
 
+        // Load bank info for email/meta
+        let bankName = "";
+        let accountNumber = "";
+        let accountHolder = "";
+        try {
+            const profile = await GuideProfile.findOne({ user_id: guideId }).lean();
+            const bank = profile?.bank_account || {};
+            bankName = bank.bank_name || bank.bank || "";
+            accountNumber = bank.account_number || bank.number || "";
+            accountHolder = bank.account_name || bank.holder || "";
+        } catch { /* ignore */ }
+        const requestDate = (reqDoc.createdAt || new Date()).toLocaleString("vi-VN");
+        const amountText = `${numericAmount.toLocaleString("vi-VN")} đ`;
+
         // In-app / system notifications to admins
         try {
             await notifyAdmins({
                 type: "payout:requested",
                 content: `Guide ${guide.name || guide._id} yêu cầu rút ${numericAmount.toLocaleString("vi-VN")}đ.`,
                 url: "/dashboard/admin/finance?tab=withdrawals",
-                meta: { payoutRequestId: reqDoc._id, guideId, guideName: guide.name, guideEmail: guide.email, amount: numericAmount }
+                meta: {
+                    payoutRequestId: reqDoc._id,
+                    payoutId: reqDoc._id,
+                    guideId,
+                    guideName: guide.name,
+                    guideEmail: guide.email,
+                    guidePhone: guide.phone_number || guide.phone || "",
+                    amount: amountText,
+                    bankName,
+                    accountNumber,
+                    accountHolder,
+                    requestDate,
+                    adminUrl: `${process.env.APP_BASE_URL || ""}/admin/payouts/${reqDoc._id}`,
+                }
             });
         } catch (e) {
             console.warn("notifyAdmins failed:", e);
@@ -101,8 +128,8 @@ export const createPayoutRequest = async (req, res) => {
             const adminEmails = await getAdminEmails();
             if (adminEmails.length > 0) {
                 const subject = `Yêu cầu rút tiền từ guide ${guide.name || guide._id}`;
-                const text = `Guide ${guide.name || guide._id} (id: ${String(guide._id)}) đã gửi yêu cầu rút ${numericAmount.toLocaleString("vi-VN")}đ.\n\nXem chi tiết: admin panel.`;
-                const html = `<p>Guide <strong>${guide.name || guide._id}</strong> (id: ${String(guide._id)}) đã gửi yêu cầu rút <strong>${numericAmount.toLocaleString("vi-VN")}đ</strong>.</p><p>Request ID: ${reqDoc._id}</p>`;
+                const text = `Guide ${guide.name || guide._id} (id: ${String(guide._id)}) đã gửi yêu cầu rút ${amountText}.\nNgân hàng: ${bankName}\nSTK: ${accountNumber}\nChủ TK: ${accountHolder}\nNgày yêu cầu: ${requestDate}\n\nXem chi tiết: admin panel.`;
+                const html = `<p>Guide <strong>${guide.name || guide._id}</strong> (id: ${String(guide._id)}) đã gửi yêu cầu rút <strong>${amountText}</strong>.</p><p>Request ID: ${reqDoc._id}</p><p>Ngân hàng: ${bankName || "(chưa có)"}<br/>STK: ${accountNumber || ""}<br/>Chủ TK: ${accountHolder || ""}<br/>Ngày yêu cầu: ${requestDate}</p>`;
                 await sendEmail({ to: adminEmails.join(","), subject, text, html });
             }
         } catch (e) {
@@ -292,13 +319,21 @@ export const adminApprovePayoutRequest = async (req, res) => {
 
         await session.commitTransaction();
 
-        // Notify guide
+        // Notify guide (email + in-app)
         try {
+            const confirmedAt = payoutReq.processedAt || new Date();
+            const amountText = `${payoutReq.amount.toLocaleString("vi-VN")} đ`;
             await notifyUser({
                 userId: guide._id,
-                type: "payout:approved",
-                content: `Yêu cầu rút ${payoutReq.amount.toLocaleString("vi-VN")}đ đã được duyệt.`,
-                meta: { payoutRequestId: payoutReq._id, amount: payoutReq.amount }
+                type: "payout:paid",
+                content: `Yêu cầu rút ${amountText} đã được duyệt và chuyển khoản.`,
+                meta: {
+                    payoutRequestId: payoutReq._id,
+                    payoutId: payoutReq._id,
+                    amount: amountText,
+                    transactionCode: externalTxId || `WD-${payoutReq._id}`,
+                    confirmedAt: confirmedAt.toLocaleString("vi-VN"),
+                }
             });
         } catch (e) {
             console.warn("notifyUser failed:", e);

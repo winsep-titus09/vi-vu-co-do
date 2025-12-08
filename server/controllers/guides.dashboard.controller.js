@@ -32,6 +32,7 @@ export async function guideDashboard(req, res) {
       {
         $match: {
           tour_id: { $in: tourIds },
+          intended_guide_id: guideId,
           status: { $in: ["paid", "completed"] },
         },
       },
@@ -105,42 +106,48 @@ export async function getGuideMonthlyEarnings(req, res) {
     const start = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
     const end = new Date(Date.UTC(year + 1, 0, 1, 0, 0, 0));
 
-    const match = {
-      payeeUserId: guideObjId,
-      status: { $in: ["confirmed", "completed", "paid"] },
-      $or: [
-        { processedAt: { $gte: start, $lt: end } },
-        { createdAt: { $gte: start, $lt: end } },
-      ],
-    };
-
     const pipeline = [
-      { $match: match },
+      {
+        $match: {
+          intended_guide_id: guideObjId,
+          status: "completed",
+          payoutProcessed: true,
+        },
+      },
       {
         $addFields: {
-          net_amount_num: {
-            $toDouble: { $ifNull: ["$net_amount", "$amount", 0] },
+          earningValue: {
+            $toDouble: { $ifNull: ["$guideEarning", 0] },
           },
+          earningDate: {
+            $ifNull: [
+              {
+                $cond: [{ $ifNull: ["$start_date", false] }, "$start_date", null],
+              },
+              "$createdAt",
+            ],
+          },
+        },
+      },
+      {
+        $match: {
+          earningDate: { $gte: start, $lt: end },
         },
       },
       {
         $group: {
           _id: {
-            year: {
-              $year: { $toDate: { $ifNull: ["$processedAt", "$createdAt"] } },
-            },
-            month: {
-              $month: { $toDate: { $ifNull: ["$processedAt", "$createdAt"] } },
-            },
+            year: { $year: "$earningDate" },
+            month: { $month: "$earningDate" },
           },
-          total: { $sum: "$net_amount_num" },
+          total: { $sum: "$earningValue" },
           count: { $sum: 1 },
         },
       },
       { $sort: { "_id.year": 1, "_id.month": 1 } },
     ];
 
-    const agg = await Transaction.aggregate(pipeline);
+    const agg = await Booking.aggregate(pipeline);
 
     // Build months 1..12
     const months = Array.from({ length: 12 }, (_, i) => {

@@ -399,7 +399,7 @@ export default function GuideMyTours() {
                               </Link>
                             )}
                             <Link
-                              to={`/tours/${req.tour_id?._id}`}
+                              to={`/tours/${req.tour_id?.slug || req.tour_id?._id}`}
                               target="_blank"
                               className="p-2 rounded-lg bg-gray-50 text-text-secondary hover:bg-gray-100 transition-colors"
                               title="Xem tour"
@@ -698,7 +698,7 @@ export default function GuideMyTours() {
                       {/* View - only for approved tours */}
                       {tourData.status === "active" && (
                         <Link
-                          to={`/tours/${tourData.id}`}
+                          to={`/tours/${tourData.slug || tourData.id}`}
                           className="flex-1 py-2.5 rounded-lg border border-border-light text-sm font-bold text-text-secondary hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2 bg-white"
                         >
                           <IconEye className="w-4 h-4" />
