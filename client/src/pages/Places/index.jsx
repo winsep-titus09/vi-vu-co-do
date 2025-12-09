@@ -22,19 +22,19 @@ const features = [
     icon: <IconMapPin className="w-12 h-12 mb-6 stroke-[1.5]" />,
     title: "Đa dạng điểm đến",
     desc: "Hơn 100+ địa điểm từ lăng tẩm, đền chùa cổ kính đến những vùng thiên nhiên hoang sơ chưa được khám phá.",
-    image: "/images/placeholders/feature-place-1.jpg",
+    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/bachma1.1.jpg",
   },
   {
     icon: <Icon3D className="w-12 h-12 mb-6 stroke-[1.5]" />,
     title: "Trải nghiệm 3D/VR",
     desc: "Công nghệ thực tế ảo giúp bạn tham quan chi tiết kiến trúc và không gian di sản trước khi đặt chân đến.",
-    image: "/images/placeholders/feature-place-2.jpg",
+    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/thiennhien/biencanhduong1.jpg",
   },
   {
     icon: <IconUser className="w-12 h-12 mb-6 stroke-[1.5]" />,
     title: "Cá nhân hóa hành trình",
     desc: "Kết nối trực tiếp với hướng dẫn viên địa phương để thiết kế chuyến đi phù hợp với sở thích riêng của bạn.",
-    image: "/images/placeholders/feature-place-3.jpg",
+    image: "https://pub-23c6fed798bd4dcf80dc1a3e7787c124.r2.dev/disan/chuathienmu6.jpg",
   },
 ];
 

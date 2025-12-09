@@ -243,6 +243,21 @@ export const getTour = async (req, res) => {
 
     if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });
 
+    // Fallback: nếu chưa lưu guide_video_url, thử lấy từ profile của HDV chính
+    if (!tour.guide_video_url) {
+      const mainGuide =
+        tour.guides?.find((g) => g?.isMain) || tour.guides?.[0] || null;
+      const mainGuideId =
+        mainGuide?.guideId?._id || mainGuide?.guideId || tour.guide_id || null;
+
+      if (mainGuideId) {
+        const profile = await GuideProfile.findOne({ user_id: mainGuideId })
+          .select("bio_video_url")
+          .lean();
+        if (profile?.bio_video_url) tour.guide_video_url = profile.bio_video_url;
+      }
+    }
+
     // Lấy 3D models cho các locations trong tour
     const locationIds = [
       ...new Set([
@@ -409,6 +424,7 @@ export const createTour = async (req, res) => {
       categories,
       cover_image_url: data.cover_image_url || null,
       video_url: data.video_url || null,
+      guide_video_url: data.guide_video_url || null,
       gallery: data.gallery || [],
       highlights: data.highlights || [],
       includes: data.includes || [],

@@ -140,6 +140,7 @@ export const createTourSchema = z.object({
 
   cover_image_url: z.string().url().nullable().optional(),
   video_url: z.string().url().nullable().optional(),
+  guide_video_url: z.string().url().nullable().optional(),
   gallery: z.array(z.string().url()).optional(),
 
   // Highlights, includes, excludes

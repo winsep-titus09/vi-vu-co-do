@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
 import { placesApi } from "../../features/places/api";
@@ -689,50 +689,13 @@ export default function PlaceDetail() {
         </div>
       </div>
 
-      {/* 3D VIEWER MODAL */}
+      {/* 3D / Panorama Viewer Modal */}
       {is3DModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <button
-            onClick={() => setIs3DModalOpen(false)}
-            className="absolute top-6 right-6 z-50 text-white/60 hover:text-white hover:rotate-90 transition-all duration-300"
-          >
-            <IconX className="w-10 h-10" />
-          </button>
-          <div className="relative w-full h-full max-w-6xl max-h-[85vh] bg-black rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col">
-            <div className="absolute top-0 left-0 right-0 p-4 z-10 bg-linear-to-b from-black/80 to-transparent pointer-events-none">
-              <h3 className="text-white font-heading font-bold text-xl text-center">
-                {placeDetail.name} - Mô hình 3D
-              </h3>
-            </div>
-            <div className="flex-1 relative flex items-center justify-center group">
-              <img
-                src={secondaryImage}
-                className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-[20s]"
-                alt="3D Placeholder"
-              />
-              <div className="relative z-10 text-center space-y-4">
-                <div className="w-20 h-20 border-4 border-white/30 rounded-full flex items-center justify-center mx-auto animate-spin-slow">
-                  <Icon3D className="w-10 h-10 text-white" />
-                </div>
-                <p className="text-white text-lg font-medium">
-                  Đang tải mô hình 3D...
-                </p>
-                <p className="text-white/50 text-sm">(Demo UI)</p>
-              </div>
-              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-4">
-                <button className="px-4 py-2 bg-white/10 backdrop-blur rounded-lg text-white text-sm hover:bg-white/20">
-                  Xoay trái
-                </button>
-                <button className="px-4 py-2 bg-white/10 backdrop-blur rounded-lg text-white text-sm hover:bg-white/20">
-                  Tự động
-                </button>
-                <button className="px-4 py-2 bg-white/10 backdrop-blur rounded-lg text-white text-sm hover:bg-white/20">
-                  Xoay phải
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PanoramaViewerModal
+          name={placeDetail.name}
+          models={placeDetail.threeDModels}
+          onClose={() => setIs3DModalOpen(false)}
+        />
       )}
 
       {/* REVIEW MODAL */}
@@ -895,6 +858,174 @@ export default function PlaceDetail() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Panorama viewer using Photo Sphere Viewer for location panoramas
+function PanoramaViewerModal({ name, models = [], onClose }) {
+  const viewerRef = useRef(null);
+  const viewerInstance = useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const panoramas = models.filter((m) => m.file_type === "panorama");
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleEsc);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "auto";
+      if (viewerInstance.current) {
+        viewerInstance.current.destroy();
+        viewerInstance.current = null;
+      }
+    };
+  }, [onClose]);
+
+  useEffect(() => {
+    const current = panoramas[currentIndex];
+    if (!viewerRef.current || !current?.file_url) return;
+
+    const initViewer = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const { Viewer } = await import("@photo-sphere-viewer/core");
+        await import("@photo-sphere-viewer/core/index.css");
+
+        if (viewerInstance.current) viewerInstance.current.destroy();
+
+        viewerInstance.current = new Viewer({
+          container: viewerRef.current,
+          panorama: current.file_url,
+          navbar: ["zoom", "fullscreen"],
+          defaultZoomLvl: 50,
+          touchmoveTwoFingers: false,
+          mousewheelCtrlKey: false,
+          loadingTxt: "Đang tải ảnh 360°...",
+        });
+
+        viewerInstance.current.addEventListener("ready", () => {
+          setIsLoading(false);
+        });
+
+        viewerInstance.current.addEventListener("error", () => {
+          setError("Không thể tải ảnh panorama");
+          setIsLoading(false);
+        });
+      } catch (err) {
+        console.error("Panorama init error:", err);
+        setError("Không thể khởi tạo trình xem 360°");
+        setIsLoading(false);
+      }
+    };
+
+    initViewer();
+  }, [currentIndex, panoramas]);
+
+  if (!panoramas.length) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+        <div className="bg-white rounded-2xl p-6 max-w-md text-center space-y-3">
+          <Icon3D className="w-10 h-10 mx-auto text-primary" />
+          <p className="text-text-primary font-heading font-bold text-lg">
+            Chưa có ảnh 3D/Panorama
+          </p>
+          <p className="text-text-secondary text-sm">
+            Địa điểm này chưa được bổ sung ảnh 360°.
+          </p>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-primary text-white font-bold hover:bg-primary/90"
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const current = panoramas[currentIndex];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+      <button
+        onClick={onClose}
+        className="absolute top-6 right-6 z-50 text-white/70 hover:text-white hover:rotate-90 transition-all duration-300"
+      >
+        <IconX className="w-10 h-10" />
+      </button>
+
+      <div className="relative w-full h-full max-w-6xl max-h-[85vh] bg-black rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col">
+        <div className="absolute top-0 left-0 right-0 p-4 z-10 bg-linear-to-b from-black/80 to-transparent pointer-events-none flex items-center justify-between">
+          <div className="text-white">
+            <h3 className="text-xl font-heading font-bold leading-tight">{name}</h3>
+            <p className="text-white/70 text-sm line-clamp-1">
+              {current?.description || "Panorama 360°"}
+            </p>
+          </div>
+          <div className="text-white/70 text-sm">
+            {currentIndex + 1} / {panoramas.length}
+          </div>
+        </div>
+
+        <div ref={viewerRef} className="flex-1 w-full bg-black" />
+
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20">
+            <div className="text-center text-white space-y-2">
+              <IconLoader className="w-8 h-8 animate-spin mx-auto" />
+              <p className="text-sm">Đang tải ảnh 360°...</p>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30">
+            <div className="text-center text-white space-y-3">
+              <p className="text-red-400 text-sm">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="px-4 py-2 rounded-lg bg-primary text-white font-bold"
+              >
+                Thử lại
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom controls */}
+        <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 via-black/60 to-transparent p-4 z-10 flex items-center justify-between">
+          <div className="text-white/70 text-xs max-w-md line-clamp-2">
+            {current?.name || "Panorama"}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentIndex((idx) => Math.max(idx - 1, 0))}
+              disabled={currentIndex === 0}
+              className="px-3 py-2 rounded-lg text-sm font-bold bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ◀ Trước
+            </button>
+            <button
+              onClick={() =>
+                setCurrentIndex((idx) => Math.min(idx + 1, panoramas.length - 1))
+              }
+              disabled={currentIndex >= panoramas.length - 1}
+              className="px-3 py-2 rounded-lg text-sm font-bold bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Tiếp ▶
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

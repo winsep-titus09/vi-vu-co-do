@@ -55,7 +55,7 @@ export default function Footer() {
             {/* 1. Logo (Chỉ ảnh, trắng) */}
             <Link to="/" className="inline-block">
               <img
-                src="/images/uploads/logo-hue-2.png"
+                src="/images/uploads/logo-hue.png"
                 alt="Vi Vu Cố Đô"
                 className="h-16 w-auto brightness-0 invert opacity-90 hover:opacity-100 transition-opacity"
               />

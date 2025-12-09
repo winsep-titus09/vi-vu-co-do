@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import { useToast } from "../../../components/Toast/useToast";
 import { Icon3D, IconMapPin, IconCheck } from "../../../icons/IconBox";
 import { IconSearch } from "../../../icons/IconSearch";
@@ -10,6 +10,7 @@ import {
   IconUploadCloud,
   IconEdit,
   IconInbox,
+  IconLoader,
 } from "../../../icons/IconCommon";
 import { IconChevronDown } from "../../../icons/IconChevronDown";
 import Spinner from "../../../components/Loaders/Spinner";
@@ -100,6 +101,12 @@ export default function AdminModels3D() {
   const [selectedThumb, setSelectedThumb] = useState(null);
   const [isPlaceOpen, setIsPlaceOpen] = useState(false);
   const [isTypeOpen, setIsTypeOpen] = useState(false);
+
+  // Panorama viewer state for preview modal
+  const viewerContainerRef = useRef(null);
+  const viewerInstanceRef = useRef(null);
+  const [viewerLoading, setViewerLoading] = useState(false);
+  const [viewerError, setViewerError] = useState(null);
 
   // Filter models by search
   const filteredModels = useMemo(() => {
@@ -233,6 +240,85 @@ export default function AdminModels3D() {
     const type = FILE_TYPES.find((t) => t.value === formData.file_type);
     return type?.label || "Chọn loại";
   };
+
+  useEffect(() => {
+    if (!viewingModel) return undefined;
+
+    const handleEsc = (e) => {
+      if (e.key === "Escape") setViewingModel(null);
+    };
+
+    document.addEventListener("keydown", handleEsc);
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "auto";
+    };
+  }, [viewingModel]);
+
+  useEffect(() => {
+    if (!viewingModel || viewingModel.file_type !== "panorama") {
+      setViewerLoading(false);
+      setViewerError(null);
+      if (viewerInstanceRef.current) {
+        viewerInstanceRef.current.destroy();
+        viewerInstanceRef.current = null;
+      }
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    const initViewer = async () => {
+      try {
+        setViewerLoading(true);
+        setViewerError(null);
+
+        const { Viewer } = await import("@photo-sphere-viewer/core");
+        await import("@photo-sphere-viewer/core/index.css");
+
+        if (viewerInstanceRef.current) {
+          viewerInstanceRef.current.destroy();
+        }
+
+        viewerInstanceRef.current = new Viewer({
+          container: viewerContainerRef.current,
+          panorama: viewingModel.file_url,
+          navbar: ["zoom", "fullscreen"],
+          defaultZoomLvl: 50,
+          touchmoveTwoFingers: false,
+          mousewheelCtrlKey: false,
+          loadingTxt: "Đang tải ảnh 360°...",
+        });
+
+        viewerInstanceRef.current.addEventListener("ready", () => {
+          if (!isCancelled) setViewerLoading(false);
+        });
+
+        viewerInstanceRef.current.addEventListener("error", () => {
+          if (isCancelled) return;
+          setViewerError("Không thể tải ảnh panorama");
+          setViewerLoading(false);
+        });
+      } catch (err) {
+        if (isCancelled) return;
+        console.error("Panorama init error:", err);
+        setViewerError("Không thể khởi tạo trình xem 360°");
+        setViewerLoading(false);
+      }
+    };
+
+    initViewer();
+
+    return () => {
+      isCancelled = true;
+      if (viewerInstanceRef.current) {
+        viewerInstanceRef.current.destroy();
+        viewerInstanceRef.current = null;
+      }
+    };
+  }, [viewingModel]);
 
   // ============================================================================
   // RENDER
@@ -653,11 +739,7 @@ export default function AdminModels3D() {
 
             <div className="flex-1 flex items-center justify-center relative group bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-gray-800 via-black to-black">
               {viewingModel.file_type === "panorama" ? (
-                <img
-                  src={viewingModel.file_url}
-                  alt={viewingModel.name}
-                  className="max-w-full max-h-full object-contain"
-                />
+                <div ref={viewerContainerRef} className="w-full h-full bg-black" />
               ) : (
                 <div className="relative z-10 text-center animate-pulse">
                   <Icon3D className="w-20 h-20 text-white/80 mx-auto mb-4" />
@@ -665,8 +747,35 @@ export default function AdminModels3D() {
                     {viewingModel.name}
                   </h3>
                   <p className="text-white/60 text-sm mt-2">
-                    Đang tải trình xem 3D...
+                    Hiện chỉ hỗ trợ xem panorama 360°
                   </p>
+                </div>
+              )}
+
+              {viewerLoading && viewingModel.file_type === "panorama" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20">
+                  <div className="text-center text-white space-y-2">
+                    <IconLoader className="w-8 h-8 animate-spin mx-auto" />
+                    <p className="text-sm">Đang tải ảnh 360°...</p>
+                  </div>
+                </div>
+              )}
+
+              {viewerError && viewingModel.file_type === "panorama" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30">
+                  <div className="text-center text-white space-y-3">
+                    <p className="text-red-400 text-sm">{viewerError}</p>
+                    <button
+                      onClick={() => {
+                        setViewerError(null);
+                        setViewerLoading(true);
+                        setViewingModel((prev) => (prev ? { ...prev } : prev));
+                      }}
+                      className="px-4 py-2 rounded-lg bg-primary text-white font-bold"
+                    >
+                      Thử lại
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

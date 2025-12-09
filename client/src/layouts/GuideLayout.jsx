@@ -123,7 +123,7 @@ export default function GuideLayout() {
             title="Về trang chủ"
           >
             <img
-              src="/images/uploads/logo-hue.png"
+              src="/images/uploads/logo-hue-2.jpg"
               alt="Vi Vu Cố Đô"
               className="h-12 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
             />
