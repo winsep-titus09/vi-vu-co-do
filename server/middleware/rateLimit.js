@@ -3,13 +3,14 @@ import "dotenv/config";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import MongoStore from "rate-limit-mongo";
 
-/** Dùng MongoStore nếu có MONGO_URI, nếu không sẽ fallback MemoryStore */
+/** MongoStore cho rate-limit (persist). Nếu gặp lỗi kết nối, fallback undefined. */
 const store = process.env.MONGO_URI
   ? new MongoStore({
-      uri: process.env.MONGO_URI,
-      collectionName: "rateLimits",
-      expireTimeMs: 15 * 60 * 1000,
-    })
+    uri: process.env.MONGO_URI,
+    collectionName: "rateLimits",
+    expireTimeMs: 15 * 60 * 1000,
+    errorHandler: (err) => console.error("RateLimit MongoStore error", err?.message || err),
+  })
   : undefined;
 
 /** 1) Global: thoáng cho toàn bộ /api */
@@ -24,7 +25,7 @@ export const globalLimiter = rateLimit({
   },
   skip: (req) => req.method === "OPTIONS" || req.path === "/api/payments/ipn",
   store,
-  keyGenerator: ipKeyGenerator(), // helper chuẩn cho IPv6
+  keyGenerator: (req) => req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress || "unknown-ip",
 });
 
 /** 2) Auth: riêng cho đăng nhập/đăng ký/refresh
@@ -40,7 +41,13 @@ export const authLimiter = rateLimit({
     message: "Too many login attempts. Try again later.",
   },
   store,
-  keyGenerator: ipKeyGenerator(),
+  // Giảm va chạm người dùng chung IP (wifi/quán net) và bỏ qua request thành công
+  keyGenerator: (req) => {
+    const email = req.body?.email || req.body?.username || "anonymous";
+    const ip = req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress || "unknown-ip";
+    return `${ip}:${email}`;
+  },
+  skipSuccessfulRequests: true,
 });
 
 /** 3) (Tuỳ chọn) Account-limiter cho người đã đăng nhập
@@ -53,5 +60,5 @@ export const accountLimiter = rateLimit({
   legacyHeaders: false,
   message: { status: 429, message: "Too many requests. Please slow down." },
   store,
-  keyGenerator: ipKeyGenerator(),
+  keyGenerator: (req) => req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress || "unknown-ip",
 });

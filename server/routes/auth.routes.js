@@ -3,6 +3,7 @@ import { authLimiter } from "../middleware/rateLimit.js";
 import {
   register,
   login,
+  loginWithGoogle,
   logout,
   getMe,
   forgotPassword,
@@ -14,6 +15,7 @@ const router = express.Router();
 
 router.post("/register", authLimiter, register);
 router.post("/login", authLimiter, login);
+router.post("/google", authLimiter, loginWithGoogle);
 router.post("/logout", auth, logout);
 router.get("/me", auth, getMe);
 router.post("/forgot-password", forgotPassword);

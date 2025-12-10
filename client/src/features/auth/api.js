@@ -17,6 +17,12 @@ export const authApi = {
     return response;
   },
 
+  // Google Sign in
+  googleSignIn: async ({ idToken }) => {
+    const response = await apiClient.post("/auth/google", { idToken });
+    return response;
+  },
+
   // Forgot password
   forgotPassword: async (email) => {
     const response = await apiClient.post("/auth/forgot-password", { email });

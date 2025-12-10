@@ -89,6 +89,8 @@ export default function TourDetailPage() {
   // Gallery lightbox state
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [locationPreviewIndex, setLocationPreviewIndex] = useState(null);
+  const locationPreviewRefs = useRef({});
   
   // Availability state
   const [availabilityStatus, setAvailabilityStatus] = useState(null);
@@ -293,6 +295,28 @@ export default function TourDetailPage() {
       document.body.style.overflow = 'auto';
     };
   }, [isGalleryOpen]);
+
+  // Close location preview on outside click or ESC
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (locationPreviewIndex === null) return;
+      const refEl = locationPreviewRefs.current[locationPreviewIndex];
+      if (refEl && !refEl.contains(e.target)) {
+        setLocationPreviewIndex(null);
+      }
+    };
+
+    const handleEsc = (e) => {
+      if (e.key === "Escape") setLocationPreviewIndex(null);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [locationPreviewIndex]);
 
   // Gallery navigation functions
   const openGallery = (index) => {
@@ -725,12 +749,62 @@ export default function TourDetailPage() {
                           <span className="text-xs font-bold text-primary uppercase tracking-wide">
                             {item.time || `Điểm ${item.order || idx + 1}`}
                           </span>
-                          {item.locationId?.name && (
-                            <span className="text-xs text-text-secondary bg-bg-main px-2 py-0.5 rounded-full flex items-center gap-1">
-                              <IconMapPin className="w-3 h-3" />
-                              {item.locationId.name}
+                          {(() => {
+                            const locationData = item.locationId?.highlights
+                              ? item.locationId
+                              : tour.locations?.find((loc) => {
+                                  const locId = loc.locationId?._id || loc.locationId;
+                                  const itemLocId = item.locationId?._id || item.locationId;
+                                  return locId && itemLocId && locId === itemLocId;
+                                })?.locationId || item.locationId;
+
+                            if (!locationData?.name) return null;
+
+                            return (
+                            <span
+                              className="relative inline-flex"
+                              ref={(el) => {
+                                if (el) {
+                                  locationPreviewRefs.current[idx] = el;
+                                } else {
+                                  delete locationPreviewRefs.current[idx];
+                                }
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setLocationPreviewIndex(
+                                    locationPreviewIndex === idx ? null : idx
+                                  )
+                                }
+                                className="text-xs text-text-secondary bg-bg-main px-2 py-0.5 rounded-full flex items-center gap-1 border border-transparent hover:border-primary/50 transition-colors"
+                              >
+                                <IconMapPin className="w-3 h-3" />
+                                {locationData.name}
+                              </button>
+                              {(
+                                locationData?.images?.[0] ||
+                                locationData?.cover_image_url ||
+                                locationData?.image_url
+                              ) && locationPreviewIndex === idx && (
+                                <div className="pointer-events-none absolute left-0 top-full mt-3 z-20 opacity-100 scale-100">
+                                  <div className="w-72 h-44 rounded-xl overflow-hidden shadow-2xl border border-border-light bg-white">
+                                    <img
+                                      src={
+                                        locationData.images?.[0] ||
+                                        locationData.cover_image_url ||
+                                        locationData.image_url
+                                      }
+                                      alt={locationData.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                </div>
+                              )}
                             </span>
-                          )}
+                            );
+                          })()}
                         </div>
                         <h4 className="text-base font-bold text-text-primary mt-0.5">
                           {item.title || "Hoạt động"}
@@ -738,6 +812,49 @@ export default function TourDetailPage() {
                         <p className="text-sm text-text-secondary mt-1">
                           {item.details || "Chi tiết sẽ được cung cấp sau."}
                         </p>
+                        {(() => {
+                          const locationData = item.locationId?.highlights
+                            ? item.locationId
+                            : tour.locations?.find((loc) => {
+                                const locId = loc.locationId?._id || loc.locationId;
+                                const itemLocId = item.locationId?._id || item.locationId;
+                                return locId && itemLocId && locId === itemLocId;
+                              })?.locationId || item.locationId;
+
+                          if (!locationData?.highlights?.length) return null;
+
+                          return (
+                            <div className="mt-3 pl-3 border-l-2 border-primary/20 bg-primary/5 rounded-xl p-3 space-y-2">
+                              <div className="text-xs font-bold text-primary uppercase flex items-center gap-2">
+                                <IconMapPin className="w-3.5 h-3.5" /> Lộ trình tại {locationData.name}
+                              </div>
+                              <div className="space-y-2">
+                                {locationData.highlights.slice(0, 6).map((hl, hIdx) => (
+                                  <div key={hIdx} className="flex items-start gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-white text-primary text-[10px] font-bold flex items-center justify-center border border-primary/30 mt-0.5">
+                                      {hIdx + 1}
+                                    </span>
+                                    <div className="text-sm text-text-secondary space-y-0.5">
+                                      <p className="font-bold text-text-primary leading-snug">
+                                        {hl.name || "Điểm tham quan"}
+                                      </p>
+                                      {hl.description && (
+                                        <p className="text-xs leading-snug text-text-secondary/80">
+                                          {hl.description}
+                                        </p>
+                                      )}
+                                      {(hl.duration || hl.tip) && (
+                                        <p className="text-[11px] text-primary font-semibold">
+                                          {hl.duration || hl.tip}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>

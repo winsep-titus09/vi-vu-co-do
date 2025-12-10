@@ -10,10 +10,14 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createTransporter } from "../config/email.js";
+import { OAuth2Client } from "google-auth-library";
 
 // Thay thế __dirname cho ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClient = googleClientId ? new OAuth2Client(googleClientId) : null;
 
 export const register = async (req, res) => {
   try {
@@ -130,6 +134,104 @@ export const login = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
+  }
+};
+
+export const loginWithGoogle = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ message: "Thiếu mã đăng nhập Google." });
+    }
+
+    if (!googleClient) {
+      return res
+        .status(500)
+        .json({ message: "Thiếu cấu hình GOOGLE_CLIENT_ID trên máy chủ." });
+    }
+
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: googleClientId,
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      console.error("Google token verify error:", err.message);
+      return res
+        .status(401)
+        .json({ message: "Token Google không hợp lệ hoặc đã hết hạn." });
+    }
+
+    const { sub, email, name, picture, email_verified: verified } = payload;
+
+    if (!email || !verified) {
+      return res
+        .status(400)
+        .json({ message: "Email Google chưa được xác minh." });
+    }
+
+    let user = await User.findOne({ email }).populate("role_id");
+
+    if (!user) {
+      const roleDoc = await Role.findOne({ name: "tourist" });
+      if (!roleDoc) {
+        return res
+          .status(500)
+          .json({ message: "Không tìm thấy vai trò mặc định." });
+      }
+
+      const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || "10", 10);
+      const tempPassword = generateRandomPassword(16);
+      const hashed = await bcrypt.hash(tempPassword, saltRounds);
+
+      user = await User.create({
+        name: name || email,
+        email,
+        password: hashed,
+        avatar_url: picture,
+        role_id: roleDoc._id,
+        googleId: sub,
+        auth_provider: "google",
+      });
+    } else {
+      const updates = {};
+      if (!user.googleId) updates.googleId = sub;
+      if (picture && !user.avatar_url) updates.avatar_url = picture;
+      if (!user.auth_provider) updates.auth_provider = "google";
+
+      if (Object.keys(updates).length) {
+        user = await User.findByIdAndUpdate(user._id, updates, {
+          new: true,
+        }).populate("role_id");
+      }
+    }
+
+    const roleName = user.role_id?.name || user.role_id || "tourist";
+
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: roleName },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
+    );
+
+    res.json({
+      message: "Đăng nhập Google thành công",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone_number: user.phone_number,
+        role: roleName,
+        avatar: user.avatar_url,
+      },
+      token,
+    });
+  } catch (err) {
+    console.error("Google login error:", err);
     res.status(500).json({ message: "Lỗi máy chủ", error: err.message });
   }
 };

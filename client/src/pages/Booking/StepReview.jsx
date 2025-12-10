@@ -262,6 +262,10 @@ export default function BookingStepReview() {
                 onClick={async () => {
                   // Nếu chưa đăng nhập, chuyển sang trang đăng nhập và giữ lại bookingData
                   if (!user) {
+                    toast.warning(
+                      "Yêu cầu đăng nhập",
+                      "Vui lòng đăng nhập hoặc đăng ký để tiếp tục đặt tour."
+                    );
                     navigate("/auth/signin", {
                       state: { redirectTo: location.pathname, bookingData },
                     });

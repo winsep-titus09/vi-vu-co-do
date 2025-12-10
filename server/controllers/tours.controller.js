@@ -237,8 +237,14 @@ export const getTour = async (req, res) => {
     const tour = await Tour.findOne(cond)
       .populate("category_id", "name")
       .populate("guides.guideId", "name avatar_url")
-      .populate("locations.locationId", "name slug images")
-      .populate("itinerary.locationId", "name slug images")
+      .populate(
+        "locations.locationId",
+        "name slug images highlights cover_image_url image_url description opening_hours ticket_price ticket_price_currency best_visit_time"
+      )
+      .populate(
+        "itinerary.locationId",
+        "name slug images highlights cover_image_url image_url description opening_hours ticket_price ticket_price_currency best_visit_time"
+      )
       .lean();
 
     if (!tour) return res.status(404).json({ message: "Không tìm thấy tour." });

@@ -9,15 +9,16 @@ import {
   IconUser,
   IconCheckCircle,
   IconFacebook,
-  IconGoogle,
   IconHueCitadel,
   IconLoader,
 } from "../../icons/IconCommon";
+import { GoogleLogin } from "@react-oauth/google";
 
 export default function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const isSignUp = location.pathname === "/auth/signup";
+  const redirectState = location.state;
 
   // States
   const [role, setRole] = useState("tourist");
@@ -35,6 +36,33 @@ export default function AuthPage() {
   const [viewState, setViewState] = useState("login"); // 'login' | 'forgot' | 'sent'
   const [forgotEmail, setForgotEmail] = useState("");
 
+  const storeSession = (response) => {
+    if (response?.token) {
+      localStorage.setItem("token", response.token);
+    }
+    if (response?.user) {
+      localStorage.setItem("user", JSON.stringify(response.user));
+    }
+    return response?.user || JSON.parse(localStorage.getItem("user"));
+  };
+
+  const navigateAfterLogin = (userData) => {
+    if (!userData) return;
+
+    if (redirectState?.redirectTo) {
+      navigate(redirectState.redirectTo, { state: redirectState.bookingData });
+      return;
+    }
+
+    if (userData.role === "tourist") {
+      navigate("/dashboard/tourist");
+    } else if (userData.role === "guide") {
+      navigate("/dashboard/guide");
+    } else if (userData.role === "admin") {
+      navigate("/dashboard/admin");
+    }
+  };
+
   // Reset view state khi chuyển tab Đăng ký/Đăng nhập
   useEffect(() => {
     if (isSignUp) setViewState("login");
@@ -43,7 +71,9 @@ export default function AuthPage() {
   }, [isSignUp]);
 
   const toggleMode = () => {
-    navigate(isSignUp ? "/auth/signin" : "/auth/signup");
+    navigate(isSignUp ? "/auth/signin" : "/auth/signup", {
+      state: redirectState,
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -63,12 +93,7 @@ export default function AuthPage() {
           password: formData.password,
           role: "tourist", // Luôn đăng ký tourist trước
         });
-
-        // Store token and user data
-        if (response.token) {
-          localStorage.setItem("token", response.token);
-          localStorage.setItem("user", JSON.stringify(response.user));
-        }
+        const userData = storeSession(response);
 
         // Nếu muốn làm HDV, redirect đến trang settings để apply
         if (wantsToBeGuide) {
@@ -82,28 +107,16 @@ export default function AuthPage() {
           });
           return;
         }
+
+        navigateAfterLogin(userData);
       } else {
         // Sign in
         const response = await authApi.signIn({
           email: formData.email,
           password: formData.password,
         });
-
-        // Store token and user data
-        if (response.token) {
-          localStorage.setItem("token", response.token);
-          localStorage.setItem("user", JSON.stringify(response.user));
-        }
-      }
-
-      // Navigate based on role
-      const userData = JSON.parse(localStorage.getItem("user"));
-      if (userData.role === "tourist") {
-        navigate("/dashboard/tourist");
-      } else if (userData.role === "guide") {
-        navigate("/dashboard/guide");
-      } else if (userData.role === "admin") {
-        navigate("/dashboard/admin");
+        const userData = storeSession(response);
+        navigateAfterLogin(userData);
       }
     } catch (err) {
       console.error("Auth error:", err);
@@ -114,6 +127,34 @@ export default function AuthPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    const idToken = credentialResponse?.credential;
+    if (!idToken) {
+      setError("Không nhận được token Google. Vui lòng thử lại.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+    try {
+      const response = await authApi.googleSignIn({ idToken });
+      const userData = storeSession(response);
+      navigateAfterLogin(userData);
+    } catch (err) {
+      console.error("Google auth error:", err);
+      const serverMessage = err?.response?.data?.message;
+      setError(
+        serverMessage || err.message || "Đăng nhập Google thất bại. Vui lòng thử lại."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError("Đăng nhập Google thất bại. Vui lòng thử lại.");
   };
 
   const handleForgotSubmit = async (e) => {
@@ -252,12 +293,13 @@ export default function AuthPage() {
               <span className="w-full h-px bg-border-light"></span>
             </div>
             <div className="flex justify-center gap-4 mt-4">
-              <button className="p-3 rounded-full border border-border-light hover:bg-gray-50 transition-colors">
-                <IconGoogle className="w-5 h-5" />
-              </button>
-              <button className="p-3 rounded-full border border-border-light hover:bg-gray-50 transition-colors text-[#1877F2]">
-                <IconFacebook className="w-5 h-5" />
-              </button>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                useOneTap={false}
+                shape="circle"
+                size="large"
+              />
             </div>
             <p className="mt-6 text-center text-sm md:hidden">
               Đã có tài khoản?{" "}
@@ -303,12 +345,13 @@ export default function AuthPage() {
               )}
 
               <div className="flex justify-center gap-4 mb-6">
-                <button className="p-3 rounded-full border border-border-light hover:bg-gray-50 transition-colors">
-                  <IconGoogle className="w-5 h-5" />
-                </button>
-                <button className="p-3 rounded-full border border-border-light hover:bg-gray-50 transition-colors text-[#1877F2]">
-                  <IconFacebook className="w-5 h-5" />
-                </button>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  useOneTap={false}
+                  shape="circle"
+                  size="large"
+                />
               </div>
               <p className="text-center text-xs text-text-secondary mb-4">
                 hoặc sử dụng tài khoản
