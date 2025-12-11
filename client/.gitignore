@@ -57,21 +57,6 @@ vite.config.temp.js
 postcss.config.cjs
 
 # ================================
-# 🎨 IMAGES / ASSETS
-# ================================
-# Không commit ảnh thật hoặc upload từ Cloudflare
-/public/images/uploads/
-/public/images/**/*.jpg
-/public/images/**/*.jpeg
-/public/images/**/*.png
-/public/images/**/*.webp
-/public/images/**/*.gif
-/public/images/**/*.svg
-
-# Cho phép ảnh placeholder nhẹ
-!/public/images/placeholders/
-
-# ================================
 # 🧠 DOCUMENTATION / LOCAL TEST
 # ================================
 __tests__/
