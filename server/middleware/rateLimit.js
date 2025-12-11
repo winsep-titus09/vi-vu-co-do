@@ -3,8 +3,9 @@ import "dotenv/config";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import MongoStore from "rate-limit-mongo";
 
-/** MongoStore cho rate-limit (persist). Nếu gặp lỗi kết nối, fallback undefined. */
-const store = process.env.MONGO_URI
+// Optional MongoStore (set RATE_LIMIT_USE_MONGO=true to enable). Default: memory to avoid cyclic BSON errors.
+const useMongoStore = process.env.RATE_LIMIT_USE_MONGO === "true";
+const store = useMongoStore && process.env.MONGO_URI
   ? new MongoStore({
     uri: process.env.MONGO_URI,
     collectionName: "rateLimits",
