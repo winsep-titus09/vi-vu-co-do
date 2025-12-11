@@ -16,7 +16,8 @@ import { OAuth2Client } from "google-auth-library";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientIdRaw = process.env.GOOGLE_CLIENT_ID || "";
+const googleClientId = googleClientIdRaw.trim();
 const googleClient = googleClientId ? new OAuth2Client(googleClientId) : null;
 
 export const register = async (req, res) => {
@@ -152,6 +153,19 @@ export const loginWithGoogle = async (req, res) => {
         .json({ message: "Thiếu cấu hình GOOGLE_CLIENT_ID trên máy chủ." });
     }
 
+    // Decode thô để kiểm tra audience trước khi verify với Google
+    const decoded = jwt.decode(idToken) || {};
+    const tokenAud = decoded?.aud;
+    if (tokenAud && tokenAud !== googleClientId) {
+      console.error("Google token audience mismatch", {
+        tokenAud,
+        expected: googleClientId,
+      });
+      return res
+        .status(401)
+        .json({ message: "Token Google không hợp lệ (audience mismatch)." });
+    }
+
     let payload;
     try {
       const ticket = await googleClient.verifyIdToken({
@@ -160,7 +174,10 @@ export const loginWithGoogle = async (req, res) => {
       });
       payload = ticket.getPayload();
     } catch (err) {
-      console.error("Google token verify error:", err.message);
+      console.error("Google token verify error:", err.message, {
+        tokenAud,
+        expected: googleClientId,
+      });
       return res
         .status(401)
         .json({ message: "Token Google không hợp lệ hoặc đã hết hạn." });
