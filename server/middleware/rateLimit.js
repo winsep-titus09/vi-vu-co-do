@@ -25,7 +25,7 @@ export const globalLimiter = rateLimit({
   },
   skip: (req) => req.method === "OPTIONS" || req.path === "/api/payments/ipn",
   store,
-  keyGenerator: (req) => req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress || "unknown-ip",
+  keyGenerator: (req) => ipKeyGenerator(req),
 });
 
 /** 2) Auth: riêng cho đăng nhập/đăng ký/refresh
@@ -44,7 +44,7 @@ export const authLimiter = rateLimit({
   // Giảm va chạm người dùng chung IP (wifi/quán net) và bỏ qua request thành công
   keyGenerator: (req) => {
     const email = req.body?.email || req.body?.username || "anonymous";
-    const ip = req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress || "unknown-ip";
+    const ip = ipKeyGenerator(req);
     return `${ip}:${email}`;
   },
   skipSuccessfulRequests: true,
@@ -60,5 +60,5 @@ export const accountLimiter = rateLimit({
   legacyHeaders: false,
   message: { status: 429, message: "Too many requests. Please slow down." },
   store,
-  keyGenerator: (req) => req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress || "unknown-ip",
+  keyGenerator: (req) => ipKeyGenerator(req),
 });
