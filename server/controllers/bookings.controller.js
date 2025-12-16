@@ -509,96 +509,83 @@ export const guideApproveBooking = async (req, res) => {
             },
         }).catch(() => { });
 
-        const bookingCode = String(booking._id);
-        const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
-        const guideBookingUrl = `${process.env.APP_BASE_URL}/guide/bookings/${booking._id}`;
-        const tourName = tour.name || `#${booking._id}`;
+        res.json({ booking });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: "Lỗi duyệt booking", error: e.message });
+    }
+};
 
-        // Lấy thông tin customer để truyền vào email
-        const customer = await User.findById(userId).select("name email phone").lean();
-        const groupSize = normalized.filter((p) => p.count_slot).length;
-        const tourDate = start ? start.toLocaleDateString("vi-VN") : "";
+/**
+ * Guide rejects booking
+ */
+export const guideRejectBooking = async (req, res) => {
+    try {
+        const user = req.user;
+        const { id } = req.params;
+        const { note } = req.body || {};
 
-        // Thu thập các tác vụ thông báo, không chặn response
-        const notificationTasks = [];
+        const booking = await Booking.findById(id);
+        if (!booking) return res.status(404).json({ message: "Booking không tồn tại" });
 
-        if (status === "awaiting_payment") {
-            notificationTasks.push(
-                notifyUser({
-                    userId,
-                    type: "booking:approved",
-                    content: `Yêu cầu đặt tour ${tourName} đã được hệ thống xác nhận.  Vui lòng thanh toán. `,
-                    url: `/booking/${booking._id}`,
-                    meta: {
-                        bookingId: booking._id,
-                        bookingCode,
-                        tourId: booking.tour_id,
-                        tourName,
-                        tourDate,
-                        amount: total.toLocaleString("vi-VN") + " VNĐ",
-                        dueDate: payment_due_at ? new Date(payment_due_at).toLocaleString("vi-VN") : undefined,
-                        bookingUrl,
-                        paymentUrl: `${process.env.APP_BASE_URL}/booking/${booking._id}/payment`,
-                    },
-                })
-            );
-        } else {
-            // Thông báo cho HDV (nếu có)
-            if (intendedGuide) {
-                // Lấy thông tin guide để truyền vào email
-                const guide = await User.findById(intendedGuide).select("name").lean();
-
-                notificationTasks.push(
-                    notifyUser({
-                        userId: intendedGuide,
-                        type: "booking:request",
-                        content: `Có yêu cầu đặt tour ${tourName} cần bạn xác nhận. `,
-                        url: `/guide/bookings/${booking._id}`,
-                        meta: {
-                            bookingId: booking._id,
-                            bookingCode,
-                            tourId: booking.tour_id,
-                            tourName,
-                            tourDate,
-                            groupSize: groupSize.toString(),
-                            amount: total.toLocaleString("vi-VN") + " VNĐ",
-                            // Thông tin khách hàng
-                            userName: customer?.name || "",
-                            userPhone: contact?.phone || customer?.phone || "",
-                            userEmail: customer?.email || "",
-                            // Thông tin guide
-                            guideName: guide?.name || "",
-                            guideBookingUrl,
-                            bookingUrl: guideBookingUrl,
-                        },
-                    })
-                );
-            }
-            notificationTasks.push(
-                notifyUser({
-                    userId,
-                    type: "booking:created",
-                    content: `Đã gửi yêu cầu đặt tour ${tourName}. Vui lòng chờ HDV duyệt. `,
-                    url: `/booking/${booking._id}`,
-                    meta: {
-                        bookingId: booking._id,
-                        bookingCode,
-                        tourId: booking.tour_id,
-                        tourName,
-                        tourDate,
-                        groupSize: groupSize.toString(),
-                        amount: total.toLocaleString("vi-VN") + " VNĐ",
-                        bookingUrl,
-                    },
-                })
-            );
+        const isGuideOwner = booking.intended_guide_id && String(booking.intended_guide_id) === String(user._id);
+        const isUserAdmin = user?.role === "admin" || user?.role_id?.name === "admin";
+        if (!isGuideOwner && !isUserAdmin) {
+            return res.status(403).json({ message: "Bạn không có quyền từ chối booking này" });
+        }
+        if (booking.status !== "waiting_guide" || booking.guide_decision?.status !== "pending") {
+            return res.status(400).json({ message: "Booking không ở trạng thái chờ HDV" });
         }
 
-        // Trả về ngay, không chặn bởi email/notify
-        res.status(201).json({ booking });
+        const tourDoc = await Tour.findById(booking.tour_id).lean();
+        const tourName = tourDoc?.name || `#${booking._id}`;
 
-        // Fire-and-forget notifications
-        Promise.allSettled(notificationTasks).catch(() => { });
+        booking.status = "rejected";
+        booking.guide_decision = {
+            status: "rejected",
+            decided_at: new Date(),
+            decided_by: user._id,
+            note: note || undefined,
+        };
+        await booking.save();
+
+        const bookingUrl = `${process.env.APP_BASE_URL}/booking/${booking._id}`;
+
+        await notifyUser({
+            userId: booking.customer_id,
+            type: "booking:rejected",
+            content: `HDV đã từ chối yêu cầu đặt tour ${tourName}${note ? `: ${note}` : ""}`,
+            url: `/booking/${booking._id}`,
+            meta: {
+                bookingId: booking._id,
+                bookingCode: String(booking._id),
+                tourId: booking.tour_id,
+                tourName,
+                reason: note || "Không có lý do cụ thể",
+                bookingUrl,
+            },
+        }).catch(() => { });
+
+        res.json({ booking });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ message: "Lỗi từ chối booking", error: e.message });
+    }
+};
+
+/**
+ * COMPLETE booking: Tính tiền HDV theo total_price (theo đầu người và số lượt booking)
+ * Công thức:
+ *   - guideEarning = total_price - (total_price * 15%) 
+ *   - total_price đã được tính theo số người (trẻ em < 11 tuổi miễn phí)
+ */
+export const completeBooking = async (req, res) => {
+    const { id } = req.params;
+    const user = req.user;
+    const session = await mongoose.startSession();
+    try {
+        session.startTransaction();
+
         const booking = await Booking.findById(id).session(session);
         if (!booking) {
             await session.abortTransaction();
