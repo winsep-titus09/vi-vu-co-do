@@ -14,6 +14,7 @@ export async function createMoMoPayment({
     notifyUrl,
     requestType,
     extraData,
+    timeoutMs = 15000,
 }) {
     // Đọc cấu hình động từ DB (fallback ENV bên trong helper)
     const cfg = await getGatewayConfig("momo");
@@ -65,15 +66,29 @@ export async function createMoMoPayment({
     console.log("[MoMo] requestType =", requestType);
 
     // Gọi MoMo và guard non-JSON
-    const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "ViVuCoDo-Server/1.0 (+node-fetch)",
-        },
-        body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    let res;
+    try {
+        res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "ViVuCoDo-Server/1.0 (+node-fetch)",
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+        });
+    } catch (err) {
+        if (err.name === "AbortError") {
+            throw new Error(`MoMo request timeout after ${timeoutMs}ms`);
+        }
+        throw err;
+    } finally {
+        clearTimeout(timer);
+    }
 
     const text = await res.text();
     const ct = (res.headers.get("content-type") || "").toLowerCase();

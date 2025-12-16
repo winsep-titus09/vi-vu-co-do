@@ -94,6 +94,7 @@ export const createCheckout = async (req, res) => {
             notifyUrl,
             requestType,
             extraData,
+            timeoutMs: Number(process.env.MOMO_TIMEOUT_MS || 15000),
         });
 
         // 6) Lưu session
@@ -110,8 +111,10 @@ export const createCheckout = async (req, res) => {
 
         return res.json({ payUrl: momo.payUrl, booking_id: booking._id, gateway: "momo" });
     } catch (e) {
-        console.error(e);
-        return res.status(500).json({ message: "Lỗi tạo checkout MoMo", error: e.message });
+        console.error("[CHECKOUT ERROR]", e?.message || e);
+        const isTimeout = String(e?.message || "").toLowerCase().includes("timeout");
+        const status = isTimeout ? 504 : 500;
+        return res.status(status).json({ message: "Lỗi tạo checkout MoMo", error: e.message, code: isTimeout ? "GATEWAY_TIMEOUT" : "CREATE_FAILED" });
     }
 };
 
