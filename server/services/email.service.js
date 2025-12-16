@@ -78,12 +78,24 @@ function renderTemplate(templateKey, data = {}) {
 
 export async function sendEmailRaw({ to, subject, html }) {
     if (!to) throw new Error("Missing recipient email");
-    return transporter.sendMail({
-        from: process.env.EMAIL_FROM,
-        to,
-        subject,
-        html,
-    });
+    const from = process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.APP_SUPPORT_EMAIL;
+    if (!from) {
+        throw new Error("Missing EMAIL_FROM/SMTP_USER for sender address");
+    }
+
+    try {
+        const result = await transporter.sendMail({
+            from,
+            to,
+            subject,
+            html,
+        });
+        console.log("[EMAIL] Sent", { to, subject, messageId: result?.messageId });
+        return result;
+    } catch (err) {
+        console.error("[EMAIL] sendMail error", err?.message || err);
+        throw err;
+    }
 }
 
 export async function sendTemplateEmail({ to, subject, templateKey, data }) {
