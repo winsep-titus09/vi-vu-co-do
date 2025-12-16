@@ -1,6 +1,7 @@
 // src/components/Forms/ButtonSvgMask.jsx
 
 import React from "react";
+import { Link } from "react-router-dom";
 
 /**
  * Nút CTA dùng SVG mask (Vàng -> Tím) để tái sử dụng.
@@ -24,9 +25,19 @@ export default function ButtonSvgMask({ href, children, className = "" }) {
   // Kết hợp base class với class truyền vào (ví dụ: 'hidden lg:inline-flex')
   const combinedClasses = `${baseClasses} ${className}`;
 
+  const isExternal = href?.startsWith("http") || href?.startsWith("mailto:") || href?.startsWith("tel:");
+
+  if (isExternal) {
+    return (
+      <a href={href} className={combinedClasses}>
+        <span>{children}</span>
+      </a>
+    );
+  }
+
   return (
-    <a href={href} className={combinedClasses}>
+    <Link to={href || "#"} className={combinedClasses}>
       <span>{children}</span>
-    </a>
+    </Link>
   );
 }
