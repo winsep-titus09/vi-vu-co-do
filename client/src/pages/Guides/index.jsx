@@ -37,23 +37,48 @@ export default function GuidesPage() {
 
   // Map API guides to display format
   const guidesData = useMemo(() => {
-    return (apiGuides || []).map((guide) => ({
-      id: guide.user_id?._id || guide.user_id,
-      name: guide.user_id?.name || "Guide",
-      specialty: guide.introduction || "Hướng dẫn viên",
-      rating: guide.avgRating ?? guide.rating ?? null,
-      reviewCount: guide.reviewCount ?? 0,
-      image: guide.user_id?.avatar_url || DEFAULT_AVATAR,
-      languages: (guide.languages || []).map((l) => l.toUpperCase()),
-      bio:
-        guide.user_id?.bio ||
-        guide.experience ||
-        guide.introduction ||
-        "Khám phá Huế cùng tôi!",
-      tags: guide.expertise
-        ? guide.expertise.split(",").map((t) => t.trim().toLowerCase())
-        : [],
-    }));
+    return (apiGuides || []).map((guide) => {
+      const ratingVal = Number(
+        guide.avg_guide_rating ??
+          guide.avgRating ??
+          guide.average_rating ??
+          guide.avg_rating ??
+          guide.averageRating ??
+          guide.reviewStats?.avg_guide_rating ??
+          guide.reviewStats?.average_rating ??
+          guide.reviewStats?.averageRating ??
+          guide.reviewStats?.avgRating ??
+          guide.rating
+      );
+
+      const expVal = Number(
+        guide.experience_years ?? guide.experience ?? guide.user_id?.experience
+      );
+
+      return {
+        id: guide.user_id?._id || guide.user_id,
+        name: guide.user_id?.name || "Guide",
+        specialty: guide.introduction || "Hướng dẫn viên",
+        rating: Number.isFinite(ratingVal) ? ratingVal : 0,
+        reviewCount:
+          guide.review_count ??
+          guide.reviewCount ??
+          guide.review_stats?.count ??
+          guide.review_stats?.totalReviews ??
+          0,
+        experienceYears: Number.isFinite(expVal) ? expVal : undefined,
+        image: guide.user_id?.avatar_url || DEFAULT_AVATAR,
+        languages: (guide.languages || []).map((l) => l.toUpperCase()),
+        bio:
+          guide.user_id?.bio ||
+          guide.experience ||
+          guide.introduction ||
+          "Khám phá Huế cùng tôi!",
+        tags: guide.expertise
+          ? guide.expertise.split(",").map((t) => t.trim().toLowerCase())
+          : [],
+      };
+    });
   }, [apiGuides]);
 
   const filteredGuides = guidesData.filter((g) => {

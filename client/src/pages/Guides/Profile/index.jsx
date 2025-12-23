@@ -97,6 +97,24 @@ export default function GuideProfile() {
       return rawVideoUrl;
     })();
 
+    const derivedRating = (() => {
+      const val =
+        reviewStats?.avg_guide_rating ??
+        reviewStats?.averageRating ??
+        reviewStats?.average_rating ??
+        reviewStats?.avgRating ??
+        apiGuide.rating ??
+        apiGuide.avg_rating ??
+        apiGuide.average_rating ??
+        apiGuide.averageRating;
+      const num = Number(val);
+      return Number.isFinite(num) ? num : 0;
+    })();
+
+    const formattedRating = Number.isInteger(derivedRating)
+      ? String(derivedRating)
+      : derivedRating.toFixed(1);
+
     return {
       id: apiGuide._id,
       name: apiGuide.user_id?.name || "Guide",
@@ -109,8 +127,13 @@ export default function GuideProfile() {
         apiGuide.cover_image_url ||
         apiGuide.user_id?.cover_image_url ||
         "/images/placeholders/cover-placeholder.jpg",
-      rating: apiGuide.rating || 5.0,
-      reviews: apiGuide.reviewCount || 0,
+      rating: derivedRating,
+      ratingText: formattedRating,
+      reviews:
+        reviewStats?.count ??
+        reviewStats?.totalReviews ??
+        apiGuide.reviewCount ??
+        0,
       experienceYears,
       languages: (apiGuide.languages || []).map((l) =>
         l === "vi"
@@ -128,23 +151,31 @@ export default function GuideProfile() {
       videoEmbedUrl,
       videoThumb: rawVideoUrl || "/images/placeholders/video-thumbnail.jpg",
     };
-  }, [apiGuide]);
+  }, [apiGuide, reviewStats]);
 
   // Map tours from API
   const tours = useMemo(() => {
     if (!apiTours?.length) return [];
     return apiTours.map((tour) => ({
       id: tour._id,
-      name: tour.name,
-      price: tour.price,
-      duration: tour.duration_hours
-        ? `${tour.duration_hours} giờ`
-        : `${tour.duration} ${tour.duration_unit === "hours" ? "giờ" : "ngày"}`,
-      rating: tour.rating || 5.0,
+      // TourCard expects `title` and `description` keys
+      title: tour.name || tour.title || "",
+      description:
+        tour.short_description || tour.summary || tour.description || "",
+      // Pricing and rating
+      price: tour.price ?? tour.base_price ?? 0,
+      rating: tour.rating,
+      // Duration fields (TourCard formats these)
+      duration_hours: tour.duration_hours,
+      duration: tour.duration,
+      duration_unit: tour.duration_unit,
+      // Image, location and highlights
       image:
-        tour.cover_image_url ||
-        tour.gallery?.[0] ||
-        "https://via.placeholder.com/400x300",
+        tour.cover_image_url || tour.gallery?.[0] || "https://via.placeholder.com/400x300",
+      location: tour.location_id?.name || tour.city || tour.location || "",
+      highlights: tour.highlights || tour.highlight || [],
+      // Slug (used for link) and category
+      slug: tour.slug || tour._id,
       category: tour.category_id?.name || "Tour",
     }));
   }, [apiTours]);
@@ -283,7 +314,7 @@ export default function GuideProfile() {
               <div className="grid grid-cols-2 gap-4 border-t border-border-light pt-6 mb-6">
                 <div className="text-center">
                   <span className="block text-2xl font-bold text-text-primary">
-                    {guideDetail.rating}
+                    {guideDetail.ratingText}
                   </span>
                   <span className="text-xs text-text-secondary flex justify-center items-center gap-1">
                     <IconStar className="w-3 h-3 text-secondary fill-current" />

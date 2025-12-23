@@ -10,6 +10,24 @@ import IconVerify from "../../icons/IconVerify.jsx";
  * Wrapped with React.memo for performance optimization
  */
 const GuideCard = React.memo(function GuideCard({ guide }) {
+  const ratingValue = (() => {
+    const n = Number(guide.rating);
+    return Number.isFinite(n) ? n : 0;
+  })();
+
+  const formattedRating = (() => {
+    if (!Number.isFinite(ratingValue)) return "0";
+    if (Number.isInteger(ratingValue)) return String(ratingValue);
+    return ratingValue.toFixed(1);
+  })();
+
+  const experienceLabel = (() => {
+    const yearsRaw = guide.experienceYears ?? guide.experience;
+    const years = Number(yearsRaw);
+    if (Number.isFinite(years) && years > 0) return `${years} năm kinh nghiệm`;
+    return "Kinh nghiệm: chưa cập nhật";
+  })();
+
   return (
     <Link
       to={`/guides/${guide.id}`}
@@ -51,7 +69,7 @@ const GuideCard = React.memo(function GuideCard({ guide }) {
 
             <div className="flex items-center gap-1 text-xs font-bold text-[#BC4C00] shrink-0">
               <IconStarSolid className="w-3.5 h-3.5 fill-[#BC4C00]" />
-              {guide.rating}
+              {formattedRating}
             </div>
           </div>
 
@@ -64,8 +82,8 @@ const GuideCard = React.memo(function GuideCard({ guide }) {
           <div className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] transition-[grid-template-rows] duration-500 ease-out">
             <div className="overflow-hidden">
               <div className="pt-3 mt-2 border-t border-border-light opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
-                <p className="text-xs text-text-secondary leading-relaxed">
-                  {guide.bio}
+                <p className="text-[11px] font-semibold text-primary mb-1">
+                  {experienceLabel}
                 </p>
               </div>
             </div>

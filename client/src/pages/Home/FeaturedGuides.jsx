@@ -17,7 +17,22 @@ export default function FeaturedGuides() {
       id: guide.user_id?._id || guide.user_id || guide._id,
       name: guide.user_id?.name || "Guide",
       specialty: guide.introduction || "Hướng dẫn viên",
-      rating: guide.rating || 5.0,
+      rating:
+        Number(
+          guide.avg_guide_rating ??
+            guide.avgRating ??
+            guide.average_rating ??
+            guide.avg_rating ??
+            guide.averageRating ??
+            guide.reviewStats?.avg_guide_rating ??
+            guide.reviewStats?.average_rating ??
+            guide.reviewStats?.averageRating ??
+            guide.reviewStats?.avgRating ??
+            guide.rating
+        ) || 0,
+      experienceYears: Number(
+        guide.experience_years ?? guide.experience ?? guide.user_id?.experience
+      ),
       languages: guide.languages || ["VN"],
       bio: guide.bio || "Khám phá Huế cùng tôi!",
       image:

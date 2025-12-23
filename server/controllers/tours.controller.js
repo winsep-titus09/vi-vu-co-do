@@ -185,6 +185,25 @@ export const listTours = async (req, res) => {
       filter["guides.guideId"] = { $in: guideIds };
     }
 
+    // Support filtering by guide_id query param (used by client profile pages)
+    // Accepts `guide_id`, `guideId` or `guide` as parameter names.
+    const rawGuideId = req.query.guide_id || req.query.guideId || req.query.guide;
+    if (rawGuideId && mongoose.isValidObjectId(rawGuideId)) {
+      const gid = new mongoose.Types.ObjectId(rawGuideId);
+      const guideOr = [{ "guides.guideId": gid }, { guide_id: gid }];
+
+      // If a $or already exists (e.g., from single-category filter), combine safely using $and
+      if (filter.$or) {
+        const existingOr = filter.$or;
+        delete filter.$or;
+        filter.$and = filter.$and || [];
+        filter.$and.push({ $or: existingOr });
+        filter.$and.push({ $or: guideOr });
+      } else {
+        filter.$or = guideOr;
+      }
+    }
+
     const pg = Math.max(parseInt(page) || 1, 1);
     const lm = Math.min(Math.max(parseInt(limit) || 12, 1), 100);
 

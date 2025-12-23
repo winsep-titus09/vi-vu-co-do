@@ -474,7 +474,7 @@ export default function Navbar() {
             className="inline-flex items-center gap-3 group shrink-0"
           >
             <img
-              src="/images/uploads/logo-hue-2.jpg"
+              src="/images/uploads/logo-hue-den.png"
               alt="Vi Vu Cố Đô"
               className="h-12 w-auto object-contain"
             />

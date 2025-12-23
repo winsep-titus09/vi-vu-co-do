@@ -70,8 +70,8 @@ export const getMyGuideProfile = async (req, res) => {
         typeof profile.experience_years === "number"
           ? profile.experience_years
           : Number.isFinite(Number(profile.experience))
-          ? Number(profile.experience)
-          : 0,
+            ? Number(profile.experience)
+            : 0,
       languages: profile.languages || [],
       expertise: profile.expertise || "",
       certificates: profile.certificates || [],
@@ -125,8 +125,8 @@ export const updateMyGuideProfile = async (req, res) => {
       body.experience !== undefined
         ? body.experience
         : body.experience_years !== undefined
-        ? body.experience_years
-        : undefined;
+          ? body.experience_years
+          : undefined;
 
     if (incomingExperience !== undefined) {
       const expNumber = Number(incomingExperience);
@@ -207,8 +207,8 @@ export const updateMyGuideProfile = async (req, res) => {
         typeof profile.experience_years === "number"
           ? profile.experience_years
           : Number.isFinite(Number(profile.experience))
-          ? Number(profile.experience)
-          : 0,
+            ? Number(profile.experience)
+            : 0,
       languages: profile.languages || [],
       expertise: profile.expertise || "",
       certificates: profile.certificates || [],
@@ -281,7 +281,58 @@ export const listFeaturedGuides = async (req, res) => {
       .limit(limit)
       .lean();
 
-    return res.json({ items, limit, featuredOnly });
+    // Attach rating stats for these guides
+    const guideIds = items
+      .map((g) => g?.user_id?._id || g?.user_id)
+      .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+    let statsMap = {};
+    if (guideIds.length) {
+      const stats = await Review.aggregate([
+        { $match: { guide_rating: { $type: "number" } } },
+        {
+          $lookup: {
+            from: "bookings",
+            localField: "bookingId",
+            foreignField: "_id",
+            as: "bk",
+          },
+        },
+        { $unwind: "$bk" },
+        {
+          $match: {
+            "bk.intended_guide_id": { $in: guideIds.map((id) => new mongoose.Types.ObjectId(id)) },
+          },
+        },
+        {
+          $group: {
+            _id: "$bk.intended_guide_id",
+            avg_guide_rating: { $avg: "$guide_rating" },
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      statsMap = stats.reduce((acc, s) => {
+        acc[s._id.toString()] = {
+          avg_guide_rating: s.avg_guide_rating || 0,
+          count: s.count || 0,
+        };
+        return acc;
+      }, {});
+    }
+
+    const enriched = items.map((g) => {
+      const gid = g?.user_id?._id || g?.user_id;
+      const stat = gid ? statsMap[gid.toString()] || {} : {};
+      return {
+        ...g,
+        avg_guide_rating: stat.avg_guide_rating ?? null,
+        review_count: stat.count ?? 0,
+      };
+    });
+
+    return res.json({ items: enriched, limit, featuredOnly });
   } catch (err) {
     console.error("listFeaturedGuides error:", err);
     return res
