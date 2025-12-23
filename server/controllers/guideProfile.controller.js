@@ -39,6 +39,7 @@ export const getMyGuideProfile = async (req, res) => {
         introduction: "",
         cover_image_url: "",
         experience: "",
+        experience_years: 0,
         languages: ["Tiếng Việt"],
         bank_account: {
           bank_name: "",
@@ -65,6 +66,12 @@ export const getMyGuideProfile = async (req, res) => {
       introduction: profile.introduction || "",
       bio_video_url: profile.bio_video_url || "",
       experience: profile.experience || "",
+      experience_years:
+        typeof profile.experience_years === "number"
+          ? profile.experience_years
+          : Number.isFinite(Number(profile.experience))
+          ? Number(profile.experience)
+          : 0,
       languages: profile.languages || [],
       expertise: profile.expertise || "",
       certificates: profile.certificates || [],
@@ -114,8 +121,22 @@ export const updateMyGuideProfile = async (req, res) => {
 
     if (body.introduction !== undefined)
       profileUpdateData.introduction = body.introduction;
-    if (body.experience !== undefined)
-      profileUpdateData.experience = body.experience;
+    const incomingExperience =
+      body.experience !== undefined
+        ? body.experience
+        : body.experience_years !== undefined
+        ? body.experience_years
+        : undefined;
+
+    if (incomingExperience !== undefined) {
+      const expNumber = Number(incomingExperience);
+      profileUpdateData.experience_years = Number.isFinite(expNumber)
+        ? expNumber
+        : 0;
+      profileUpdateData.experience = Number.isFinite(expNumber)
+        ? String(expNumber)
+        : incomingExperience;
+    }
     if (body.cover_image_url !== undefined)
       profileUpdateData.cover_image_url = body.cover_image_url;
     if (body.bio_video_url !== undefined)
@@ -182,6 +203,12 @@ export const updateMyGuideProfile = async (req, res) => {
       introduction: profile.introduction || "",
       bio_video_url: profile.bio_video_url || "",
       experience: profile.experience || "",
+      experience_years:
+        typeof profile.experience_years === "number"
+          ? profile.experience_years
+          : Number.isFinite(Number(profile.experience))
+          ? Number(profile.experience)
+          : 0,
       languages: profile.languages || [],
       expertise: profile.expertise || "",
       certificates: profile.certificates || [],
@@ -212,7 +239,10 @@ export const getPublicGuideProfile = async (req, res) => {
     // Loại trừ các trường nhạy cảm: bank_account, __v
     const profile = await GuideProfile.findOne({ user_id: guideId })
       .select("-bank_account -__v")
-      .populate("user_id", "name avatar_url bio cover_image_url email phone_number")
+      .populate(
+        "user_id",
+        "name avatar_url bio cover_image_url email phone_number"
+      )
       .lean();
 
     if (!profile) {
@@ -244,7 +274,7 @@ export const listFeaturedGuides = async (req, res) => {
 
     const items = await GuideProfile.find(filter)
       .select(
-        "user_id introduction bio_video_url experience languages is_featured createdAt"
+        "user_id introduction bio_video_url experience experience_years expertise languages is_featured createdAt"
       )
       .populate("user_id", "name avatar_url")
       .sort({ is_featured: -1, createdAt: -1 })

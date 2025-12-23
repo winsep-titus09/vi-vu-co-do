@@ -42,6 +42,7 @@ export const applyGuide = async (req, res) => {
     // Parse body - hỗ trợ cả form-data và JSON
     let {
       about,
+      expertise,
       languages = [],
       experience_years = 0,
       id_cards = [],
@@ -114,6 +115,7 @@ export const applyGuide = async (req, res) => {
       {
         $set: {
           about,
+          expertise,
           languages,
           experience_years,
           id_cards,
@@ -144,9 +146,12 @@ export const applyGuide = async (req, res) => {
         guideName: user.name,
         guideEmail: user.email,
         guidePhone: user.phone_number || user.phone || "",
-        applicationDate: (appDoc.createdAt || new Date()).toLocaleString("vi-VN"),
-        adminUrl: `${process.env.APP_BASE_URL || ""}/admin/guide-applications/${appDoc._id
-          }`,
+        applicationDate: (appDoc.createdAt || new Date()).toLocaleString(
+          "vi-VN"
+        ),
+        adminUrl: `${process.env.APP_BASE_URL || ""}/admin/guide-applications/${
+          appDoc._id
+        }`,
       },
     });
 
@@ -248,9 +253,7 @@ export const adminReviewGuideApplication = async (req, res) => {
 
       // 2) upsert GuideProfile từ application
       const experienceText =
-        appDoc.experience_years > 0
-          ? `Kinh nghiệm ${appDoc.experience_years} năm.`
-          : "Chưa có kinh nghiệm.";
+        appDoc.experience_years > 0 ? String(appDoc.experience_years) : "0";
 
       const certificates = [
         ...(appDoc.certificates || []).map((c) => ({
@@ -268,6 +271,8 @@ export const adminReviewGuideApplication = async (req, res) => {
             introduction: appDoc.about,
             bio_video_url: appDoc.intro_video?.url,
             experience: experienceText,
+            experience_years: appDoc.experience_years || 0,
+            expertise: appDoc.expertise || null,
             languages: appDoc.languages || [],
             bank_account: {
               bank_name: appDoc.bank_info?.bank_name,

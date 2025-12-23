@@ -41,10 +41,15 @@ export default function GuidesPage() {
       id: guide.user_id?._id || guide.user_id,
       name: guide.user_id?.name || "Guide",
       specialty: guide.introduction || "Hướng dẫn viên",
-      rating: guide.rating || 5.0,
+      rating: guide.avgRating ?? guide.rating ?? null,
+      reviewCount: guide.reviewCount ?? 0,
       image: guide.user_id?.avatar_url || DEFAULT_AVATAR,
       languages: (guide.languages || []).map((l) => l.toUpperCase()),
-      bio: guide.user_id?.bio || guide.experience || "Khám phá Huế cùng tôi!",
+      bio:
+        guide.user_id?.bio ||
+        guide.experience ||
+        guide.introduction ||
+        "Khám phá Huế cùng tôi!",
       tags: guide.expertise
         ? guide.expertise.split(",").map((t) => t.trim().toLowerCase())
         : [],
