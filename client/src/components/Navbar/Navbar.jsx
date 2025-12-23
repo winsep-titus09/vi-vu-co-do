@@ -511,7 +511,7 @@ export default function Navbar() {
                   {blogCategories.map((category) => (
                     <NavLink
                       key={category._id}
-                      to={`/blog/${category.slug}`}
+                      to={`/blog?category=${encodeURIComponent(category._id)}`}
                       className="block px-4 py-2.5 text-base text-text-primary hover:bg-primary-light hover:text-primary"
                     >
                       {category.name}
@@ -691,7 +691,7 @@ export default function Navbar() {
                   {blogCategories.map((category) => (
                     <NavLink
                       key={category._id}
-                      to={`/blog/${category.slug}`}
+                      to={`/blog?category=${encodeURIComponent(category._id)}`}
                       onClick={toggleMenu}
                       className="block p-2 text-sm text-text-secondary hover:text-primary"
                     >

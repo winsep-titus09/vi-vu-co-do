@@ -399,10 +399,11 @@ export default function PostDetail() {
                       <TourCard
                         key={tour._id || tour.id}
                         tour={{
-                          id: tour._id || tour.id,
-                          title: tour.title,
-                          description: tour.description,
-                          image: getTourImage(tour),
+                            id: tour._id || tour.id,
+                            title: tour.name || tour.title || tour._id || tour.id,
+                            description:
+                              tour.description || tour.summary || tour.excerpt || "",
+                            image: getTourImage(tour),
                           location:
                             tour.location?.name ||
                             tour.locationName ||

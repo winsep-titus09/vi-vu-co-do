@@ -1,7 +1,7 @@
 // src/pages/Blog/index.jsx
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
 import BlogCard from "../../components/Cards/BlogCard";
 import Spinner from "../../components/Loaders/Spinner";
@@ -37,6 +37,17 @@ export default function BlogPage() {
     const all = { _id: "all", name: "Tất cả chủ đề", slug: "all" };
     return [all, ...(apiCategories || [])];
   }, [apiCategories]);
+
+  // If a category is provided via query param (from Navbar links), set active category
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const catParam = params.get("category");
+    if (!catParam) return;
+    // catParam might be an _id or a slug; prefer matching _id then slug
+    const match = categories.find((c) => c._id === catParam || c.slug === catParam);
+    if (match) setActiveCategory(match._id);
+  }, [location.search, categories]);
 
   // Fetch articles with filters
   const params = useMemo(() => {
