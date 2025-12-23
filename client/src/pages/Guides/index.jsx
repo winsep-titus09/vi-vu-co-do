@@ -7,6 +7,8 @@ import IconChevronLeft from "../../icons/IconChevronLeft";
 import IconChevronRight from "../../icons/IconChevronRight";
 import Spinner from "../../components/Loaders/Spinner";
 import { useFeaturedGuides } from "../../features/guides/hooks";
+import { useAuth } from "../../features/auth/hooks";
+import { useNavigate } from "react-router-dom";
 
 // Default placeholder for guides without avatar
 const DEFAULT_AVATAR = "/images/placeholders/avatar-placeholder.jpg";
@@ -30,6 +32,8 @@ export default function GuidesPage() {
 
   // Fetch guides from API
   const { guides: apiGuides, isLoading } = useFeaturedGuides(50);
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   // Map API guides to display format
   const guidesData = useMemo(() => {
@@ -261,7 +265,23 @@ export default function GuidesPage() {
               Gia nhập cộng đồng Vi Vu Cố Đô để tiếp cận hàng ngàn du khách, tự
               do thiết kế tour và xây dựng thương hiệu cá nhân của riêng bạn.
             </p>
-            <button className="px-8 py-4 bg-secondary text-[#2C3E50] font-bold rounded-xl hover:bg-white transition-all shadow-lg shadow-black/20 transform hover:-translate-y-1">
+            <button
+              onClick={() => {
+                if (isAuthenticated) {
+                  navigate("/dashboard/tourist/settings", {
+                    state: { showGuideApply: true },
+                  });
+                } else {
+                  navigate("/auth/signin", {
+                    state: {
+                      redirectTo: "/dashboard/tourist/settings",
+                      showGuideApply: true,
+                    },
+                  });
+                }
+              }}
+              className="px-8 py-4 bg-secondary text-[#2C3E50] font-bold rounded-xl hover:bg-white transition-all shadow-lg shadow-black/20 transform hover:-translate-y-1"
+            >
               Trở thành Đối tác ngay
             </button>
           </div>

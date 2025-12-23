@@ -30,6 +30,7 @@ export default function AuthPage() {
     fullName: "",
     email: "",
     password: "",
+    confirmPassword: "",
   });
 
   // Forgot password logic
@@ -67,7 +68,7 @@ export default function AuthPage() {
   useEffect(() => {
     if (isSignUp) setViewState("login");
     setError("");
-    setFormData({ fullName: "", email: "", password: "" });
+    setFormData({ fullName: "", email: "", password: "", confirmPassword: "" });
   }, [isSignUp]);
 
   const toggleMode = () => {
@@ -83,6 +84,12 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
+        // Validate password confirmation
+        if (formData.password !== formData.confirmPassword) {
+          setError("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.");
+          setIsLoading(false);
+          return;
+        }
         // Sign up - luôn đăng ký với role tourist
         // Nếu muốn làm HDV, sau đăng ký sẽ redirect đến trang apply
         const wantsToBeGuide = role === "guide";
@@ -269,6 +276,19 @@ export default function AuthPage() {
                   value={formData.password}
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
+                  }
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm"
+                  required
+                />
+                <IconLock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+              </div>
+              <div className="relative">
+                <input
+                  type="password"
+                  placeholder="Xác nhận mật khẩu"
+                  value={formData.confirmPassword}
+                  onChange={(e) =>
+                    setFormData({ ...formData, confirmPassword: e.target.value })
                   }
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm"
                   required
