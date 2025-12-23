@@ -34,8 +34,9 @@ export default function GuideProfile() {
   const navigate = useNavigate();
   const toast = useToast();
   const { isAuthenticated } = useAuth();
-  const { createGuideReview, isLoading: isSubmittingReview } = useCreateReview();
-  
+  const { createGuideReview, isLoading: isSubmittingReview } =
+    useCreateReview();
+
   const { guide: apiGuide, isLoading, error } = useGuideProfile(id);
 
   // Review modal state
@@ -78,7 +79,10 @@ export default function GuideProfile() {
   const guideDetail = useMemo(() => {
     if (!apiGuide) return null;
 
-    const expYears = Number.parseInt(apiGuide.experience, 10);
+    const expYears = Number.parseInt(
+      apiGuide.experience_years ?? apiGuide.experience,
+      10
+    );
     const experienceYears = Number.isFinite(expYears) ? expYears : 0;
 
     const rawVideoUrl = apiGuide.bio_video_url || "";
@@ -122,8 +126,7 @@ export default function GuideProfile() {
       phone: apiGuide.user_id?.phone_number || apiGuide.phone || "",
       email: apiGuide.user_id?.email || apiGuide.email || "",
       videoEmbedUrl,
-      videoThumb:
-        rawVideoUrl || "/images/placeholders/video-thumbnail.jpg",
+      videoThumb: rawVideoUrl || "/images/placeholders/video-thumbnail.jpg",
     };
   }, [apiGuide]);
 
@@ -134,7 +137,7 @@ export default function GuideProfile() {
       id: tour._id,
       name: tour.name,
       price: tour.price,
-      duration: tour.duration_hours 
+      duration: tour.duration_hours
         ? `${tour.duration_hours} giờ`
         : `${tour.duration} ${tour.duration_unit === "hours" ? "giờ" : "ngày"}`,
       rating: tour.rating || 5.0,
@@ -298,15 +301,25 @@ export default function GuideProfile() {
               {/* Desktop CTA */}
               <div className="hidden md:block space-y-3">
                 <a
-                  href={guideDetail.phone ? `tel:${guideDetail.phone}` : undefined}
-                  className={`w-full inline-flex justify-center py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/30 hover:bg-primary/90 transition-all active:scale-95 ${guideDetail.phone ? "" : "opacity-50 cursor-not-allowed"}`}
+                  href={
+                    guideDetail.phone ? `tel:${guideDetail.phone}` : undefined
+                  }
+                  className={`w-full inline-flex justify-center py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/30 hover:bg-primary/90 transition-all active:scale-95 ${
+                    guideDetail.phone ? "" : "opacity-50 cursor-not-allowed"
+                  }`}
                   aria-disabled={!guideDetail.phone}
                 >
                   Liên hệ ngay
                 </a>
                 <a
-                  href={guideDetail.email ? `mailto:${guideDetail.email}?subject=Li%C3%AAn%20h%E1%BB%87%20h%C6%B0%E1%BB%9Bng%20d%E1%BA%ABn%20vi%C3%AAn` : undefined}
-                  className={`w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border-light text-text-secondary hover:text-primary hover:border-primary transition-all bg-white ${guideDetail.email ? "" : "opacity-50 cursor-not-allowed"}`}
+                  href={
+                    guideDetail.email
+                      ? `mailto:${guideDetail.email}?subject=Li%C3%AAn%20h%E1%BB%87%20h%C6%B0%E1%BB%9Bng%20d%E1%BA%ABn%20vi%C3%AAn`
+                      : undefined
+                  }
+                  className={`w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border-light text-text-secondary hover:text-primary hover:border-primary transition-all bg-white ${
+                    guideDetail.email ? "" : "opacity-50 cursor-not-allowed"
+                  }`}
                   aria-disabled={!guideDetail.email}
                 >
                   <IconMail className="w-4 h-4" /> Nhắn tin
@@ -348,7 +361,6 @@ export default function GuideProfile() {
                   <div className="w-2 h-2 rounded-full bg-gray-300"></div> Bận
                 </span>
               </div>
-
             </div>
 
             {/* Certifications */}
@@ -492,7 +504,9 @@ export default function GuideProfile() {
                       </p>
                       {review.reply && (
                         <div className="mt-4 p-3 rounded-2xl bg-bg-main text-sm text-text-primary border border-border-light">
-                          <p className="font-bold text-text-primary mb-1">Phản hồi từ hướng dẫn viên</p>
+                          <p className="font-bold text-text-primary mb-1">
+                            Phản hồi từ hướng dẫn viên
+                          </p>
                           <p className="text-text-secondary">{review.reply}</p>
                         </div>
                       )}
@@ -550,8 +564,12 @@ export default function GuideProfile() {
                   className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
                 />
                 <div>
-                  <h4 className="font-bold text-text-primary">{guideDetail?.name}</h4>
-                  <p className="text-sm text-text-secondary">{guideDetail?.role}</p>
+                  <h4 className="font-bold text-text-primary">
+                    {guideDetail?.name}
+                  </h4>
+                  <p className="text-sm text-text-secondary">
+                    {guideDetail?.role}
+                  </p>
                 </div>
               </div>
 
@@ -632,14 +650,20 @@ export default function GuideProfile() {
                   });
 
                   if (result.success) {
-                    toast.success("Thành công!", "Cảm ơn bạn đã đánh giá hướng dẫn viên");
+                    toast.success(
+                      "Thành công!",
+                      "Cảm ơn bạn đã đánh giá hướng dẫn viên"
+                    );
                     setIsReviewModalOpen(false);
                     setReviewRating(5);
                     setReviewComment("");
                     // Reload page to show new review
                     window.location.reload();
                   } else {
-                    toast.error("Lỗi", result.error || "Không thể gửi đánh giá");
+                    toast.error(
+                      "Lỗi",
+                      result.error || "Không thể gửi đánh giá"
+                    );
                   }
                 }}
                 disabled={isSubmittingReview || !reviewComment.trim()}

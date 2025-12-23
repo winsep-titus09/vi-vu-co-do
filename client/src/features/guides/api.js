@@ -336,6 +336,7 @@ export const guidesApi = {
 
       // Append text fields
       formData.append("about", rest.about || "");
+      formData.append("expertise", rest.expertise || "");
       formData.append("experience_years", rest.experience_years || 0);
       formData.append("languages", languages.join(", "));
 

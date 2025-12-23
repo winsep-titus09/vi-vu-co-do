@@ -94,7 +94,11 @@ export default function GuideProfileSettings() {
   // Load profile data when fetched
   useEffect(() => {
     if (apiProfile) {
-      const parsedExperience = Number.isFinite(Number(apiProfile.experience))
+      const parsedExperience = Number.isFinite(
+        Number(apiProfile.experience_years)
+      )
+        ? Number(apiProfile.experience_years)
+        : Number.isFinite(Number(apiProfile.experience))
         ? Number(apiProfile.experience)
         : 0;
       setFormData({
@@ -177,6 +181,9 @@ export default function GuideProfileSettings() {
       expertise: formData.expertise,
       introduction: formData.introduction,
       experience: Number.isFinite(Number(formData.experience))
+        ? Number(formData.experience)
+        : 0,
+      experience_years: Number.isFinite(Number(formData.experience))
         ? Number(formData.experience)
         : 0,
       languages: formData.languages, // Already an array of language codes
@@ -630,9 +637,7 @@ export default function GuideProfileSettings() {
                 {isAppLoading ? (
                   <Spinner size="sm" />
                 ) : (
-                  <span
-                    className="px-2.5 py-1 rounded-full text-xs font-bold bg-white/80 border border-border-light"
-                  >
+                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-white/80 border border-border-light">
                     {applicationStatus || apiProfile?.status || "N/A"}
                   </span>
                 )}
@@ -735,12 +740,14 @@ export default function GuideProfileSettings() {
               </>
             ) : (
               <div className="p-4 rounded-xl border border-dashed border-border-light bg-bg-main/40 text-sm text-text-secondary">
-                Chưa thấy giấy tờ nào được gửi. Nếu bạn đã nộp, nhấn "Làm mới" để cập nhật.
+                Chưa thấy giấy tờ nào được gửi. Nếu bạn đã nộp, nhấn "Làm mới"
+                để cập nhật.
               </div>
             )}
 
             <div className="pt-2 text-center text-xs text-text-secondary">
-              Thông tin định danh được xử lý bởi admin. Nếu cần cập nhật, vui lòng liên hệ hỗ trợ hoặc gửi lại hồ sơ.
+              Thông tin định danh được xử lý bởi admin. Nếu cần cập nhật, vui
+              lòng liên hệ hỗ trợ hoặc gửi lại hồ sơ.
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import React from "react";
 import ReactDOM from "react-dom/client";
-// 1. Import CSS Tailwind (RẤT QUAN TRỌNG)
+// 1. Import CSS Tailwind
 import "../../styles/app.css";
 
 import "react-day-picker/dist/style.css";

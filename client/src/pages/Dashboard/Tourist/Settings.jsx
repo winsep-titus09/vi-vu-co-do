@@ -33,6 +33,20 @@ const CURRENCY_OPTIONS = [
   { value: "usd", label: "USD (US Dollar)" },
 ];
 
+// Ngôn ngữ hỗ trợ lựa chọn (có thể chọn nhiều)
+const AVAILABLE_LANGUAGES = [
+  { code: "vi", label: "Tiếng Việt" },
+  { code: "en", label: "English" },
+  { code: "fr", label: "Français" },
+  { code: "zh", label: "中文" },
+  { code: "ja", label: "日本語" },
+  { code: "ko", label: "한국어" },
+  { code: "de", label: "Deutsch" },
+  { code: "es", label: "Español" },
+  { code: "ru", label: "Русский" },
+  { code: "th", label: "ไทย" },
+];
+
 export default function SettingsPage() {
   const location = useLocation();
   const toast = useToast();
@@ -94,6 +108,7 @@ export default function SettingsPage() {
   const [showGuideForm, setShowGuideForm] = useState(false);
   const [guideFormData, setGuideFormData] = useState({
     about: "",
+    expertise: "",
     languages: ["vi"],
     experience_years: 0,
     id_cards: [], // File[] từ input
@@ -104,6 +119,7 @@ export default function SettingsPage() {
       account_number: "",
     },
   });
+  const [customLanguage, setCustomLanguage] = useState("");
 
   // Guide Application Hooks
   const {
@@ -156,7 +172,10 @@ export default function SettingsPage() {
     } else {
       // Revert on error
       setNotifications((prev) => ({ ...prev, [key]: !newValue }));
-      toast.error("Lỗi lưu cài đặt", result.error || "Không thể lưu cài đặt thông báo");
+      toast.error(
+        "Lỗi lưu cài đặt",
+        result.error || "Không thể lưu cài đặt thông báo"
+      );
     }
   };
 
@@ -175,7 +194,10 @@ export default function SettingsPage() {
     } else {
       // Revert on error
       setQuality3D(oldValue);
-      toast.error("Lỗi lưu cài đặt", result.error || "Không thể lưu chất lượng 3D");
+      toast.error(
+        "Lỗi lưu cài đặt",
+        result.error || "Không thể lưu chất lượng 3D"
+      );
     }
   };
 
@@ -194,8 +216,35 @@ export default function SettingsPage() {
     } else {
       // Revert on error
       setCurrency(oldValue);
-      toast.error("Lỗi lưu cài đặt", result.error || "Không thể lưu đơn vị tiền tệ");
+      toast.error(
+        "Lỗi lưu cài đặt",
+        result.error || "Không thể lưu đơn vị tiền tệ"
+      );
     }
+  };
+
+  // Toggle language selection (multi-select)
+  const toggleLanguage = (code) => {
+    setGuideFormData((prev) => {
+      const current = Array.isArray(prev.languages) ? prev.languages : [];
+      const exists = current.includes(code);
+      const updated = exists
+        ? current.filter((l) => l !== code)
+        : [...current, code];
+      return { ...prev, languages: updated };
+    });
+  };
+
+  // Add custom language from text input
+  const addCustomLanguage = () => {
+    const value = customLanguage.trim();
+    if (!value) return;
+    setGuideFormData((prev) => {
+      const current = Array.isArray(prev.languages) ? prev.languages : [];
+      if (current.includes(value)) return prev;
+      return { ...prev, languages: [...current, value] };
+    });
+    setCustomLanguage("");
   };
 
   // Handle delete account request
@@ -208,7 +257,10 @@ export default function SettingsPage() {
         "Admin sẽ xem xét và phản hồi yêu cầu xóa tài khoản của bạn."
       );
     } else {
-      toast.error("Lỗi gửi yêu cầu", result.error || "Không thể gửi yêu cầu xóa tài khoản");
+      toast.error(
+        "Lỗi gửi yêu cầu",
+        result.error || "Không thể gửi yêu cầu xóa tài khoản"
+      );
     }
   };
 
@@ -218,7 +270,10 @@ export default function SettingsPage() {
     if (result.success) {
       toast.success("Đã hủy", "Yêu cầu xóa tài khoản đã được hủy.");
     } else {
-      toast.error("Lỗi hủy yêu cầu", result.error || "Không thể hủy yêu cầu xóa tài khoản");
+      toast.error(
+        "Lỗi hủy yêu cầu",
+        result.error || "Không thể hủy yêu cầu xóa tài khoản"
+      );
     }
   };
 
@@ -226,6 +281,10 @@ export default function SettingsPage() {
   const handleGuideApply = async () => {
     if (!guideFormData.about.trim()) {
       toast.warning("Thiếu thông tin", "Vui lòng nhập giới thiệu về bản thân");
+      return;
+    }
+    if (!guideFormData.expertise.trim()) {
+      toast.warning("Thiếu thông tin", "Vui lòng nhập chuyên môn của bạn");
       return;
     }
     if (guideFormData.id_cards.length === 0) {
@@ -337,224 +396,288 @@ export default function SettingsPage() {
         </div>
 
         {/* Guide Application Form */}
-        {showGuideForm && (!hasApplication || applicationStatus === "rejected") && (
-          <div className="mt-6 pt-6 border-t border-primary/20 space-y-4 animate-fade-in">
-            <h4 className="font-bold text-text-primary">
-              Điền thông tin hồ sơ
-            </h4>
+        {showGuideForm &&
+          (!hasApplication || applicationStatus === "rejected") && (
+            <div className="mt-6 pt-6 border-t border-primary/20 space-y-4 animate-fade-in">
+              <h4 className="font-bold text-text-primary">
+                Điền thông tin hồ sơ
+              </h4>
 
-            {/* About */}
-            <div>
-              <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
-                Giới thiệu về bản thân *
-              </label>
-              <textarea
-                value={guideFormData.about}
-                onChange={(e) =>
-                  setGuideFormData((prev) => ({
-                    ...prev,
-                    about: e.target.value,
-                  }))
-                }
-                placeholder="Mô tả kinh nghiệm, sở thích du lịch, điểm mạnh của bạn..."
-                className="w-full p-3 rounded-xl border border-border-light bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm resize-none"
-                rows={4}
-              />
-            </div>
-
-            {/* Experience */}
-            <div className="grid grid-cols-2 gap-4">
+              {/* About */}
               <div>
                 <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
-                  Số năm kinh nghiệm
+                  Giới thiệu về bản thân *
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={guideFormData.experience_years}
+                <textarea
+                  value={guideFormData.about}
                   onChange={(e) =>
                     setGuideFormData((prev) => ({
                       ...prev,
-                      experience_years: parseInt(e.target.value) || 0,
+                      about: e.target.value,
                     }))
                   }
-                  className="w-full p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
+                  placeholder="Mô tả kinh nghiệm, sở thích du lịch, điểm mạnh của bạn..."
+                  className="w-full p-3 rounded-xl border border-border-light bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm resize-none"
+                  rows={4}
                 />
               </div>
+
+              {/* Expertise */}
               <div>
                 <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
-                  Ngôn ngữ
+                  Chuyên môn *
                 </label>
                 <input
                   type="text"
-                  value={guideFormData.languages.join(", ")}
+                  value={guideFormData.expertise}
                   onChange={(e) =>
                     setGuideFormData((prev) => ({
                       ...prev,
-                      languages: e.target.value
-                        .split(",")
-                        .map((l) => l.trim())
-                        .filter(Boolean),
+                      expertise: e.target.value,
                     }))
                   }
-                  placeholder="vi, en, ja..."
+                  placeholder="VD: Di sản Huế, ẩm thực, trekking"
                   className="w-full p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
                 />
+                <p className="text-xs text-text-secondary mt-1">
+                  Nêu lĩnh vực bạn am hiểu nhất để admin duyệt nhanh hơn.
+                </p>
               </div>
-            </div>
 
-            {/* ID Card File Upload */}
-            <div>
-              <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
-                Ảnh CCCD/Thẻ HDV * (tối đa 3 ảnh)
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []).slice(0, 3);
-                  setGuideFormData((prev) => ({
-                    ...prev,
-                    id_cards: files,
-                  }));
-                }}
-                className="w-full p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-              />
-              {guideFormData.id_cards.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {guideFormData.id_cards.map((file, idx) => (
-                    <span
-                      key={idx}
-                      className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full"
-                    >
-                      ✓ {file.name || file.url?.split("/").pop()}
-                    </span>
-                  ))}
+              {/* Experience */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
+                    Số năm kinh nghiệm
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={guideFormData.experience_years}
+                    onChange={(e) =>
+                      setGuideFormData((prev) => ({
+                        ...prev,
+                        experience_years: parseInt(e.target.value) || 0,
+                      }))
+                    }
+                    className="w-full p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
+                  />
                 </div>
-              )}
-              <p className="text-xs text-text-secondary mt-1">
-                Chụp ảnh CCCD 2 mặt hoặc thẻ Hướng dẫn viên (nếu có)
-              </p>
-            </div>
-
-            {/* Certificates File Upload (Optional) */}
-            <div>
-              <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
-                Chứng chỉ (tùy chọn)
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []).slice(0, 5);
-                  setGuideFormData((prev) => ({
-                    ...prev,
-                    certificates: files,
-                  }));
-                }}
-                className="w-full p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-              />
-              {guideFormData.certificates?.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {guideFormData.certificates.map((file, idx) => (
-                    <span
-                      key={idx}
-                      className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full"
+                <div>
+                  <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
+                    Ngôn ngữ (chọn nhiều)
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {AVAILABLE_LANGUAGES.map((lang) => {
+                      const isSelected = Array.isArray(guideFormData.languages)
+                        ? guideFormData.languages.includes(lang.code)
+                        : false;
+                      return (
+                        <button
+                          key={lang.code}
+                          type="button"
+                          onClick={() => toggleLanguage(lang.code)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                            isSelected
+                              ? "bg-primary text-white border-primary"
+                              : "bg-white text-text-secondary border-border-light hover:border-primary hover:text-primary"
+                          }`}
+                        >
+                          {lang.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={customLanguage}
+                      onChange={(e) => setCustomLanguage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addCustomLanguage();
+                        }
+                      }}
+                      placeholder="Thêm ngôn ngữ khác (nhấn Enter để thêm)"
+                      className="flex-1 p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={addCustomLanguage}
+                      className="px-4 py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-colors"
                     >
-                      ✓ {file.name}
-                    </span>
-                  ))}
+                      Thêm
+                    </button>
+                  </div>
+                  {Array.isArray(guideFormData.languages) &&
+                    guideFormData.languages.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {guideFormData.languages.map((lang) => (
+                          <span
+                            key={lang}
+                            className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20"
+                          >
+                            {lang}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                 </div>
-              )}
-              <p className="text-xs text-text-secondary mt-1">
-                Chứng chỉ nghiệp vụ HDV, ngoại ngữ,... (nếu có)
-              </p>
-            </div>
-
-            {/* Bank Info */}
-            <div>
-              <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
-                Thông tin ngân hàng (nhận tiền)
-              </label>
-              <div className="grid grid-cols-3 gap-3">
-                <input
-                  type="text"
-                  value={guideFormData.bank_info.bank_name}
-                  onChange={(e) =>
-                    setGuideFormData((prev) => ({
-                      ...prev,
-                      bank_info: {
-                        ...prev.bank_info,
-                        bank_name: e.target.value,
-                      },
-                    }))
-                  }
-                  placeholder="Tên ngân hàng"
-                  className="p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
-                />
-                <input
-                  type="text"
-                  value={guideFormData.bank_info.account_name}
-                  onChange={(e) =>
-                    setGuideFormData((prev) => ({
-                      ...prev,
-                      bank_info: {
-                        ...prev.bank_info,
-                        account_name: e.target.value,
-                      },
-                    }))
-                  }
-                  placeholder="Tên chủ TK"
-                  className="p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
-                />
-                <input
-                  type="text"
-                  value={guideFormData.bank_info.account_number}
-                  onChange={(e) =>
-                    setGuideFormData((prev) => ({
-                      ...prev,
-                      bank_info: {
-                        ...prev.bank_info,
-                        account_number: e.target.value,
-                      },
-                    }))
-                  }
-                  placeholder="Số tài khoản"
-                  className="p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
-                />
               </div>
-            </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleGuideApply}
-                disabled={isSubmitting}
-                className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <>
-                    <IconLoader className="w-4 h-4 animate-spin" />
-                    Đang gửi...
-                  </>
-                ) : (
-                  <>
-                    <IconCheck className="w-4 h-4" />
-                    Gửi hồ sơ
-                  </>
+              {/* ID Card File Upload */}
+              <div>
+                <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
+                  Ảnh CCCD/Thẻ HDV * (tối đa 3 ảnh)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []).slice(0, 3);
+                    setGuideFormData((prev) => ({
+                      ...prev,
+                      id_cards: files,
+                    }));
+                  }}
+                  className="w-full p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                />
+                {guideFormData.id_cards.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {guideFormData.id_cards.map((file, idx) => (
+                      <span
+                        key={idx}
+                        className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full"
+                      >
+                        ✓ {file.name || file.url?.split("/").pop()}
+                      </span>
+                    ))}
+                  </div>
                 )}
-              </button>
-              <button
-                onClick={() => setShowGuideForm(false)}
-                className="px-6 py-3 border border-border-light text-text-secondary font-bold rounded-xl hover:bg-bg-main transition-colors"
-              >
-                Hủy
-              </button>
+                <p className="text-xs text-text-secondary mt-1">
+                  Chụp ảnh CCCD 2 mặt hoặc thẻ Hướng dẫn viên (nếu có)
+                </p>
+              </div>
+
+              {/* Certificates File Upload (Optional) */}
+              <div>
+                <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
+                  Chứng chỉ (tùy chọn)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []).slice(0, 5);
+                    setGuideFormData((prev) => ({
+                      ...prev,
+                      certificates: files,
+                    }));
+                  }}
+                  className="w-full p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                />
+                {guideFormData.certificates?.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {guideFormData.certificates.map((file, idx) => (
+                      <span
+                        key={idx}
+                        className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full"
+                      >
+                        ✓ {file.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-text-secondary mt-1">
+                  Chứng chỉ nghiệp vụ HDV, ngoại ngữ,... (nếu có)
+                </p>
+              </div>
+
+              {/* Bank Info */}
+              <div>
+                <label className="text-xs font-bold text-text-secondary uppercase block mb-2">
+                  Thông tin ngân hàng (nhận tiền)
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <input
+                    type="text"
+                    value={guideFormData.bank_info.bank_name}
+                    onChange={(e) =>
+                      setGuideFormData((prev) => ({
+                        ...prev,
+                        bank_info: {
+                          ...prev.bank_info,
+                          bank_name: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="Tên ngân hàng"
+                    className="p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={guideFormData.bank_info.account_name}
+                    onChange={(e) =>
+                      setGuideFormData((prev) => ({
+                        ...prev,
+                        bank_info: {
+                          ...prev.bank_info,
+                          account_name: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="Tên chủ TK"
+                    className="p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={guideFormData.bank_info.account_number}
+                    onChange={(e) =>
+                      setGuideFormData((prev) => ({
+                        ...prev,
+                        bank_info: {
+                          ...prev.bank_info,
+                          account_number: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="Số tài khoản"
+                    className="p-3 rounded-xl border border-border-light bg-white focus:border-primary outline-none text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleGuideApply}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <IconLoader className="w-4 h-4 animate-spin" />
+                      Đang gửi...
+                    </>
+                  ) : (
+                    <>
+                      <IconCheck className="w-4 h-4" />
+                      Gửi hồ sơ
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowGuideForm(false)}
+                  className="px-6 py-3 border border-border-light text-text-secondary font-bold rounded-xl hover:bg-bg-main transition-colors"
+                >
+                  Hủy
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

@@ -37,6 +37,11 @@ export default function AuthPage() {
   const [viewState, setViewState] = useState("login"); // 'login' | 'forgot' | 'sent'
   const [forgotEmail, setForgotEmail] = useState("");
 
+  const isValidEmail = (value) => {
+    const trimmed = (value || "").trim();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+  };
+
   const storeSession = (response) => {
     if (response?.token) {
       localStorage.setItem("token", response.token);
@@ -82,6 +87,13 @@ export default function AuthPage() {
     setIsLoading(true);
     setError("");
 
+    const email = formData.email.trim();
+    if (!isValidEmail(email)) {
+      setError("Email không hợp lệ. Vui lòng kiểm tra lại.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (isSignUp) {
         // Validate password confirmation
@@ -96,7 +108,7 @@ export default function AuthPage() {
 
         const response = await authApi.signUp({
           fullName: formData.fullName,
-          email: formData.email,
+          email,
           password: formData.password,
           role: "tourist", // Luôn đăng ký tourist trước
         });
@@ -119,7 +131,7 @@ export default function AuthPage() {
       } else {
         // Sign in
         const response = await authApi.signIn({
-          email: formData.email,
+          email,
           password: formData.password,
         });
         const userData = storeSession(response);
@@ -153,7 +165,9 @@ export default function AuthPage() {
       console.error("Google auth error:", err);
       const serverMessage = err?.response?.data?.message;
       setError(
-        serverMessage || err.message || "Đăng nhập Google thất bại. Vui lòng thử lại."
+        serverMessage ||
+          err.message ||
+          "Đăng nhập Google thất bại. Vui lòng thử lại."
       );
     } finally {
       setIsLoading(false);
@@ -169,8 +183,15 @@ export default function AuthPage() {
     setIsLoading(true);
     setError("");
 
+    const email = forgotEmail.trim();
+    if (!isValidEmail(email)) {
+      setError("Email không hợp lệ. Vui lòng kiểm tra lại.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      await authApi.forgotPassword(forgotEmail);
+      await authApi.forgotPassword(email);
       setViewState("sent");
     } catch (err) {
       console.error("Forgot password error:", err);
@@ -288,7 +309,10 @@ export default function AuthPage() {
                   placeholder="Xác nhận mật khẩu"
                   value={formData.confirmPassword}
                   onChange={(e) =>
-                    setFormData({ ...formData, confirmPassword: e.target.value })
+                    setFormData({
+                      ...formData,
+                      confirmPassword: e.target.value,
+                    })
                   }
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-border-light bg-bg-main/30 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-sm"
                   required
