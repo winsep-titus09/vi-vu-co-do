@@ -4,6 +4,7 @@ import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
 import { placesApi } from "../../features/places/api";
 import { toursApi } from "../../features/tours/api";
 import { reviewsApi } from "../../features/reviews/api";
+import { models3dApi } from "../../features/places/api";
 import { useCreateReview } from "../../features/reviews/hooks";
 import { useAuth } from "../../features/auth/hooks";
 import { useToast } from "../../components/Toast/useToast";
@@ -64,12 +65,14 @@ export default function PlaceDetail() {
   const navigate = useNavigate();
   const toast = useToast();
   const { isAuthenticated } = useAuth();
-  const { createLocationReview, isLoading: isSubmittingReview } = useCreateReview();
+  const { createLocationReview, isLoading: isSubmittingReview } =
+    useCreateReview();
 
   // State management
   const [location, setLocation] = useState(null);
   const [relatedTours, setRelatedTours] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [threeDModels, setThreeDModels] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [toursLoading, setToursLoading] = useState(false);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -89,6 +92,7 @@ export default function PlaceDetail() {
         setIsLoading(true);
         const response = await placesApi.getLocation(id);
         setLocation(response);
+        setThreeDModels(response?.threeDModels || []);
       } catch (err) {
         console.error("Fetch location error:", err);
         setError(err.message || "Không thể tải thông tin địa điểm");
@@ -101,6 +105,24 @@ export default function PlaceDetail() {
       fetchLocation();
     }
   }, [id]);
+
+  // Fallback fetch 3D models if location loaded but models missing (e.g. legacy API response)
+  useEffect(() => {
+    const fetchPanoramas = async () => {
+      if (!location?._id || threeDModels.length > 0) return;
+      try {
+        const models = await models3dApi.listModels({
+          locationId: location._id,
+          limit: 10,
+        });
+        setThreeDModels(models || []);
+      } catch (err) {
+        console.error("Fetch 3D models error:", err);
+      }
+    };
+
+    fetchPanoramas();
+  }, [location?._id, threeDModels.length]);
 
   // Fetch related tours - filtered by location
   useEffect(() => {
@@ -170,8 +192,8 @@ export default function PlaceDetail() {
           bestTime: location.best_visit_time || "Cả ngày",
         },
         weather: { temp: 28, condition: "Nắng đẹp", humidity: "65%" }, // Mock - optional
-        has3D: location.threeDModels?.length > 0,
-        threeDModels: location.threeDModels || [],
+        has3D: threeDModels.length > 0,
+        threeDModels: threeDModels,
         rating: toNumber(location.average_rating) || 0,
         reviewsCount: location.review_count || 0,
       }
@@ -380,11 +402,16 @@ export default function PlaceDetail() {
                 <h3 className="text-2xl font-heading font-bold text-text-primary">
                   Đánh giá & Bình luận
                 </h3>
-                <button 
+                <button
                   onClick={() => {
                     if (!isAuthenticated) {
-                      toast.warning("Yêu cầu đăng nhập", "Vui lòng đăng nhập để viết đánh giá");
-                      navigate("/sign-in", { state: { from: `/places/${id}` } });
+                      toast.warning(
+                        "Yêu cầu đăng nhập",
+                        "Vui lòng đăng nhập để viết đánh giá"
+                      );
+                      navigate("/sign-in", {
+                        state: { from: `/places/${id}` },
+                      });
                       return;
                     }
                     setIsReviewModalOpen(true);
@@ -640,10 +667,13 @@ export default function PlaceDetail() {
                               <span>{formatVND(tour.price)}</span>
                               <span>•</span>
                               <span>
-                                {tour.duration_hours 
+                                {tour.duration_hours
                                   ? `${tour.duration_hours} giờ`
-                                  : `${tour.duration} ${tour.duration_unit === "hours" ? "giờ" : "ngày"}`
-                                }
+                                  : `${tour.duration} ${
+                                      tour.duration_unit === "hours"
+                                        ? "giờ"
+                                        : "ngày"
+                                    }`}
                               </span>
                             </div>
                           </div>
@@ -730,8 +760,12 @@ export default function PlaceDetail() {
                   className="w-16 h-16 rounded-xl object-cover"
                 />
                 <div>
-                  <h4 className="font-bold text-text-primary">{placeDetail?.name}</h4>
-                  <p className="text-sm text-text-secondary">{placeDetail?.category}</p>
+                  <h4 className="font-bold text-text-primary">
+                    {placeDetail?.name}
+                  </h4>
+                  <p className="text-sm text-text-secondary">
+                    {placeDetail?.category}
+                  </p>
                 </div>
               </div>
 
@@ -827,19 +861,28 @@ export default function PlaceDetail() {
                   });
 
                   if (result.success) {
-                    toast.success("Thành công!", "Cảm ơn bạn đã đánh giá địa điểm này");
+                    toast.success(
+                      "Thành công!",
+                      "Cảm ơn bạn đã đánh giá địa điểm này"
+                    );
                     setIsReviewModalOpen(false);
                     setReviewRating(5);
                     setReviewComment("");
                     setReviewVisitDate("");
                     // Refresh reviews
-                    const response = await reviewsApi.listLocationReviews(location._id, {
-                      limit: 6,
-                      sort: "-createdAt",
-                    });
+                    const response = await reviewsApi.listLocationReviews(
+                      location._id,
+                      {
+                        limit: 6,
+                        sort: "-createdAt",
+                      }
+                    );
                     setReviews(response?.items || []);
                   } else {
-                    toast.error("Lỗi", result.error || "Không thể gửi đánh giá");
+                    toast.error(
+                      "Lỗi",
+                      result.error || "Không thể gửi đánh giá"
+                    );
                   }
                 }}
                 disabled={isSubmittingReview || !reviewComment.trim()}
@@ -965,7 +1008,9 @@ function PanoramaViewerModal({ name, models = [], onClose }) {
       <div className="relative w-full h-full max-w-6xl max-h-[85vh] bg-black rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col">
         <div className="absolute top-0 left-0 right-0 p-4 z-10 bg-linear-to-b from-black/80 to-transparent pointer-events-none flex items-center justify-between">
           <div className="text-white">
-            <h3 className="text-xl font-heading font-bold leading-tight">{name}</h3>
+            <h3 className="text-xl font-heading font-bold leading-tight">
+              {name}
+            </h3>
             <p className="text-white/70 text-sm line-clamp-1">
               {current?.description || "Panorama 360°"}
             </p>
@@ -1015,7 +1060,9 @@ function PanoramaViewerModal({ name, models = [], onClose }) {
             </button>
             <button
               onClick={() =>
-                setCurrentIndex((idx) => Math.min(idx + 1, panoramas.length - 1))
+                setCurrentIndex((idx) =>
+                  Math.min(idx + 1, panoramas.length - 1)
+                )
               }
               disabled={currentIndex >= panoramas.length - 1}
               className="px-3 py-2 rounded-lg text-sm font-bold bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1025,7 +1072,6 @@ function PanoramaViewerModal({ name, models = [], onClose }) {
           </div>
         </div>
       </div>
-
     </div>
   );
 }
