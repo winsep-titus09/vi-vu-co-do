@@ -162,9 +162,9 @@ export default function AdminPlaces() {
       </div>
 
       {/* Filter toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-border-light flex flex-col md:flex-row gap-4 shadow-sm">
-        {/* Category Filter */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
+      <div className="bg-white p-4 rounded-2xl border border-border-light flex flex-col md:flex-row md:items-center gap-4 shadow-sm">
+        {/* Category Filter: Thêm flex-1 và min-w-0 để co giãn đúng cách */}
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 md:pb-0 flex-1 min-w-0">
           {categoriesLoading ? (
             <Spinner className="w-5 h-5" />
           ) : (
@@ -172,7 +172,8 @@ export default function AdminPlaces() {
               <button
                 key={cat._id}
                 onClick={() => setFilterCategoryId(cat._id)}
-                className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                /* Thêm shrink-0 để nút không bị co lại khi hết chỗ */
+                className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-bold transition-all shrink-0 ${
                   filterCategoryId === cat._id
                     ? "bg-bg-main text-primary shadow-inner"
                     : "text-text-secondary hover:bg-gray-50"
@@ -184,8 +185,8 @@ export default function AdminPlaces() {
           )}
         </div>
 
-        {/* Search Box */}
-        <div className="relative w-full md:w-72 ml-auto">
+        {/* Search Box: Thêm shrink-0 để không bị ép nhỏ lại */}
+        <div className="relative w-full md:w-72 shrink-0">
           <input
             type="text"
             placeholder="Tìm địa điểm..."

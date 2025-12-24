@@ -134,18 +134,24 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
         description: initialData.description || prev.description,
         duration_hours: initialData.duration_hours || prev.duration_hours,
         category_id: initialData.categories?.[0] || prev.category_id,
-        price: priceVal !== undefined && priceVal !== null ? String(priceVal) : prev.price,
+        price:
+          priceVal !== undefined && priceVal !== null
+            ? String(priceVal)
+            : prev.price,
         max_guests: initialData.max_guests || prev.max_guests,
         cover_image_url: initialData.cover_image_url || prev.cover_image_url,
         video_url: initialData.video_url || prev.video_url,
         guide_video_url: initialData.guide_video_url || prev.guide_video_url,
-        fixed_departure_time: initialData.fixed_departure_time || prev.fixed_departure_time,
-        min_days_before_start: initialData.min_days_before_start || prev.min_days_before_start,
+        fixed_departure_time:
+          initialData.fixed_departure_time || prev.fixed_departure_time,
+        min_days_before_start:
+          initialData.min_days_before_start || prev.min_days_before_start,
         max_days_advance: initialData.max_days_advance || prev.max_days_advance,
       }));
 
       // preview image
-      if (initialData.cover_image_url) setPreviewImage(initialData.cover_image_url);
+      if (initialData.cover_image_url)
+        setPreviewImage(initialData.cover_image_url);
 
       // gallery
       if (Array.isArray(initialData.gallery)) {
@@ -171,17 +177,27 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
       }
 
       // itinerary (map locationId to place object when possible)
-      if (Array.isArray(initialData.itinerary) && initialData.itinerary.length > 0) {
-        const placeMap = Object.fromEntries(places.map((p) => [String(p._id), p]));
+      if (
+        Array.isArray(initialData.itinerary) &&
+        initialData.itinerary.length > 0
+      ) {
+        const placeMap = Object.fromEntries(
+          places.map((p) => [String(p._id), p])
+        );
         setItineraryItems(
           initialData.itinerary.map((it, idx) => {
-            const locId = it.locationId && (it.locationId._id || it.locationId) ? String(it.locationId._id || it.locationId) : null;
+            const locId =
+              it.locationId && (it.locationId._id || it.locationId)
+                ? String(it.locationId._id || it.locationId)
+                : null;
             return {
               id: it._id || Date.now() + idx,
               time: it.time || it.time || "08:00",
               title: it.title || it.details || "",
               description: it.details || it.description || "",
-              location: locId ? placeMap[locId] || { _id: locId, name: "Địa điểm" } : null,
+              location: locId
+                ? placeMap[locId] || { _id: locId, name: "Địa điểm" }
+                : null,
             };
           })
         );
@@ -195,7 +211,8 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
           return {
             _id: guideObj._id || guideObj.id,
             name: guideObj.name || guideObj.fullName || guideObj.username || "",
-            avatar: guideObj.avatar_url || guideObj.avatar || guideObj.photo || "",
+            avatar:
+              guideObj.avatar_url || guideObj.avatar || guideObj.photo || "",
             email: guideObj.email || "",
             isMain: !!g.isMain,
             percentage: (g.percentage || 0) * 100,
@@ -205,20 +222,45 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
       }
 
       // lists: highlights, includes, excludes, amenities, rules
-      if (Array.isArray(initialData.highlights) && initialData.highlights.length > 0) {
-        setHighlights(initialData.highlights.map((t, i) => ({ id: Date.now() + i, text: t })));
+      if (
+        Array.isArray(initialData.highlights) &&
+        initialData.highlights.length > 0
+      ) {
+        setHighlights(
+          initialData.highlights.map((t, i) => ({
+            id: Date.now() + i,
+            text: t,
+          }))
+        );
       }
-      if (Array.isArray(initialData.includes) && initialData.includes.length > 0) {
-        setIncludes(initialData.includes.map((t, i) => ({ id: Date.now() + i, text: t })));
+      if (
+        Array.isArray(initialData.includes) &&
+        initialData.includes.length > 0
+      ) {
+        setIncludes(
+          initialData.includes.map((t, i) => ({ id: Date.now() + i, text: t }))
+        );
       }
-      if (Array.isArray(initialData.excludes) && initialData.excludes.length > 0) {
-        setExcludes(initialData.excludes.map((t, i) => ({ id: Date.now() + i, text: t })));
+      if (
+        Array.isArray(initialData.excludes) &&
+        initialData.excludes.length > 0
+      ) {
+        setExcludes(
+          initialData.excludes.map((t, i) => ({ id: Date.now() + i, text: t }))
+        );
       }
-      if (Array.isArray(initialData.amenities) && initialData.amenities.length > 0) {
-        setAmenities(initialData.amenities.map((t, i) => ({ id: Date.now() + i, text: t })));
+      if (
+        Array.isArray(initialData.amenities) &&
+        initialData.amenities.length > 0
+      ) {
+        setAmenities(
+          initialData.amenities.map((t, i) => ({ id: Date.now() + i, text: t }))
+        );
       }
       if (Array.isArray(initialData.rules) && initialData.rules.length > 0) {
-        setRules(initialData.rules.map((t, i) => ({ id: Date.now() + i, text: t })));
+        setRules(
+          initialData.rules.map((t, i) => ({ id: Date.now() + i, text: t }))
+        );
       }
     } catch (e) {
       console.error("Failed to populate edit form:", e);
@@ -280,11 +322,20 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
       const totalMins = h * 60 + m + 30;
       const newH = Math.floor(totalMins / 60) % 24;
       const newM = totalMins % 60;
-      nextTime = `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
+      nextTime = `${String(newH).padStart(2, "0")}:${String(newM).padStart(
+        2,
+        "0"
+      )}`;
     }
     setItineraryItems([
       ...itineraryItems,
-      { id: Date.now(), time: nextTime, title: "", description: "", location: null },
+      {
+        id: Date.now(),
+        time: nextTime,
+        title: "",
+        description: "",
+        location: null,
+      },
     ]);
   };
 
@@ -296,7 +347,10 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
 
   const removeItineraryItem = (id) => {
     if (itineraryItems.length <= 1) {
-      toast.warning("Cần ít nhất 1 mục", "Lịch trình cần có ít nhất 1 hoạt động.");
+      toast.warning(
+        "Cần ít nhất 1 mục",
+        "Lịch trình cần có ít nhất 1 hoạt động."
+      );
       return;
     }
     setItineraryItems((items) => items.filter((item) => item.id !== id));
@@ -308,7 +362,10 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
     const newIndex = direction === "up" ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= itineraryItems.length) return;
     const newItems = [...itineraryItems];
-    [newItems[index], newItems[newIndex]] = [newItems[newIndex], newItems[index]];
+    [newItems[index], newItems[newIndex]] = [
+      newItems[newIndex],
+      newItems[index],
+    ];
     setItineraryItems(newItems);
   };
 
@@ -339,18 +396,48 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
   };
 
   const quickTemplates = [
-    { time: "08:00", title: "Đón khách", description: "Đón khách tại điểm hẹn" },
-    { time: "08:30", title: "Tham quan", description: "Tham quan và nghe thuyết minh" },
-    { time: "10:00", title: "Nghỉ giải lao", description: "Nghỉ ngơi, chụp ảnh" },
-    { time: "11:30", title: "Ăn trưa", description: "Thưởng thức ẩm thực địa phương" },
-    { time: "14:00", title: "Tiếp tục hành trình", description: "Di chuyển đến điểm tiếp theo" },
-    { time: "17:00", title: "Kết thúc", description: "Tiễn khách, kết thúc tour" },
+    {
+      time: "08:00",
+      title: "Đón khách",
+      description: "Đón khách tại điểm hẹn",
+    },
+    {
+      time: "08:30",
+      title: "Tham quan",
+      description: "Tham quan và nghe thuyết minh",
+    },
+    {
+      time: "10:00",
+      title: "Nghỉ giải lao",
+      description: "Nghỉ ngơi, chụp ảnh",
+    },
+    {
+      time: "11:30",
+      title: "Ăn trưa",
+      description: "Thưởng thức ẩm thực địa phương",
+    },
+    {
+      time: "14:00",
+      title: "Tiếp tục hành trình",
+      description: "Di chuyển đến điểm tiếp theo",
+    },
+    {
+      time: "17:00",
+      title: "Kết thúc",
+      description: "Tiễn khách, kết thúc tour",
+    },
   ];
 
   const applyQuickTemplate = (template) => {
     setItineraryItems([
       ...itineraryItems,
-      { id: Date.now(), time: template.time, title: template.title, description: template.description, location: null },
+      {
+        id: Date.now(),
+        time: template.time,
+        title: template.title,
+        description: template.description,
+        location: null,
+      },
     ]);
   };
 
@@ -363,12 +450,15 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
         setPreviewImage(reader.result);
       };
       reader.readAsDataURL(file);
-      
+
       // Upload to cloud
       try {
         const result = await uploadApi.uploadImages([file], "tours/cover");
         if (result.success && result.images?.[0]) {
-          setFormData((prev) => ({ ...prev, cover_image_url: result.images[0].url }));
+          setFormData((prev) => ({
+            ...prev,
+            cover_image_url: result.images[0].url,
+          }));
           toast.success("Upload thành công", "Đã tải ảnh bìa lên");
         }
       } catch (err) {
@@ -420,7 +510,9 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
   };
 
   const updateListItem = (setter, id, text) => {
-    setter((prev) => prev.map((item) => (item.id === id ? { ...item, text } : item)));
+    setter((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, text } : item))
+    );
   };
 
   const removeListItem = (setter, items, id) => {
@@ -444,7 +536,10 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
         return false;
       }
       if (selectedGuides.length === 0) {
-        toast.warning("Thiếu thông tin", "Vui lòng chọn ít nhất 1 hướng dẫn viên");
+        toast.warning(
+          "Thiếu thông tin",
+          "Vui lòng chọn ít nhất 1 hướng dẫn viên"
+        );
         return false;
       }
     }
@@ -476,7 +571,9 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
 
     try {
       const imageUrl = formData.cover_image_url;
-      const isValidUrl = imageUrl && (imageUrl.startsWith("http://") || imageUrl.startsWith("https://"));
+      const isValidUrl =
+        imageUrl &&
+        (imageUrl.startsWith("http://") || imageUrl.startsWith("https://"));
       const validGalleryUrls = galleryUrls.filter(
         (url) => url.startsWith("http://") || url.startsWith("https://")
       );
@@ -512,10 +609,18 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
           locationId: p._id,
           order: i,
         })),
-        highlights: highlights.filter((h) => h.text.trim()).map((h) => h.text.trim()),
-        includes: includes.filter((i) => i.text.trim()).map((i) => i.text.trim()),
-        excludes: excludes.filter((e) => e.text.trim()).map((e) => e.text.trim()),
-        amenities: amenities.filter((a) => a.text.trim()).map((a) => a.text.trim()),
+        highlights: highlights
+          .filter((h) => h.text.trim())
+          .map((h) => h.text.trim()),
+        includes: includes
+          .filter((i) => i.text.trim())
+          .map((i) => i.text.trim()),
+        excludes: excludes
+          .filter((e) => e.text.trim())
+          .map((e) => e.text.trim()),
+        amenities: amenities
+          .filter((a) => a.text.trim())
+          .map((a) => a.text.trim()),
         rules: rules.filter((r) => r.text.trim()).map((r) => r.text.trim()),
         fixed_departure_time: formData.fixed_departure_time || "08:00",
         min_days_before_start: Number(formData.min_days_before_start) || 1,
@@ -541,7 +646,10 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
       }
     } catch (err) {
       console.error("Tour creation error:", err);
-      const errorMsg = err?.message || err?.detail?.toString() || "Không thể tạo tour. Vui lòng thử lại.";
+      const errorMsg =
+        err?.message ||
+        err?.detail?.toString() ||
+        "Không thể tạo tour. Vui lòng thử lại.";
       toast.error("Lỗi tạo tour", errorMsg);
     }
   };
@@ -555,7 +663,9 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
             {editId ? "Chỉnh sửa Tour (Admin)" : "Tạo Tour mới (Admin)"}
           </h1>
           <p className="text-text-secondary text-sm">
-            {editId ? "Cập nhật thông tin tour." : "Tạo tour và gán hướng dẫn viên phụ trách."}
+            {editId
+              ? "Cập nhật thông tin tour."
+              : "Tạo tour và gán hướng dẫn viên phụ trách."}
           </p>
         </div>
 
@@ -592,7 +702,7 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
               <h3 className="text-xl font-bold text-text-primary mb-6">
                 1. Thông tin cơ bản & Hướng dẫn viên
               </h3>
-              
+
               {/* Thông tin cơ bản */}
               <div className="grid grid-cols-1 gap-6 mb-8">
                 <div className="space-y-2">
@@ -683,7 +793,8 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                   <div>
                     <h4 className="text-lg font-bold text-text-primary flex items-center gap-2">
                       <IconUser className="w-5 h-5 text-primary" />
-                      Chọn Hướng dẫn viên <span className="text-red-500">*</span>
+                      Chọn Hướng dẫn viên{" "}
+                      <span className="text-red-500">*</span>
                       {selectedGuides.length > 0 && (
                         <span className="ml-2 px-2 py-0.5 bg-primary text-white text-xs font-bold rounded-full">
                           {selectedGuides.length}
@@ -691,7 +802,8 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                       )}
                     </h4>
                     <p className="text-sm text-text-secondary mt-1">
-                      Chọn các hướng dẫn viên có thể dẫn tour này. Khách sẽ chọn 1 HDV khi đặt tour.
+                      Chọn các hướng dẫn viên có thể dẫn tour này. Khách sẽ chọn
+                      1 HDV khi đặt tour.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -717,11 +829,18 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                 {/* Info box */}
                 <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 mb-4">
                   <p className="text-xs text-amber-700">
-                    <strong>📌 Lưu ý:</strong> HDV nhận <strong>85%</strong> doanh thu tour, nền tảng giữ <strong>15%</strong> phí hoa hồng.
+                    <strong>📌 Lưu ý:</strong> HDV nhận <strong>85%</strong>{" "}
+                    doanh thu tour, nền tảng giữ <strong>15%</strong> phí hoa
+                    hồng.
                     <br />
-                    <span className="text-amber-600">• Guide chính: Hiển thị mặc định trên trang tour, đại diện tour khi cần.</span>
+                    <span className="text-amber-600">
+                      • Guide chính: Hiển thị mặc định trên trang tour, đại diện
+                      tour khi cần.
+                    </span>
                     <br />
-                    <span className="text-amber-600">• Các guide khác: Khách có thể chọn khi đặt tour.</span>
+                    <span className="text-amber-600">
+                      • Các guide khác: Khách có thể chọn khi đặt tour.
+                    </span>
                   </p>
                 </div>
 
@@ -740,7 +859,8 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                       Chưa có hướng dẫn viên nào được duyệt
                     </p>
                     <p className="text-xs text-text-secondary mt-1">
-                      Vui lòng duyệt đơn đăng ký hướng dẫn viên trước khi tạo tour.
+                      Vui lòng duyệt đơn đăng ký hướng dẫn viên trước khi tạo
+                      tour.
                     </p>
                   </div>
                 ) : (
@@ -778,7 +898,9 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                           <div className="flex-1 min-w-0">
                             <h4
                               className={`font-bold truncate ${
-                                isSelected ? "text-primary" : "text-text-primary"
+                                isSelected
+                                  ? "text-primary"
+                                  : "text-text-primary"
                               }`}
                             >
                               {guide.name}
@@ -846,7 +968,8 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                             </p>
                             {guide.isMain && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold mt-1">
-                                <IconStarSolid className="w-3 h-3" /> GUIDE CHÍNH
+                                <IconStarSolid className="w-3 h-3" /> GUIDE
+                                CHÍNH
                               </span>
                             )}
                           </div>
@@ -881,7 +1004,8 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                     </div>
 
                     <p className="text-xs text-text-secondary mt-3 italic">
-                      💡 Khách sẽ chọn 1 trong các HDV này khi đặt tour. Guide chính sẽ hiển thị mặc định trên trang tour.
+                      💡 Khách sẽ chọn 1 trong các HDV này khi đặt tour. Guide
+                      chính sẽ hiển thị mặc định trên trang tour.
                     </p>
                   </div>
                 )}
@@ -898,7 +1022,8 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
             </h3>
             <p className="text-sm text-text-secondary bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-2">
               <span className="text-blue-500 font-bold text-lg">ⓘ</span>
-              Chọn các địa điểm có sẵn trong hệ thống giúp tour được liên kết với kho dữ liệu 3D và thông tin lịch sử.
+              Chọn các địa điểm có sẵn trong hệ thống giúp tour được liên kết
+              với kho dữ liệu 3D và thông tin lịch sử.
             </p>
 
             {/* Chọn địa điểm */}
@@ -919,13 +1044,18 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
               {loadingLocations ? (
                 <div className="py-10 text-center">
                   <IconLoader className="w-8 h-8 text-primary animate-spin mx-auto" />
-                  <p className="text-text-secondary text-sm mt-2">Đang tải địa điểm...</p>
+                  <p className="text-text-secondary text-sm mt-2">
+                    Đang tải địa điểm...
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                   {filteredLocations.map((place) => {
-                    const isSelected = selectedPlaces.some((p) => p._id === place._id);
-                    const has3D = place.models3d?.length > 0 || place.has_3d_model;
+                    const isSelected = selectedPlaces.some(
+                      (p) => p._id === place._id
+                    );
+                    const has3D =
+                      place.models3d?.length > 0 || place.has_3d_model;
                     return (
                       <div
                         key={place._id}
@@ -938,16 +1068,26 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                       >
                         <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0">
                           <img
-                            src={place.images?.[0] || place.cover_image || "/images/placeholders/place-placeholder.jpg"}
+                            src={
+                              place.images?.[0] ||
+                              place.cover_image ||
+                              "/images/placeholders/place-placeholder.jpg"
+                            }
                             alt={place.name}
                             className="w-full h-full object-cover"
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className={`font-bold truncate ${isSelected ? "text-primary" : "text-text-primary"}`}>
+                          <h4
+                            className={`font-bold truncate ${
+                              isSelected ? "text-primary" : "text-text-primary"
+                            }`}
+                          >
                             {place.name}
                           </h4>
-                          <p className="text-xs text-text-secondary">{place.category?.name || "Di sản"}</p>
+                          <p className="text-xs text-text-secondary">
+                            {place.category?.name || "Di sản"}
+                          </p>
                           {has3D && (
                             <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded bg-secondary/10 text-secondary text-[10px] font-bold uppercase tracking-wide border border-secondary/20">
                               <Icon3D className="w-3 h-3" /> Có 3D Model
@@ -972,18 +1112,31 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
 
               {/* Địa điểm đã chọn */}
               <div className="pt-4 border-t border-border-light">
-                <p className="text-sm font-bold text-text-primary mb-2">Đã chọn ({selectedPlaces.length}):</p>
+                <p className="text-sm font-bold text-text-primary mb-2">
+                  Đã chọn ({selectedPlaces.length}):
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {selectedPlaces.map((p) => (
-                    <span key={p._id} className="px-3 py-1 rounded-lg bg-bg-main border border-border-light text-xs font-medium flex items-center gap-2">
+                    <span
+                      key={p._id}
+                      className="px-3 py-1 rounded-lg bg-bg-main border border-border-light text-xs font-medium flex items-center gap-2"
+                    >
                       {p.name}
-                      <button onClick={(e) => { e.stopPropagation(); togglePlace(p); }} className="hover:text-red-500">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePlace(p);
+                        }}
+                        className="hover:text-red-500"
+                      >
                         <IconX className="w-3 h-3" />
                       </button>
                     </span>
                   ))}
                   {selectedPlaces.length === 0 && (
-                    <span className="text-xs text-text-secondary italic">Chưa chọn địa điểm nào.</span>
+                    <span className="text-xs text-text-secondary italic">
+                      Chưa chọn địa điểm nào.
+                    </span>
                   )}
                 </div>
               </div>
@@ -992,8 +1145,14 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
             {/* Lịch trình */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-bold text-text-secondary uppercase">Chi tiết lịch trình (Timeline)</label>
-                <button type="button" onClick={addItineraryItem} className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all flex items-center gap-1">
+                <label className="text-sm font-bold text-text-secondary uppercase">
+                  Chi tiết lịch trình (Timeline)
+                </label>
+                <button
+                  type="button"
+                  onClick={addItineraryItem}
+                  className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all flex items-center gap-1"
+                >
                   <IconPlus className="w-3.5 h-3.5" /> Thêm mục
                 </button>
               </div>
@@ -1002,7 +1161,12 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
               <div className="flex flex-wrap gap-2">
                 <span className="text-xs text-text-secondary">Thêm nhanh:</span>
                 {quickTemplates.map((tpl, idx) => (
-                  <button key={idx} type="button" onClick={() => applyQuickTemplate(tpl)} className="px-2.5 py-1 rounded-full bg-bg-main border border-border-light text-[11px] font-medium hover:border-primary hover:text-primary transition-all">
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => applyQuickTemplate(tpl)}
+                    className="px-2.5 py-1 rounded-full bg-bg-main border border-border-light text-[11px] font-medium hover:border-primary hover:text-primary transition-all"
+                  >
                     {tpl.time} - {tpl.title}
                   </button>
                 ))}
@@ -1035,20 +1199,71 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
 
                     <div className="flex-1 space-y-2">
                       <div className="flex gap-2">
-                        <input type="time" value={item.time} onChange={(e) => updateItineraryItem(item.id, "time", e.target.value)} className="w-24 px-2 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm font-medium focus:border-primary focus:bg-white outline-none" />
-                        <input type="text" value={item.title} onChange={(e) => updateItineraryItem(item.id, "title", e.target.value)} placeholder="Tiêu đề hoạt động" className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm font-medium focus:border-primary focus:bg-white outline-none" />
+                        <input
+                          type="time"
+                          value={item.time}
+                          onChange={(e) =>
+                            updateItineraryItem(item.id, "time", e.target.value)
+                          }
+                          className="w-32 px-2 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm font-medium focus:border-primary focus:bg-white outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={item.title}
+                          onChange={(e) =>
+                            updateItineraryItem(
+                              item.id,
+                              "title",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Tiêu đề hoạt động"
+                          className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm font-medium focus:border-primary focus:bg-white outline-none"
+                        />
                       </div>
-                      <textarea value={item.description} onChange={(e) => updateItineraryItem(item.id, "description", e.target.value)} placeholder="Mô tả chi tiết..." rows={2} className="w-full px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none resize-none" />
+                      <textarea
+                        value={item.description}
+                        onChange={(e) =>
+                          updateItineraryItem(
+                            item.id,
+                            "description",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Mô tả chi tiết..."
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none resize-none"
+                      />
                       {selectedPlaces.length > 0 && (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-text-secondary">Gắn địa điểm:</span>
-                          <select value={item.location?._id || ""} onChange={(e) => { const place = selectedPlaces.find((p) => p._id === e.target.value); updateItineraryItem(item.id, "location", place || null); }} className="px-2 py-1 rounded-lg border border-border-light text-xs bg-white focus:border-primary outline-none">
+                          <span className="text-xs text-text-secondary">
+                            Gắn địa điểm:
+                          </span>
+                          <select
+                            value={item.location?._id || ""}
+                            onChange={(e) => {
+                              const place = selectedPlaces.find(
+                                (p) => p._id === e.target.value
+                              );
+                              updateItineraryItem(
+                                item.id,
+                                "location",
+                                place || null
+                              );
+                            }}
+                            className="px-2 py-1 rounded-lg border border-border-light text-xs bg-white focus:border-primary outline-none"
+                          >
                             <option value="">-- Không chọn --</option>
-                            {selectedPlaces.map((p) => (<option key={p._id} value={p._id}>{p.name}</option>))}
+                            {selectedPlaces.map((p) => (
+                              <option key={p._id} value={p._id}>
+                                {p.name}
+                              </option>
+                            ))}
                           </select>
                           {item.location && (
                             <span className="px-2 py-0.5 rounded bg-secondary/10 text-secondary text-[10px] font-bold flex items-center gap-1">
-                              <IconMapPin className="w-3 h-3" /> {item.location.name}
+                              <IconMapPin className="w-3 h-3" />{" "}
+                              {item.location.name}
                             </span>
                           )}
                         </div>
@@ -1056,13 +1271,27 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                     </div>
 
                     <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button type="button" onClick={() => moveItineraryItem(item.id, "up")} disabled={index === 0} className="p-1 rounded hover:bg-bg-main text-text-secondary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                      <button
+                        type="button"
+                        onClick={() => moveItineraryItem(item.id, "up")}
+                        disabled={index === 0}
+                        className="p-1 rounded hover:bg-bg-main text-text-secondary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      >
                         <IconChevronUp className="w-4 h-4" />
                       </button>
-                      <button type="button" onClick={() => moveItineraryItem(item.id, "down")} disabled={index === itineraryItems.length - 1} className="p-1 rounded hover:bg-bg-main text-text-secondary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                      <button
+                        type="button"
+                        onClick={() => moveItineraryItem(item.id, "down")}
+                        disabled={index === itineraryItems.length - 1}
+                        className="p-1 rounded hover:bg-bg-main text-text-secondary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      >
                         <IconChevronDown className="w-4 h-4" />
                       </button>
-                      <button type="button" onClick={() => removeItineraryItem(item.id)} className="p-1 rounded hover:bg-red-50 text-text-secondary hover:text-red-500 transition-all">
+                      <button
+                        type="button"
+                        onClick={() => removeItineraryItem(item.id)}
+                        className="p-1 rounded hover:bg-red-50 text-text-secondary hover:text-red-500 transition-all"
+                      >
                         <IconTrash className="w-4 h-4" />
                       </button>
                     </div>
@@ -1071,7 +1300,10 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
               </div>
               <p className="text-xs text-text-secondary italic flex items-start gap-1.5">
                 <span>💡</span>
-                <span>Kéo thả để sắp xếp lại thứ tự. Gắn địa điểm để liên kết với thông tin 3D/lịch sử.</span>
+                <span>
+                  Kéo thả để sắp xếp lại thứ tự. Gắn địa điểm để liên kết với
+                  thông tin 3D/lịch sử.
+                </span>
               </p>
             </div>
           </div>
@@ -1080,21 +1312,50 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
         {/* --- STEP 3: GIÁ, HÌNH ẢNH & CHI TIẾT --- */}
         {step === 3 && (
           <div className="space-y-8 animate-fade-in">
-            <h3 className="text-xl font-bold text-text-primary mb-6">3. Giá, Hình ảnh & Chi tiết</h3>
+            <h3 className="text-xl font-bold text-text-primary mb-6">
+              3. Giá, Hình ảnh & Chi tiết
+            </h3>
 
             {/* Giá & Số khách */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-text-secondary uppercase">Giá tour / khách <span className="text-red-500">*</span></label>
+                <label className="text-sm font-bold text-text-secondary uppercase">
+                  Giá tour / khách <span className="text-red-500">*</span>
+                </label>
                 <div className="relative">
-                  <input type="number" name="price" value={formData.price} onChange={handleInputChange} className="w-full pl-5 pr-12 py-3.5 rounded-xl border border-border-light bg-bg-main/30 focus:bg-white focus:border-primary outline-none font-bold text-lg" placeholder="0" min="0" />
-                  <span className="absolute right-5 top-1/2 -translate-y-1/2 text-text-secondary font-bold text-xs bg-white px-2 py-1 rounded border border-border-light">VND</span>
+                  <input
+                    type="number"
+                    name="price"
+                    value={formData.price}
+                    onChange={handleInputChange}
+                    className="w-full pl-5 pr-12 py-3.5 rounded-xl border border-border-light bg-bg-main/30 focus:bg-white focus:border-primary outline-none font-bold text-lg"
+                    placeholder="0"
+                    min="0"
+                  />
+                  <span className="absolute right-5 top-1/2 -translate-y-1/2 text-text-secondary font-bold text-xs bg-white px-2 py-1 rounded border border-border-light">
+                    VND
+                  </span>
                 </div>
-                {formData.price && <p className="text-sm text-primary font-medium">{formatCurrency(Number(formData.price))}</p>}
+                {formData.price && (
+                  <p className="text-sm text-primary font-medium">
+                    {formatCurrency(Number(formData.price))}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-text-secondary uppercase">Số khách tối đa</label>
-                <input type="number" name="max_guests" value={formData.max_guests} onChange={handleInputChange} className="w-full px-5 py-3.5 rounded-xl border border-border-light bg-bg-main/30 focus:bg-white focus:border-primary outline-none" placeholder="10" min="1" max="100" />
+                <label className="text-sm font-bold text-text-secondary uppercase">
+                  Số khách tối đa
+                </label>
+                <input
+                  type="number"
+                  name="max_guests"
+                  value={formData.max_guests}
+                  onChange={handleInputChange}
+                  className="w-full px-5 py-3.5 rounded-xl border border-border-light bg-bg-main/30 focus:bg-white focus:border-primary outline-none"
+                  placeholder="10"
+                  min="1"
+                  max="100"
+                />
               </div>
             </div>
 
@@ -1105,28 +1366,72 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-text-secondary">Giờ khởi hành mặc định</label>
-                  <input type="time" name="fixed_departure_time" value={formData.fixed_departure_time} onChange={handleInputChange} className="w-full px-3 py-2 rounded-lg border border-border-light bg-white text-sm focus:border-primary outline-none" />
+                  <label className="text-xs font-medium text-text-secondary">
+                    Giờ khởi hành mặc định
+                  </label>
+                  <input
+                    type="time"
+                    name="fixed_departure_time"
+                    value={formData.fixed_departure_time}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 rounded-lg border border-border-light bg-white text-sm focus:border-primary outline-none"
+                  />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-text-secondary">Đặt trước tối thiểu (ngày)</label>
-                  <input type="number" name="min_days_before_start" value={formData.min_days_before_start} onChange={handleInputChange} min="0" max="30" className="w-full px-3 py-2 rounded-lg border border-border-light bg-white text-sm focus:border-primary outline-none" />
+                  <label className="text-xs font-medium text-text-secondary">
+                    Đặt trước tối thiểu (ngày)
+                  </label>
+                  <input
+                    type="number"
+                    name="min_days_before_start"
+                    value={formData.min_days_before_start}
+                    onChange={handleInputChange}
+                    min="0"
+                    max="30"
+                    className="w-full px-3 py-2 rounded-lg border border-border-light bg-white text-sm focus:border-primary outline-none"
+                  />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-text-secondary">Đặt trước tối đa (ngày)</label>
-                  <input type="number" name="max_days_advance" value={formData.max_days_advance} onChange={handleInputChange} min="1" max="365" className="w-full px-3 py-2 rounded-lg border border-border-light bg-white text-sm focus:border-primary outline-none" />
+                  <label className="text-xs font-medium text-text-secondary">
+                    Đặt trước tối đa (ngày)
+                  </label>
+                  <input
+                    type="number"
+                    name="max_days_advance"
+                    value={formData.max_days_advance}
+                    onChange={handleInputChange}
+                    min="1"
+                    max="365"
+                    className="w-full px-3 py-2 rounded-lg border border-border-light bg-white text-sm focus:border-primary outline-none"
+                  />
                 </div>
               </div>
             </div>
 
             {/* Ảnh bìa */}
             <div className="space-y-2">
-              <label className="text-sm font-bold text-text-secondary uppercase">Ảnh bìa Tour</label>
+              <label className="text-sm font-bold text-text-secondary uppercase">
+                Ảnh bìa Tour
+              </label>
               <div className="border-2 border-dashed border-border-light rounded-3xl p-8 text-center hover:bg-bg-main/50 hover:border-primary/50 transition-all cursor-pointer group relative overflow-hidden">
                 {previewImage ? (
                   <div className="relative h-64 w-full">
-                    <img src={previewImage} alt="Preview" className="w-full h-full object-contain rounded-xl" />
-                    <button onClick={(e) => { e.stopPropagation(); setPreviewImage(null); setFormData((prev) => ({ ...prev, cover_image_url: "" })); }} className="absolute top-2 right-2 bg-white/80 p-1 rounded-full hover:bg-white text-red-500 shadow-sm">
+                    <img
+                      src={previewImage}
+                      alt="Preview"
+                      className="w-full h-full object-contain rounded-xl"
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewImage(null);
+                        setFormData((prev) => ({
+                          ...prev,
+                          cover_image_url: "",
+                        }));
+                      }}
+                      className="absolute top-2 right-2 bg-white/80 p-1 rounded-full hover:bg-white text-red-500 shadow-sm"
+                    >
                       <IconX className="w-5 h-5" />
                     </button>
                   </div>
@@ -1135,49 +1440,125 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                     <div className="w-16 h-16 bg-bg-main rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform text-text-secondary">
                       <IconImage className="w-8 h-8" />
                     </div>
-                    <p className="text-sm text-text-primary font-bold">Nhấn để tải ảnh bìa</p>
-                    <p className="text-xs text-text-secondary mt-1">JPG, PNG (Tối đa 5MB)</p>
+                    <p className="text-sm text-text-primary font-bold">
+                      Nhấn để tải ảnh bìa
+                    </p>
+                    <p className="text-xs text-text-secondary mt-1">
+                      JPG, PNG (Tối đa 5MB)
+                    </p>
                   </div>
                 )}
-                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
+                <input
+                  type="file"
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  onChange={handleImageChange}
+                  accept="image/*"
+                />
               </div>
             </div>
 
             {/* Video URLs */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-text-secondary uppercase">Video giới thiệu tour</label>
-                <input type="url" placeholder="https://youtube.com/watch?v=..." value={formData.video_url} onChange={(e) => setFormData((prev) => ({ ...prev, video_url: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none" />
+                <label className="text-sm font-bold text-text-secondary uppercase">
+                  Video giới thiệu tour
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://youtube.com/watch?v=..."
+                  value={formData.video_url}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      video_url: e.target.value,
+                    }))
+                  }
+                  className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none"
+                />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-text-secondary uppercase">Video giới thiệu HDV</label>
-                <input type="url" placeholder="https://youtube.com/watch?v=..." value={formData.guide_video_url} onChange={(e) => setFormData((prev) => ({ ...prev, guide_video_url: e.target.value }))} className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none" />
+                <label className="text-sm font-bold text-text-secondary uppercase">
+                  Video giới thiệu HDV
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://youtube.com/watch?v=..."
+                  value={formData.guide_video_url}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      guide_video_url: e.target.value,
+                    }))
+                  }
+                  className="w-full px-4 py-3 rounded-xl border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none"
+                />
               </div>
             </div>
 
             {/* Gallery */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-bold text-text-secondary uppercase">Thư viện ảnh (Tối đa 8)</label>
-                <span className="text-xs text-text-secondary">{galleryPreviews.length}/8</span>
+                <label className="text-sm font-bold text-text-secondary uppercase">
+                  Thư viện ảnh (Tối đa 8)
+                </label>
+                <span className="text-xs text-text-secondary">
+                  {galleryPreviews.length}/8
+                </span>
               </div>
               {galleryPreviews.length < 8 && (
                 <div className="flex gap-2">
-                  <input type="url" placeholder="Dán URL ảnh (https://...)" className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addGalleryUrl(e.target.value.trim()); e.target.value = ""; } }} />
-                  <button type="button" onClick={(e) => { const input = e.target.previousElementSibling; addGalleryUrl(input?.value?.trim()); if (input) input.value = ""; }} className="px-3 py-2 bg-primary/10 text-primary text-sm font-medium rounded-lg hover:bg-primary/20 transition-colors">Thêm</button>
+                  <input
+                    type="url"
+                    placeholder="Dán URL ảnh (https://...)"
+                    className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addGalleryUrl(e.target.value.trim());
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      const input = e.target.previousElementSibling;
+                      addGalleryUrl(input?.value?.trim());
+                      if (input) input.value = "";
+                    }}
+                    className="px-3 py-2 bg-primary/10 text-primary text-sm font-medium rounded-lg hover:bg-primary/20 transition-colors"
+                  >
+                    Thêm
+                  </button>
                 </div>
               )}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {isUploadingGallery && (
                   <div className="aspect-video rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 flex flex-col items-center justify-center">
                     <IconLoader className="w-6 h-6 text-primary animate-spin" />
-                    <span className="text-xs text-primary mt-1">Đang tải...</span>
+                    <span className="text-xs text-primary mt-1">
+                      Đang tải...
+                    </span>
                   </div>
                 )}
                 {galleryPreviews.map((img, idx) => (
-                  <div key={idx} className="relative aspect-video rounded-xl overflow-hidden group">
-                    <img src={img} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" onError={(e) => { e.target.src = "/images/placeholders/tour-placeholder.jpg"; }} />
-                    <button onClick={() => removeGalleryImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div
+                    key={idx}
+                    className="relative aspect-video rounded-xl overflow-hidden group"
+                  >
+                    <img
+                      src={img}
+                      alt={`Gallery ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.src =
+                          "/images/placeholders/tour-placeholder.jpg";
+                      }}
+                    />
+                    <button
+                      onClick={() => removeGalleryImage(idx)}
+                      className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
                       <IconX className="w-3 h-3" />
                     </button>
                   </div>
@@ -1185,8 +1566,16 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
                 {galleryPreviews.length < 8 && !isUploadingGallery && (
                   <label className="aspect-video rounded-xl border-2 border-dashed border-border-light hover:border-primary/50 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-bg-main/50">
                     <IconPlus className="w-6 h-6 text-text-secondary" />
-                    <span className="text-xs text-text-secondary mt-1">Tải ảnh</span>
-                    <input type="file" multiple accept="image/*" className="hidden" onChange={handleGalleryChange} />
+                    <span className="text-xs text-text-secondary mt-1">
+                      Tải ảnh
+                    </span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleGalleryChange}
+                    />
                   </label>
                 )}
               </div>
@@ -1195,15 +1584,43 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
             {/* Điểm nổi bật */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-bold text-text-secondary uppercase">Điểm nổi bật</label>
-                <button type="button" onClick={() => addListItem(setHighlights)} className="text-xs text-primary font-medium hover:underline flex items-center gap-1"><IconPlus className="w-3.5 h-3.5" /> Thêm</button>
+                <label className="text-sm font-bold text-text-secondary uppercase">
+                  Điểm nổi bật
+                </label>
+                <button
+                  type="button"
+                  onClick={() => addListItem(setHighlights)}
+                  className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
+                >
+                  <IconPlus className="w-3.5 h-3.5" /> Thêm
+                </button>
               </div>
               <div className="space-y-2">
                 {highlights.map((item, idx) => (
                   <div key={item.id} className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
-                    <input type="text" value={item.text} onChange={(e) => updateListItem(setHighlights, item.id, e.target.value)} placeholder="VD: Tham quan Đại Nội về đêm" className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none" />
-                    {highlights.length > 1 && (<button type="button" onClick={() => removeListItem(setHighlights, highlights, item.id)} className="p-1.5 text-text-secondary hover:text-red-500 transition-colors"><IconX className="w-4 h-4" /></button>)}
+                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={item.text}
+                      onChange={(e) =>
+                        updateListItem(setHighlights, item.id, e.target.value)
+                      }
+                      placeholder="VD: Tham quan Đại Nội về đêm"
+                      className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none"
+                    />
+                    {highlights.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          removeListItem(setHighlights, highlights, item.id)
+                        }
+                        className="p-1.5 text-text-secondary hover:text-red-500 transition-colors"
+                      >
+                        <IconX className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1213,30 +1630,82 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-bold text-green-600 uppercase flex items-center gap-1.5"><IconCheck className="w-4 h-4" /> Bao gồm</label>
-                  <button type="button" onClick={() => addListItem(setIncludes)} className="text-xs text-primary font-medium hover:underline">+ Thêm</button>
+                  <label className="text-sm font-bold text-green-600 uppercase flex items-center gap-1.5">
+                    <IconCheck className="w-4 h-4" /> Bao gồm
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => addListItem(setIncludes)}
+                    className="text-xs text-primary font-medium hover:underline"
+                  >
+                    + Thêm
+                  </button>
                 </div>
                 <div className="space-y-2">
                   {includes.map((item) => (
                     <div key={item.id} className="flex items-center gap-2">
                       <IconCheck className="w-4 h-4 text-green-500 shrink-0" />
-                      <input type="text" value={item.text} onChange={(e) => updateListItem(setIncludes, item.id, e.target.value)} placeholder="VD: Vé tham quan" className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none" />
-                      {includes.length > 1 && (<button type="button" onClick={() => removeListItem(setIncludes, includes, item.id)} className="p-1 text-text-secondary hover:text-red-500"><IconX className="w-3.5 h-3.5" /></button>)}
+                      <input
+                        type="text"
+                        value={item.text}
+                        onChange={(e) =>
+                          updateListItem(setIncludes, item.id, e.target.value)
+                        }
+                        placeholder="VD: Vé tham quan"
+                        className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none"
+                      />
+                      {includes.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeListItem(setIncludes, includes, item.id)
+                          }
+                          className="p-1 text-text-secondary hover:text-red-500"
+                        >
+                          <IconX className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-bold text-red-500 uppercase flex items-center gap-1.5"><IconX className="w-4 h-4" /> Không bao gồm</label>
-                  <button type="button" onClick={() => addListItem(setExcludes)} className="text-xs text-primary font-medium hover:underline">+ Thêm</button>
+                  <label className="text-sm font-bold text-red-500 uppercase flex items-center gap-1.5">
+                    <IconX className="w-4 h-4" /> Không bao gồm
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => addListItem(setExcludes)}
+                    className="text-xs text-primary font-medium hover:underline"
+                  >
+                    + Thêm
+                  </button>
                 </div>
                 <div className="space-y-2">
                   {excludes.map((item) => (
                     <div key={item.id} className="flex items-center gap-2">
                       <IconX className="w-4 h-4 text-red-400 shrink-0" />
-                      <input type="text" value={item.text} onChange={(e) => updateListItem(setExcludes, item.id, e.target.value)} placeholder="VD: Ăn uống cá nhân" className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none" />
-                      {excludes.length > 1 && (<button type="button" onClick={() => removeListItem(setExcludes, excludes, item.id)} className="p-1 text-text-secondary hover:text-red-500"><IconX className="w-3.5 h-3.5" /></button>)}
+                      <input
+                        type="text"
+                        value={item.text}
+                        onChange={(e) =>
+                          updateListItem(setExcludes, item.id, e.target.value)
+                        }
+                        placeholder="VD: Ăn uống cá nhân"
+                        className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none"
+                      />
+                      {excludes.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeListItem(setExcludes, excludes, item.id)
+                          }
+                          className="p-1 text-text-secondary hover:text-red-500"
+                        >
+                          <IconX className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1247,30 +1716,84 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-bold text-text-secondary uppercase">🎁 Tiện ích tour</label>
-                  <button type="button" onClick={() => addListItem(setAmenities)} className="text-xs text-primary font-medium hover:underline">+ Thêm</button>
+                  <label className="text-sm font-bold text-text-secondary uppercase">
+                    🎁 Tiện ích tour
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => addListItem(setAmenities)}
+                    className="text-xs text-primary font-medium hover:underline"
+                  >
+                    + Thêm
+                  </button>
                 </div>
                 <div className="space-y-2">
                   {amenities.map((item) => (
                     <div key={item.id} className="flex items-center gap-2">
                       <IconCheck className="w-4 h-4 text-primary shrink-0" />
-                      <input type="text" value={item.text} onChange={(e) => updateListItem(setAmenities, item.id, e.target.value)} placeholder="VD: Hướng dẫn viên" className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none" />
-                      {amenities.length > 1 && (<button type="button" onClick={() => removeListItem(setAmenities, amenities, item.id)} className="p-1 text-text-secondary hover:text-red-500"><IconX className="w-3.5 h-3.5" /></button>)}
+                      <input
+                        type="text"
+                        value={item.text}
+                        onChange={(e) =>
+                          updateListItem(setAmenities, item.id, e.target.value)
+                        }
+                        placeholder="VD: Hướng dẫn viên"
+                        className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none"
+                      />
+                      {amenities.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeListItem(setAmenities, amenities, item.id)
+                          }
+                          className="p-1 text-text-secondary hover:text-red-500"
+                        >
+                          <IconX className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-bold text-text-secondary uppercase">📋 Quy tắc tour</label>
-                  <button type="button" onClick={() => addListItem(setRules)} className="text-xs text-primary font-medium hover:underline">+ Thêm</button>
+                  <label className="text-sm font-bold text-text-secondary uppercase">
+                    📋 Quy tắc tour
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => addListItem(setRules)}
+                    className="text-xs text-primary font-medium hover:underline"
+                  >
+                    + Thêm
+                  </button>
                 </div>
                 <div className="space-y-2">
                   {rules.map((item, idx) => (
                     <div key={item.id} className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
-                      <input type="text" value={item.text} onChange={(e) => updateListItem(setRules, item.id, e.target.value)} placeholder="VD: Đến đúng giờ" className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none" />
-                      {rules.length > 1 && (<button type="button" onClick={() => removeListItem(setRules, rules, item.id)} className="p-1 text-text-secondary hover:text-red-500"><IconX className="w-3.5 h-3.5" /></button>)}
+                      <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={item.text}
+                        onChange={(e) =>
+                          updateListItem(setRules, item.id, e.target.value)
+                        }
+                        placeholder="VD: Đến đúng giờ"
+                        className="flex-1 px-3 py-2 rounded-lg border border-border-light bg-bg-main/50 text-sm focus:border-primary focus:bg-white outline-none"
+                      />
+                      {rules.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeListItem(setRules, rules, item.id)
+                          }
+                          className="p-1 text-text-secondary hover:text-red-500"
+                        >
+                          <IconX className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1282,14 +1805,46 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
               <h4 className="font-bold text-text-primary mb-4">Tóm tắt Tour</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div className="space-y-2">
-                  <p><span className="text-text-secondary">Tên:</span> <span className="font-medium">{formData.name || "-"}</span></p>
-                  <p><span className="text-text-secondary">Thời lượng:</span> <span className="font-medium">{formData.duration_hours || "-"} giờ</span></p>
-                  <p><span className="text-text-secondary">Giá:</span> <span className="font-medium text-primary">{formData.price ? formatCurrency(Number(formData.price)) : "-"}</span></p>
+                  <p>
+                    <span className="text-text-secondary">Tên:</span>{" "}
+                    <span className="font-medium">{formData.name || "-"}</span>
+                  </p>
+                  <p>
+                    <span className="text-text-secondary">Thời lượng:</span>{" "}
+                    <span className="font-medium">
+                      {formData.duration_hours || "-"} giờ
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-text-secondary">Giá:</span>{" "}
+                    <span className="font-medium text-primary">
+                      {formData.price
+                        ? formatCurrency(Number(formData.price))
+                        : "-"}
+                    </span>
+                  </p>
                 </div>
                 <div className="space-y-2">
-                  <p><span className="text-text-secondary">Số khách tối đa:</span> <span className="font-medium">{formData.max_guests || "10"} người</span></p>
-                  <p><span className="text-text-secondary">Hướng dẫn viên:</span> <span className="font-medium">{selectedGuides.map((g) => g.name).join(", ") || "-"}</span></p>
-                  <p><span className="text-text-secondary">Địa điểm:</span> <span className="font-medium">{selectedPlaces.map((p) => p.name).join(", ") || "-"}</span></p>
+                  <p>
+                    <span className="text-text-secondary">
+                      Số khách tối đa:
+                    </span>{" "}
+                    <span className="font-medium">
+                      {formData.max_guests || "10"} người
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-text-secondary">Hướng dẫn viên:</span>{" "}
+                    <span className="font-medium">
+                      {selectedGuides.map((g) => g.name).join(", ") || "-"}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-text-secondary">Địa điểm:</span>{" "}
+                    <span className="font-medium">
+                      {selectedPlaces.map((p) => p.name).join(", ") || "-"}
+                    </span>
+                  </p>
                 </div>
               </div>
             </div>
@@ -1310,7 +1865,8 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
               }
             `}
           >
-            <IconChevronLeft className="w-4 h-4" /> {step === 1 ? "Hủy" : "Quay lại"}
+            <IconChevronLeft className="w-4 h-4" />{" "}
+            {step === 1 ? "Hủy" : "Quay lại"}
           </button>
 
           {step < 3 ? (
@@ -1322,20 +1878,22 @@ export default function AdminCreateTour({ initialData = null, editId = null }) {
             </button>
           ) : (
             <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || isUpdating}
-                className="px-8 py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-all shadow-lg flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {(isSubmitting || isUpdating) ? (
-                  <>
-                    <IconLoader className="w-5 h-5 animate-spin" /> {editId ? "Đang cập nhật..." : "Đang tạo..."}
-                  </>
-                ) : (
-                  <>
-                    <IconCheck className="w-5 h-5" /> {editId ? "Cập nhật Tour" : "Tạo Tour"}
-                  </>
-                )}
-              </button>
+              onClick={handleSubmit}
+              disabled={isSubmitting || isUpdating}
+              className="px-8 py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-all shadow-lg flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting || isUpdating ? (
+                <>
+                  <IconLoader className="w-5 h-5 animate-spin" />{" "}
+                  {editId ? "Đang cập nhật..." : "Đang tạo..."}
+                </>
+              ) : (
+                <>
+                  <IconCheck className="w-5 h-5" />{" "}
+                  {editId ? "Cập nhật Tour" : "Tạo Tour"}
+                </>
+              )}
+            </button>
           )}
         </div>
       </div>

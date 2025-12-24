@@ -29,7 +29,11 @@ import {
   useApproveTour,
   useRejectTour,
 } from "../../../features/admin/hooks";
-import { formatCurrency, formatDate, formatTourDuration } from "../../../lib/formatters";
+import {
+  formatCurrency,
+  formatDate,
+  formatTourDuration,
+} from "../../../lib/formatters";
 
 const getTourImage = (tour) => {
   const candidate =
@@ -206,24 +210,33 @@ export default function Tours() {
       setConfirmToggle({ open: false, tour: null });
       refetchTours();
     } catch (error) {
-      toast.error("Lỗi ẩn/hiện tour", error.message || "Không thể thay đổi trạng thái hiển thị");
+      toast.error(
+        "Lỗi ẩn/hiện tour",
+        error.message || "Không thể thay đổi trạng thái hiển thị"
+      );
     } finally {
       setActionLoading(null);
     }
   }, [confirmToggle.tour, toggleVisibility, toast, refetchTours]);
 
-  const handleToggleFeatured = useCallback(async (tour) => {
-    try {
-      setActionLoading(tour._id);
-      const result = await toggleFeatured(tour._id);
-      toast.success("Thành công!", result.message);
-      refetchTours();
-    } catch (error) {
-      toast.error("Lỗi", error.message || "Không thể thay đổi trạng thái tiêu biểu");
-    } finally {
-      setActionLoading(null);
-    }
-  }, [toggleFeatured, toast, refetchTours]);
+  const handleToggleFeatured = useCallback(
+    async (tour) => {
+      try {
+        setActionLoading(tour._id);
+        const result = await toggleFeatured(tour._id);
+        toast.success("Thành công!", result.message);
+        refetchTours();
+      } catch (error) {
+        toast.error(
+          "Lỗi",
+          error.message || "Không thể thay đổi trạng thái tiêu biểu"
+        );
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [toggleFeatured, toast, refetchTours]
+  );
 
   const handleDeleteTour = useCallback(async () => {
     if (!confirmDelete.tour) return;
@@ -232,12 +245,12 @@ export default function Tours() {
       setActionLoading(confirmDelete.tour._id);
       setDeleteError(null);
       const result = await deleteTour(confirmDelete.tour._id, deleteTourReason);
-      
+
       // Hiển thị kết quả thành công
       const canceledCount = result?.canceledBookings || 0;
       toast.success(
-        "Thành công!", 
-        canceledCount > 0 
+        "Thành công!",
+        canceledCount > 0
           ? `Đã xóa tour và hủy ${canceledCount} booking đang chờ`
           : "Đã xóa tour thành công"
       );
@@ -246,16 +259,19 @@ export default function Tours() {
       refetchTours();
     } catch (error) {
       const errorData = error.response?.data;
-      
+
       // Nếu có booking đã thanh toán, hiển thị chi tiết
       if (errorData?.hasBookings) {
         setDeleteError({
           message: errorData.message,
           bookings: errorData.bookings || [],
-          bookingCount: errorData.bookingCount
+          bookingCount: errorData.bookingCount,
         });
       } else {
-        toast.error("Lỗi xóa tour", errorData?.message || error.message || "Không thể xóa tour");
+        toast.error(
+          "Lỗi xóa tour",
+          errorData?.message || error.message || "Không thể xóa tour"
+        );
       }
     } finally {
       setActionLoading(null);
@@ -291,11 +307,20 @@ export default function Tours() {
       setRejectTourNote("");
       refetchTours();
     } catch (error) {
-      toast.error("Lỗi từ chối tour", error.message || "Không thể từ chối tour");
+      toast.error(
+        "Lỗi từ chối tour",
+        error.message || "Không thể từ chối tour"
+      );
     } finally {
       setActionLoading(null);
     }
-  }, [confirmRejectTour.tour, rejectTourFn, rejectTourNote, toast, refetchTours]);
+  }, [
+    confirmRejectTour.tour,
+    rejectTourFn,
+    rejectTourNote,
+    toast,
+    refetchTours,
+  ]);
 
   const handleApproveRequest = useCallback(async () => {
     if (!confirmApprove.request) return;
@@ -308,7 +333,10 @@ export default function Tours() {
       refetchRequests();
       refetchTours();
     } catch (error) {
-      toast.error("Lỗi duyệt yêu cầu", error.message || "Không thể duyệt yêu cầu chỉnh sửa");
+      toast.error(
+        "Lỗi duyệt yêu cầu",
+        error.message || "Không thể duyệt yêu cầu chỉnh sửa"
+      );
     } finally {
       setActionLoading(null);
     }
@@ -331,7 +359,10 @@ export default function Tours() {
       setRejectNote("");
       refetchRequests();
     } catch (error) {
-      toast.error("Lỗi từ chối yêu cầu", error.message || "Không thể từ chối yêu cầu chỉnh sửa");
+      toast.error(
+        "Lỗi từ chối yêu cầu",
+        error.message || "Không thể từ chối yêu cầu chỉnh sửa"
+      );
     } finally {
       setActionLoading(null);
     }
@@ -432,7 +463,7 @@ export default function Tours() {
       )}
 
       {/* Toolbar Tabs */}
-      <div className="bg-white p-4 rounded-2xl border border-border-light flex flex-col md:flex-row justify-between gap-4 shadow-sm">
+      <div className="bg-white p-4 rounded-2xl border border-border-light flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
           {[
             { id: "all", label: "Tất cả" },
@@ -698,12 +729,16 @@ export default function Tours() {
                               <span className="font-medium text-text-primary">
                                 {tour.created_by?.name || "Không xác định"}
                               </span>
-                              <span className={`text-[10px] font-bold uppercase ${
-                                tour.created_by_role === "admin" 
-                                  ? "text-purple-600" 
-                                  : "text-blue-600"
-                              }`}>
-                                {tour.created_by_role === "admin" ? "Admin" : "HDV"}
+                              <span
+                                className={`text-[10px] font-bold uppercase ${
+                                  tour.created_by_role === "admin"
+                                    ? "text-purple-600"
+                                    : "text-blue-600"
+                                }`}
+                              >
+                                {tour.created_by_role === "admin"
+                                  ? "Admin"
+                                  : "HDV"}
                               </span>
                             </div>
                           </div>
@@ -761,13 +796,19 @@ export default function Tours() {
                             {getTourStatus(tour) === "active" && (
                               <button
                                 onClick={() => handleToggleFeatured(tour)}
-                                disabled={actionLoading === tour._id || featuredLoading}
+                                disabled={
+                                  actionLoading === tour._id || featuredLoading
+                                }
                                 className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
                                   tour.featured
                                     ? "bg-yellow-100 text-yellow-600 hover:bg-yellow-200"
                                     : "bg-gray-50 text-gray-400 hover:bg-yellow-50 hover:text-yellow-600"
                                 }`}
-                                title={tour.featured ? "Bỏ tiêu biểu" : "Đánh dấu tiêu biểu"}
+                                title={
+                                  tour.featured
+                                    ? "Bỏ tiêu biểu"
+                                    : "Đánh dấu tiêu biểu"
+                                }
                               >
                                 <IconStar className="w-4 h-4" />
                               </button>
@@ -905,7 +946,7 @@ export default function Tours() {
             <h2 className="text-xl font-bold text-text-primary mb-4">
               Xóa tour
             </h2>
-            
+
             {/* Error with bookings list */}
             {deleteError ? (
               <>
@@ -920,13 +961,24 @@ export default function Tours() {
                       </p>
                       <div className="space-y-2 max-h-40 overflow-y-auto">
                         {deleteError.bookings.map((booking, idx) => (
-                          <div key={booking.id || idx} className="text-xs bg-white rounded-lg p-2 border border-red-100">
-                            <span className="font-medium">{booking.customer}</span>
+                          <div
+                            key={booking.id || idx}
+                            className="text-xs bg-white rounded-lg p-2 border border-red-100"
+                          >
+                            <span className="font-medium">
+                              {booking.customer}
+                            </span>
                             <span className="mx-2 text-gray-400">•</span>
-                            <span className={`${
-                              booking.status === 'paid' ? 'text-green-600' : 'text-blue-600'
-                            }`}>
-                              {booking.status === 'paid' ? 'Đã thanh toán' : 'Hoàn thành'}
+                            <span
+                              className={`${
+                                booking.status === "paid"
+                                  ? "text-green-600"
+                                  : "text-blue-600"
+                              }`}
+                            >
+                              {booking.status === "paid"
+                                ? "Đã thanh toán"
+                                : "Hoàn thành"}
                             </span>
                             {booking.startDate && (
                               <>
@@ -942,7 +994,8 @@ export default function Tours() {
                     </div>
                   )}
                   <p className="text-xs text-red-500 mt-3">
-                    💡 Gợi ý: Hãy ẩn tour thay vì xóa, hoặc hoàn tiền cho khách trước.
+                    💡 Gợi ý: Hãy ẩn tour thay vì xóa, hoặc hoàn tiền cho khách
+                    trước.
                   </p>
                 </div>
                 <div className="flex justify-end gap-3">
@@ -960,7 +1013,10 @@ export default function Tours() {
                     onClick={() => {
                       setConfirmDelete({ open: false, tour: null });
                       setDeleteError(null);
-                      setConfirmToggle({ open: true, tour: confirmDelete.tour });
+                      setConfirmToggle({
+                        open: true,
+                        tour: confirmDelete.tour,
+                      });
                     }}
                     className="px-4 py-2 rounded-xl bg-yellow-500 text-white hover:bg-yellow-600"
                   >
@@ -1009,7 +1065,11 @@ export default function Tours() {
                   </button>
                   <button
                     onClick={handleDeleteTour}
-                    disabled={!deleteTourReason.trim() || deleteLoading || actionLoading === confirmDelete.tour?._id}
+                    disabled={
+                      !deleteTourReason.trim() ||
+                      deleteLoading ||
+                      actionLoading === confirmDelete.tour?._id
+                    }
                     className="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
                   >
                     {deleteLoading ? "Đang xử lý..." : "Xóa tour"}
@@ -1030,7 +1090,9 @@ export default function Tours() {
         message={`Bạn có chắc muốn duyệt tour "${confirmApproveTour.tour?.name}"? Tour sẽ được hiển thị công khai.`}
         confirmText="Duyệt"
         variant="success"
-        isLoading={approveTourLoading || actionLoading === confirmApproveTour.tour?._id}
+        isLoading={
+          approveTourLoading || actionLoading === confirmApproveTour.tour?._id
+        }
       />
 
       {/* Confirm Reject Tour Modal */}
@@ -1068,7 +1130,10 @@ export default function Tours() {
               </button>
               <button
                 onClick={handleRejectTour}
-                disabled={rejectTourLoading || actionLoading === confirmRejectTour.tour?._id}
+                disabled={
+                  rejectTourLoading ||
+                  actionLoading === confirmRejectTour.tour?._id
+                }
                 className="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {rejectTourLoading ? "Đang xử lý..." : "Từ chối"}
@@ -1130,16 +1195,28 @@ export default function Tours() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div className="p-4 bg-bg-main rounded-xl border border-border-light">
-                  <p className="text-text-secondary text-xs font-bold uppercase mb-1">Giá</p>
-                  <p className="text-text-primary font-bold">{formatCurrency(previewTour.price || 0)} / khách</p>
+                  <p className="text-text-secondary text-xs font-bold uppercase mb-1">
+                    Giá
+                  </p>
+                  <p className="text-text-primary font-bold">
+                    {formatCurrency(previewTour.price || 0)} / khách
+                  </p>
                 </div>
                 <div className="p-4 bg-bg-main rounded-xl border border-border-light">
-                  <p className="text-text-secondary text-xs font-bold uppercase mb-1">Thời lượng</p>
-                  <p className="text-text-primary font-bold">{formatTourDuration(previewTour)}</p>
+                  <p className="text-text-secondary text-xs font-bold uppercase mb-1">
+                    Thời lượng
+                  </p>
+                  <p className="text-text-primary font-bold">
+                    {formatTourDuration(previewTour)}
+                  </p>
                 </div>
                 <div className="p-4 bg-bg-main rounded-xl border border-border-light">
-                  <p className="text-text-secondary text-xs font-bold uppercase mb-1">Số khách tối đa</p>
-                  <p className="text-text-primary font-bold">{previewTour.max_guests || "—"}</p>
+                  <p className="text-text-secondary text-xs font-bold uppercase mb-1">
+                    Số khách tối đa
+                  </p>
+                  <p className="text-text-primary font-bold">
+                    {previewTour.max_guests || "—"}
+                  </p>
                 </div>
               </div>
 
@@ -1152,61 +1229,76 @@ export default function Tours() {
                 </div>
               )}
 
-              {Array.isArray(previewTour.highlights) && previewTour.highlights.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-bold text-text-primary">Điểm nổi bật</p>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-text-secondary">
-                    {previewTour.highlights.map((h, idx) => (
-                      <li key={idx}>{h}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {Array.isArray(previewTour.locations) && previewTour.locations.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-bold text-text-primary">Địa điểm</p>
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    {previewTour.locations.map((loc, idx) => (
-                      <span
-                        key={loc._id || loc.locationId || idx}
-                        className="px-3 py-1 rounded-full bg-primary/10 text-primary font-bold"
-                      >
-                        {loc.locationId?.name || loc.name || loc.title || "Địa điểm"}
-                      </span>
-                    ))}
+              {Array.isArray(previewTour.highlights) &&
+                previewTour.highlights.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-text-primary">
+                      Điểm nổi bật
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-text-secondary">
+                      {previewTour.highlights.map((h, idx) => (
+                        <li key={idx}>{h}</li>
+                      ))}
+                    </ul>
                   </div>
-                </div>
-              )}
+                )}
 
-              {Array.isArray(previewTour.itinerary) && previewTour.itinerary.length > 0 && (
-                <div className="space-y-3">
-                  <p className="text-sm font-bold text-text-primary">Lịch trình</p>
-                  <div className="space-y-2 text-sm text-text-secondary">
-                    {previewTour.itinerary.slice(0, 6).map((item, idx) => (
-                      <div
-                        key={item.id || idx}
-                        className="p-3 rounded-xl border border-border-light bg-bg-main flex items-start gap-3"
-                      >
-                        <span className="text-xs font-bold text-primary w-12 shrink-0">
-                          {item.time || `#${idx + 1}`}
+              {Array.isArray(previewTour.locations) &&
+                previewTour.locations.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-text-primary">
+                      Địa điểm
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      {previewTour.locations.map((loc, idx) => (
+                        <span
+                          key={loc._id || loc.locationId || idx}
+                          className="px-3 py-1 rounded-full bg-primary/10 text-primary font-bold"
+                        >
+                          {loc.locationId?.name ||
+                            loc.name ||
+                            loc.title ||
+                            "Địa điểm"}
                         </span>
-                        <div>
-                          <p className="font-bold text-text-primary">{item.title || "Hoạt động"}</p>
-                          <p className="text-sm text-text-secondary">
-                            {item.details || item.description || ""}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                    {previewTour.itinerary.length > 6 && (
-                      <p className="text-xs text-text-secondary italic">
-                        … {previewTour.itinerary.length - 6} mục lịch trình khác
-                      </p>
-                    )}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+
+              {Array.isArray(previewTour.itinerary) &&
+                previewTour.itinerary.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-bold text-text-primary">
+                      Lịch trình
+                    </p>
+                    <div className="space-y-2 text-sm text-text-secondary">
+                      {previewTour.itinerary.slice(0, 6).map((item, idx) => (
+                        <div
+                          key={item.id || idx}
+                          className="p-3 rounded-xl border border-border-light bg-bg-main flex items-start gap-3"
+                        >
+                          <span className="text-xs font-bold text-primary w-12 shrink-0">
+                            {item.time || `#${idx + 1}`}
+                          </span>
+                          <div>
+                            <p className="font-bold text-text-primary">
+                              {item.title || "Hoạt động"}
+                            </p>
+                            <p className="text-sm text-text-secondary">
+                              {item.details || item.description || ""}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      {previewTour.itinerary.length > 6 && (
+                        <p className="text-xs text-text-secondary italic">
+                          … {previewTour.itinerary.length - 6} mục lịch trình
+                          khác
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
             </div>
 
             <div className="px-6 py-4 border-t border-border-light bg-gray-50 flex justify-end gap-3">
