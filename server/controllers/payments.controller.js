@@ -341,8 +341,13 @@ export const ipnHandler = async (req, res) => {
 // Return URL (redirect về FE hiển thị kết quả)
 export const returnHandler = async (req, res) => {
     try {
-        const qs = new URLSearchParams(req.query).toString();
-        return res.redirect(`/payment/result?${qs}`);
+        // MoMo trả về nhiều query params (signature, raw payload).
+        // Để không hiển thị các tham số này trên URL front-end, redirect thuần về route kết quả FE.
+        // FE nên gọi API (ví dụ: GET /api/payments/status?bookingId=...) hoặc lấy trạng thái từ booking API.
+        const clientBase = process.env.CLIENT_URL || (process.env.APP_BASE_URL || "");
+        const target = `${clientBase.replace(/\/$/, "")}/payment/result`;
+        console.log("[MoMo RETURN] raw query:", req.query);
+        return res.redirect(target);
     } catch (e) {
         return res.status(500).send("Error");
     }

@@ -30,14 +30,18 @@ export async function createMoMoPayment({
     extraData = extraData ?? "";
     const normalizedAmount = String(Number(amount || 0));
 
+    // determine final return / notify URLs: prefer explicit params, then DB config, then ENV
+    const finalReturnUrl = returnUrl || cfg.returnUrl || process.env.PAYMENT_RETURN_URL || "";
+    const finalNotifyUrl = notifyUrl || cfg.ipnUrl || cfg.ipnURL || process.env.PAYMENT_IPN_URL || "";
+
     const body = {
         partnerCode,
         requestId,
         amount: normalizedAmount,
         orderId,
         orderInfo,
-        redirectUrl: returnUrl,
-        ipnUrl: notifyUrl,
+        redirectUrl: finalReturnUrl,
+        ipnUrl: finalNotifyUrl,
         requestType,
         extraData,
         lang: "vi",
@@ -60,8 +64,8 @@ export async function createMoMoPayment({
 
     // Log chẩn đoán (DEV)
     console.log("[MoMo] endpoint =", endpoint);
-    console.log("[MoMo] ipnUrl  =", notifyUrl);
-    console.log("[MoMo] return  =", returnUrl);
+    console.log("[MoMo] ipnUrl  =", finalNotifyUrl);
+    console.log("[MoMo] return  =", finalReturnUrl);
     console.log("[MoMo] orderId  =", orderId);
     console.log("[MoMo] requestType =", requestType);
 
