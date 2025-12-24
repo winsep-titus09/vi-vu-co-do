@@ -748,6 +748,15 @@ export default function Tours() {
                                 <IconEye className="w-4 h-4" />
                               </Link>
                             )}
+
+                            {/* Edit button - opens admin create page with id param for editing */}
+                            <Link
+                              to={`/dashboard/admin/edit-tour/${tour._id}`}
+                              className="p-2 rounded-lg bg-gray-50 text-text-secondary hover:bg-gray-100 transition-colors"
+                              title="Chỉnh sửa tour"
+                            >
+                              <IconFileText className="w-4 h-4" />
+                            </Link>
                             {/* Nút đánh dấu tiêu biểu */}
                             {getTourStatus(tour) === "active" && (
                               <button

@@ -78,6 +78,7 @@ export default function PlaceDetail() {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [error, setError] = useState("");
   const [is3DModalOpen, setIs3DModalOpen] = useState(false);
+  const [lightboxImg, setLightboxImg] = useState(null);
 
   // Review modal state
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -384,10 +385,18 @@ export default function PlaceDetail() {
                           </div>
                         </div>
                         <div className="w-full md:w-32 h-32 rounded-xl overflow-hidden shrink-0 order-1 md:order-2 shadow-sm group-hover:shadow-md transition-shadow">
-                          <img
-                            src={point.image}
-                            className="w-full h-full object-cover"
-                          />
+                          <button
+                            type="button"
+                            onClick={() => setLightboxImg(point.image)}
+                            className="w-full h-full block cursor-zoom-in"
+                            aria-label={`Phóng to hình ảnh ${point.title}`}
+                          >
+                            <img
+                              src={point.image}
+                              className="w-full h-full object-cover"
+                              alt={point.title || "Hình ảnh lộ trình"}
+                            />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -901,16 +910,40 @@ export default function PlaceDetail() {
           </div>
         </div>
       )}
+      
+
+      {lightboxImg && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={() => setLightboxImg(null)}
+        >
+          <button
+            onClick={() => setLightboxImg(null)}
+            className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/10 hover:bg-white/20"
+          >
+            <IconX className="w-6 h-6 text-white" />
+          </button>
+
+          <div className="max-w-5xl max-h-[90vh] mx-4" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={lightboxImg}
+              alt="Ảnh phóng to"
+              className="w-full h-full object-contain rounded-lg"
+            />
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
 
-// Panorama viewer using Photo Sphere Viewer for location panoramas
+// Panorama viewer modal (adopted from Tours page implementation)
 function PanoramaViewerModal({ name, models = [], onClose }) {
   const viewerRef = useRef(null);
   const viewerInstance = useRef(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
   const panoramas = models.filter((m) => m.file_type === "panorama");
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -923,9 +956,13 @@ function PanoramaViewerModal({ name, models = [], onClose }) {
     return () => {
       document.removeEventListener("keydown", handleEsc);
       document.body.style.overflow = "auto";
-      if (viewerInstance.current) {
-        viewerInstance.current.destroy();
-        viewerInstance.current = null;
+      try {
+        if (viewerInstance.current) {
+          viewerInstance.current.destroy();
+          viewerInstance.current = null;
+        }
+      } catch (e) {
+        console.error("Error destroying viewer on unmount:", e);
       }
     };
   }, [onClose]);
@@ -934,42 +971,97 @@ function PanoramaViewerModal({ name, models = [], onClose }) {
     const current = panoramas[currentIndex];
     if (!viewerRef.current || !current?.file_url) return;
 
+    let blobUrl = null;
     const initViewer = async () => {
       try {
-        setIsLoading(true);
         setError(null);
-
         const { Viewer } = await import("@photo-sphere-viewer/core");
         await import("@photo-sphere-viewer/core/index.css");
 
-        if (viewerInstance.current) viewerInstance.current.destroy();
+        // Try fetching panorama as blob first (avoid storage/tracking blocking).
+        // If fetch fails, try Image() fallback with crossOrigin.
+        let blobUrl = null;
+        let usedUrl = null;
+        try {
+          const resp = await fetch(current.file_url, { mode: "cors", credentials: "omit" });
+          if (!resp.ok) throw new Error(`Fetch panorama failed ${resp.status}`);
+          const blob = await resp.blob();
+          blobUrl = URL.createObjectURL(blob);
+          usedUrl = blobUrl;
+        } catch (fetchErr) {
+          console.warn("Fetch panorama failed, attempting Image fallback:", fetchErr);
+          // Try Image fallback (may succeed if server allows crossOrigin)
+          try {
+            usedUrl = await new Promise((resolve, reject) => {
+              const img = new Image();
+              img.crossOrigin = "anonymous";
+              img.onload = () => resolve(current.file_url);
+              img.onerror = (e) => reject(new Error("Image fallback failed"));
+              img.src = current.file_url;
+            });
+          } catch (imgErr) {
+            console.error("Failed to load panorama via Image fallback:", imgErr);
+            setError("Không thể tải ảnh panorama (fetch/cors)");
+            return;
+          }
+        }
+
+        if (viewerInstance.current) {
+          try {
+            viewerInstance.current.destroy();
+          } catch (e) {
+            console.error("Error destroying previous viewer:", e);
+          }
+          viewerInstance.current = null;
+        }
 
         viewerInstance.current = new Viewer({
           container: viewerRef.current,
-          panorama: current.file_url,
+          panorama: usedUrl,
           navbar: ["zoom", "fullscreen"],
           defaultZoomLvl: 50,
           touchmoveTwoFingers: false,
           mousewheelCtrlKey: false,
-          loadingTxt: "Đang tải ảnh 360°...",
+          loadingTxt: "",
         });
 
         viewerInstance.current.addEventListener("ready", () => {
-          setIsLoading(false);
+          // ready
         });
 
-        viewerInstance.current.addEventListener("error", () => {
+        viewerInstance.current.addEventListener("error", (e) => {
+          console.error("Panorama error:", e);
           setError("Không thể tải ảnh panorama");
-          setIsLoading(false);
         });
       } catch (err) {
-        console.error("Panorama init error:", err);
+        console.error("Failed to init viewer:", err);
         setError("Không thể khởi tạo trình xem 360°");
-        setIsLoading(false);
       }
     };
 
     initViewer();
+    // cleanup: revoke any created object URLs and destroy viewer
+    return () => {
+      try {
+        if (viewerInstance.current) {
+          try {
+            viewerInstance.current.destroy();
+          } catch (e) {
+            console.error("Error destroying viewer during cleanup:", e);
+          }
+          viewerInstance.current = null;
+        }
+        if (blobUrl) {
+          try {
+            URL.revokeObjectURL(blobUrl);
+          } catch (e) {
+            /* ignore */
+          }
+        }
+      } catch (e) {
+        console.error("Cleanup error:", e);
+      }
+    };
   }, [currentIndex, panoramas]);
 
   if (!panoramas.length) {
@@ -977,18 +1069,9 @@ function PanoramaViewerModal({ name, models = [], onClose }) {
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
         <div className="bg-white rounded-2xl p-6 max-w-md text-center space-y-3">
           <Icon3D className="w-10 h-10 mx-auto text-primary" />
-          <p className="text-text-primary font-heading font-bold text-lg">
-            Chưa có ảnh 3D/Panorama
-          </p>
-          <p className="text-text-secondary text-sm">
-            Địa điểm này chưa được bổ sung ảnh 360°.
-          </p>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-primary text-white font-bold hover:bg-primary/90"
-          >
-            Đóng
-          </button>
+          <p className="text-text-primary font-heading font-bold text-lg">Chưa có ảnh 3D/Panorama</p>
+          <p className="text-text-secondary text-sm">Địa điểm này chưa được bổ sung ảnh 360°.</p>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl bg-primary text-white font-bold hover:bg-primary/90">Đóng</button>
         </div>
       </div>
     );
@@ -998,77 +1081,47 @@ function PanoramaViewerModal({ name, models = [], onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-      <button
-        onClick={onClose}
-        className="absolute top-6 right-6 z-50 text-white/70 hover:text-white hover:rotate-90 transition-all duration-300"
-      >
+      <button onClick={onClose} className="absolute top-6 right-6 z-50 text-white/70 hover:text-white hover:rotate-90 transition-all duration-300">
         <IconX className="w-10 h-10" />
       </button>
 
       <div className="relative w-full h-full max-w-6xl max-h-[85vh] bg-black rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex flex-col">
         <div className="absolute top-0 left-0 right-0 p-4 z-10 bg-linear-to-b from-black/80 to-transparent pointer-events-none flex items-center justify-between">
           <div className="text-white">
-            <h3 className="text-xl font-heading font-bold leading-tight">
-              {name}
-            </h3>
-            <p className="text-white/70 text-sm line-clamp-1">
-              {current?.description || "Panorama 360°"}
-            </p>
+            <h3 className="text-xl font-heading font-bold leading-tight">{name}</h3>
+            <p className="text-white/70 text-sm line-clamp-1">{current?.description || "Panorama 360°"}</p>
           </div>
-          <div className="text-white/70 text-sm">
-            {currentIndex + 1} / {panoramas.length}
-          </div>
+          <div className="text-white/70 text-sm">{currentIndex + 1} / {panoramas.length}</div>
         </div>
 
-        <div ref={viewerRef} className="flex-1 w-full bg-black" />
+        <div
+          ref={viewerRef}
+          className="flex-1 w-full bg-black"
+          style={{
+            backgroundImage: `url(${current?.thumbnail_url || current?.file_url || ""})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            backgroundColor: "#000",
+          }}
+        />
 
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20">
-            <div className="text-center text-white space-y-2">
-              <IconLoader className="w-8 h-8 animate-spin mx-auto" />
-              <p className="text-sm">Đang tải ảnh 360°...</p>
-            </div>
-          </div>
-        )}
+        
 
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-30">
             <div className="text-center text-white space-y-3">
               <p className="text-red-400 text-sm">{error}</p>
-              <button
-                onClick={() => setError(null)}
-                className="px-4 py-2 rounded-lg bg-primary text-white font-bold"
-              >
-                Thử lại
-              </button>
+              <button onClick={() => setError(null)} className="px-4 py-2 rounded-lg bg-primary text-white font-bold">Thử lại</button>
             </div>
           </div>
         )}
 
-        {/* Bottom controls */}
         <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 via-black/60 to-transparent p-4 z-10 flex items-center justify-between">
-          <div className="text-white/70 text-xs max-w-md line-clamp-2">
-            {current?.name || "Panorama"}
-          </div>
+          <div className="text-white/70 text-xs max-w-md line-clamp-2">{current?.name || "Panorama"}</div>
           <div className="flex gap-2">
-            <button
-              onClick={() => setCurrentIndex((idx) => Math.max(idx - 1, 0))}
-              disabled={currentIndex === 0}
-              className="px-3 py-2 rounded-lg text-sm font-bold bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              ◀ Trước
-            </button>
-            <button
-              onClick={() =>
-                setCurrentIndex((idx) =>
-                  Math.min(idx + 1, panoramas.length - 1)
-                )
-              }
-              disabled={currentIndex >= panoramas.length - 1}
-              className="px-3 py-2 rounded-lg text-sm font-bold bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Tiếp ▶
-            </button>
+            <button onClick={() => setCurrentIndex((idx) => Math.max(idx - 1, 0))} disabled={currentIndex === 0} className="px-3 py-2 rounded-lg text-sm font-bold bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed">◀ Trước</button>
+            <button onClick={() => setCurrentIndex((idx) => Math.min(idx + 1, panoramas.length - 1))} disabled={currentIndex >= panoramas.length - 1} className="px-3 py-2 rounded-lg text-sm font-bold bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed">Tiếp ▶</button>
           </div>
         </div>
       </div>

@@ -101,6 +101,7 @@ const AdminNotifications = lazy(() =>
 const AdminUsers = lazy(() => import("../pages/Dashboard/Admin/Users"));
 const AdminTours = lazy(() => import("../pages/Dashboard/Admin/Tours"));
 const AdminCreateTour = lazy(() => import("../pages/Dashboard/Admin/CreateTour"));
+const AdminEditTour = lazy(() => import("../pages/Dashboard/Admin/EditTour"));
 const AdminPlaces = lazy(() => import("../pages/Dashboard/Admin/Places"));
 const AdminFinance = lazy(() => import("../pages/Dashboard/Admin/Finance"));
 const AdminSettings = lazy(() => import("../pages/Dashboard/Admin/Settings"));
@@ -530,6 +531,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageFallback />}>
             <AdminCreateTour />
+          </Suspense>
+        ),
+      },
+      {
+        path: "edit-tour/:id",
+        element: (
+          <Suspense fallback={<PageFallback />}>
+            <AdminEditTour />
           </Suspense>
         ),
       },

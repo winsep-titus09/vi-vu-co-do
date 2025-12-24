@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconCheck,
@@ -32,7 +32,9 @@ import { uploadApi } from "../../../features/upload/api";
 import { formatCurrency } from "../../../lib/formatters";
 import { useToast } from "../../../components/Toast/useToast";
 
-export default function AdminCreateTour() {
+import { toursApi } from "../../../features/tours/api";
+
+export default function AdminCreateTour({ initialData = null, editId = null }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const toast = useToast();
@@ -81,6 +83,7 @@ export default function AdminCreateTour() {
   const { locations, isLoading: loadingLocations } = useLocations();
   const { guides, isLoading: loadingGuides } = useApprovedGuides();
   const { createTour, isLoading: isSubmitting } = useAdminCreateTour();
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Filter guides by search
   const filteredGuides = guides.filter((g) => {
@@ -102,6 +105,125 @@ export default function AdminCreateTour() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+  // If initialData is provided (edit mode), populate form state
+  useEffect(() => {
+    if (!initialData) return;
+    try {
+      // Normalize price (Decimal128 -> string) - support several shapes
+      const rawPrice = initialData.price;
+      let priceVal = "";
+      if (rawPrice == null) {
+        priceVal = "";
+      } else if (typeof rawPrice === "string" || typeof rawPrice === "number") {
+        priceVal = String(rawPrice);
+      } else if (typeof rawPrice === "object") {
+        if (rawPrice.$numberDecimal) priceVal = String(rawPrice.$numberDecimal);
+        else if (rawPrice.$numberLong) priceVal = String(rawPrice.$numberLong);
+        else if (rawPrice.value) priceVal = String(rawPrice.value);
+        else if (typeof rawPrice.toString === "function") {
+          const s = rawPrice.toString();
+          // avoid [object Object]
+          if (s && !s.includes("[object")) priceVal = s;
+        }
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        name: initialData.name || prev.name,
+        description: initialData.description || prev.description,
+        duration_hours: initialData.duration_hours || prev.duration_hours,
+        category_id: initialData.categories?.[0] || prev.category_id,
+        price: priceVal !== undefined && priceVal !== null ? String(priceVal) : prev.price,
+        max_guests: initialData.max_guests || prev.max_guests,
+        cover_image_url: initialData.cover_image_url || prev.cover_image_url,
+        video_url: initialData.video_url || prev.video_url,
+        guide_video_url: initialData.guide_video_url || prev.guide_video_url,
+        fixed_departure_time: initialData.fixed_departure_time || prev.fixed_departure_time,
+        min_days_before_start: initialData.min_days_before_start || prev.min_days_before_start,
+        max_days_advance: initialData.max_days_advance || prev.max_days_advance,
+      }));
+
+      // preview image
+      if (initialData.cover_image_url) setPreviewImage(initialData.cover_image_url);
+
+      // gallery
+      if (Array.isArray(initialData.gallery)) {
+        setGalleryUrls(initialData.gallery);
+        setGalleryPreviews(initialData.gallery);
+      }
+
+      // selected places (locations array may contain objects with locationId)
+      let places = [];
+      if (Array.isArray(initialData.locations)) {
+        places = initialData.locations
+          .map((l) => {
+            const loc = l.locationId || l.location || l;
+            if (!loc) return null;
+            return {
+              _id: String(loc._id || loc.id || loc),
+              name: loc.name || loc.title || l.name || "Địa điểm",
+              ...loc,
+            };
+          })
+          .filter(Boolean);
+        setSelectedPlaces(places);
+      }
+
+      // itinerary (map locationId to place object when possible)
+      if (Array.isArray(initialData.itinerary) && initialData.itinerary.length > 0) {
+        const placeMap = Object.fromEntries(places.map((p) => [String(p._id), p]));
+        setItineraryItems(
+          initialData.itinerary.map((it, idx) => {
+            const locId = it.locationId && (it.locationId._id || it.locationId) ? String(it.locationId._id || it.locationId) : null;
+            return {
+              id: it._id || Date.now() + idx,
+              time: it.time || it.time || "08:00",
+              title: it.title || it.details || "",
+              description: it.details || it.description || "",
+              location: locId ? placeMap[locId] || { _id: locId, name: "Địa điểm" } : null,
+            };
+          })
+        );
+      }
+
+      // guides - try to populate display fields (name/avatar/email) if possible
+      if (Array.isArray(initialData.guides)) {
+        const mapped = initialData.guides.map((g) => {
+          const gid = g.guideId || g.guide || g._id || g;
+          const guideObj = typeof gid === "object" ? gid : { _id: gid };
+          return {
+            _id: guideObj._id || guideObj.id,
+            name: guideObj.name || guideObj.fullName || guideObj.username || "",
+            avatar: guideObj.avatar_url || guideObj.avatar || guideObj.photo || "",
+            email: guideObj.email || "",
+            isMain: !!g.isMain,
+            percentage: (g.percentage || 0) * 100,
+          };
+        });
+        setSelectedGuides(mapped);
+      }
+
+      // lists: highlights, includes, excludes, amenities, rules
+      if (Array.isArray(initialData.highlights) && initialData.highlights.length > 0) {
+        setHighlights(initialData.highlights.map((t, i) => ({ id: Date.now() + i, text: t })));
+      }
+      if (Array.isArray(initialData.includes) && initialData.includes.length > 0) {
+        setIncludes(initialData.includes.map((t, i) => ({ id: Date.now() + i, text: t })));
+      }
+      if (Array.isArray(initialData.excludes) && initialData.excludes.length > 0) {
+        setExcludes(initialData.excludes.map((t, i) => ({ id: Date.now() + i, text: t })));
+      }
+      if (Array.isArray(initialData.amenities) && initialData.amenities.length > 0) {
+        setAmenities(initialData.amenities.map((t, i) => ({ id: Date.now() + i, text: t })));
+      }
+      if (Array.isArray(initialData.rules) && initialData.rules.length > 0) {
+        setRules(initialData.rules.map((t, i) => ({ id: Date.now() + i, text: t })));
+      }
+    } catch (e) {
+      console.error("Failed to populate edit form:", e);
+    }
+  }, [initialData]);
 
   // ======== GUIDE SELECTION FUNCTIONS ========
   const toggleGuide = (guide) => {
@@ -402,9 +524,21 @@ export default function AdminCreateTour() {
       };
 
       console.log("Submitting admin tour:", payload);
-      await createTour(payload);
-      toast.success("Thành công!", "Đã tạo tour thành công.");
-      navigate("/dashboard/admin/tours");
+      if (editId) {
+        // update
+        try {
+          setIsUpdating(true);
+          await toursApi.updateTour(editId, payload);
+          toast.success("Thành công!", "Đã cập nhật tour.");
+          navigate("/dashboard/admin/tours");
+        } finally {
+          setIsUpdating(false);
+        }
+      } else {
+        await createTour(payload);
+        toast.success("Thành công!", "Đã tạo tour thành công.");
+        navigate("/dashboard/admin/tours");
+      }
     } catch (err) {
       console.error("Tour creation error:", err);
       const errorMsg = err?.message || err?.detail?.toString() || "Không thể tạo tour. Vui lòng thử lại.";
@@ -418,10 +552,10 @@ export default function AdminCreateTour() {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8">
         <div>
           <h1 className="text-2xl font-heading font-bold text-text-primary">
-            Tạo Tour mới (Admin)
+            {editId ? "Chỉnh sửa Tour (Admin)" : "Tạo Tour mới (Admin)"}
           </h1>
           <p className="text-text-secondary text-sm">
-            Tạo tour và gán hướng dẫn viên phụ trách.
+            {editId ? "Cập nhật thông tin tour." : "Tạo tour và gán hướng dẫn viên phụ trách."}
           </p>
         </div>
 
@@ -1188,20 +1322,20 @@ export default function AdminCreateTour() {
             </button>
           ) : (
             <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="px-8 py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-all shadow-lg flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? (
-                <>
-                  <IconLoader className="w-5 h-5 animate-spin" /> Đang tạo...
-                </>
-              ) : (
-                <>
-                  <IconCheck className="w-5 h-5" /> Tạo Tour
-                </>
-              )}
-            </button>
+                onClick={handleSubmit}
+                disabled={isSubmitting || isUpdating}
+                className="px-8 py-3 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-all shadow-lg flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {(isSubmitting || isUpdating) ? (
+                  <>
+                    <IconLoader className="w-5 h-5 animate-spin" /> {editId ? "Đang cập nhật..." : "Đang tạo..."}
+                  </>
+                ) : (
+                  <>
+                    <IconCheck className="w-5 h-5" /> {editId ? "Cập nhật Tour" : "Tạo Tour"}
+                  </>
+                )}
+              </button>
           )}
         </div>
       </div>

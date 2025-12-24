@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Breadcrumbs from "../../components/Breadcrumbs/Breadcrumbs";
 import { IconMapPin, Icon3D } from "../../icons/IconBox";
 import { IconUser } from "../../icons/IconUser";
 import { IconLoader } from "../../icons/IconCommon";
+import IconChevronLeft from "../../icons/IconChevronLeft";
+import IconChevronRight from "../../icons/IconChevronRight";
 import { placesApi } from "../../features/places/api";
 
 // Grid layout pattern for places
@@ -40,29 +42,103 @@ const features = [
 
 export default function PlacesPage() {
   const [locations, setLocations] = useState([]);
+  const [allLocations, setAllLocations] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isServerPagination, setIsServerPagination] = useState(false);
+  const [serverPage, setServerPage] = useState(1);
+  const limit = 6;
 
   useEffect(() => {
     const fetchLocations = async () => {
+      // Nếu API đã trả về dữ liệu phân trang theo server cho trang hiện tại thì không cần gọi lại
+      if (isServerPagination && serverPage === currentPage && locations.length) {
+        return;
+      }
+
       try {
+        // Nếu đang phân trang phía client và đã có dữ liệu, không cần gọi API lại
+        if (!isServerPagination && allLocations.length) {
+          return;
+        }
+
         setIsLoading(true);
-        const response = await placesApi.listLocations();
-        setLocations(response || []);
+        setError("");
+        const response = await placesApi.listLocations({
+          page: currentPage,
+          limit,
+        });
+
+        // Trường hợp API đã hỗ trợ phân trang (có items và total)
+        if (Array.isArray(response?.items)) {
+          const total = response?.total ?? response.items.length;
+          const limitFromApi = response?.limit || limit;
+          const pageFromApi = response?.page || currentPage;
+
+          setIsServerPagination(true);
+          setServerPage(pageFromApi);
+          setLocations(response.items);
+          setTotalCount(total);
+          setTotalPages(Math.max(1, Math.ceil(total / limitFromApi)));
+          return;
+        }
+
+        // Mặc định: API trả về toàn bộ danh sách -> phân trang phía client
+        const rawLocations = response?.locations || response || [];
+        const total = response?.total ?? rawLocations.length;
+
+        setIsServerPagination(false);
+        setServerPage(1);
+        setAllLocations(rawLocations);
+        setLocations(rawLocations.slice(0, limit));
+        setTotalCount(total);
+        setTotalPages(Math.max(1, Math.ceil(total / limit)));
       } catch (err) {
         console.error("Fetch locations error:", err);
         setError(err.message || "Không thể tải danh sách địa điểm");
+        setLocations([]);
+        setAllLocations([]);
+        setIsServerPagination(false);
+        setServerPage(1);
+        setTotalCount(0);
+        setTotalPages(1);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchLocations();
-  }, []);
+  }, [currentPage, isServerPagination, allLocations.length, serverPage, locations.length]);
 
-  // Take first 6 locations for highlight grid
-  const highlightPlaces = locations.slice(0, 6).map((loc, idx) => ({
-    id: loc._id,
+  // Scroll to top when changing page
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentPage]);
+
+  // Khi phân trang phía client, cắt dữ liệu theo trang hiện tại
+  useEffect(() => {
+    if (isServerPagination) return;
+    const total = allLocations.length;
+    const totalPagesCalc = Math.max(1, Math.ceil(total / limit));
+
+    // Điều chỉnh lại nếu trang hiện tại vượt quá tổng trang (ví dụ sau khi xóa bớt dữ liệu)
+    if (currentPage > totalPagesCalc) {
+      setCurrentPage(totalPagesCalc);
+      return;
+    }
+
+    const start = (currentPage - 1) * limit;
+    setLocations(allLocations.slice(start, start + limit));
+    setTotalPages(totalPagesCalc);
+    setTotalCount(total);
+  }, [allLocations, currentPage, isServerPagination]);
+
+  // Lấy dữ liệu hiển thị cho grid ở trang hiện tại
+  const highlightPlaces = locations.map((loc, idx) => ({
+    id: loc._id || loc.id || loc.slug || `loc-${idx}`,
     name: loc.name,
     location: loc.address || loc.category_id?.name || "Huế",
     tag: loc.category_id?.name?.toUpperCase() || "ĐỊA ĐIỂM",
@@ -71,6 +147,22 @@ export default function PlacesPage() {
     colSpan: gridPattern[idx % gridPattern.length],
     slug: loc.slug,
   }));
+
+  const paginationPages = useMemo(() => {
+    return Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+      let pageNum;
+      if (totalPages <= 5) {
+        pageNum = i + 1;
+      } else if (currentPage <= 3) {
+        pageNum = i + 1;
+      } else if (currentPage >= totalPages - 2) {
+        pageNum = totalPages - 4 + i;
+      } else {
+        pageNum = currentPage - 2 + i;
+      }
+      return pageNum;
+    });
+  }, [currentPage, totalPages]);
 
   if (isLoading) {
     return (
@@ -114,6 +206,13 @@ export default function PlacesPage() {
           </div>
         </div>
 
+        {/* Stats */}
+        <div className="flex items-center justify-center text-sm text-text-secondary font-medium">
+          <span>
+            Có <span className="font-bold text-text-primary">{totalCount}</span> địa điểm đang hiển thị
+          </span>
+        </div>
+
         {/* FEATURED PLACES GRID */}
         {highlightPlaces.length === 0 ? (
           <div className="text-center py-20">
@@ -122,46 +221,97 @@ export default function PlacesPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {highlightPlaces.map((place) => (
-              <div
-                key={place.id}
-                className={`group relative overflow-hidden rounded-3xl cursor-pointer ${place.colSpan} h-80 md:h-[450px] shadow-md`}
-              >
-                <img
-                  src={place.image}
-                  alt={place.name}
-                  className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/70 transition-colors duration-500"></div>
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-8 group-hover:translate-y-0 z-20">
-                  <div className="flex items-center gap-1.5 text-secondary mb-3 font-bold text-xs uppercase tracking-widest">
-                    <IconMapPin className="w-4 h-4" />
-                    <span>{place.location}</span>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {highlightPlaces.map((place) => (
+                <div
+                  key={place.id}
+                  className={`group relative overflow-hidden rounded-3xl cursor-pointer ${place.colSpan} h-80 md:h-[450px] shadow-md`}
+                >
+                  <img
+                    src={place.image}
+                    alt={place.name}
+                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/70 transition-colors duration-500"></div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-8 group-hover:translate-y-0 z-20">
+                    <div className="flex items-center gap-1.5 text-secondary mb-3 font-bold text-xs uppercase tracking-widest">
+                      <IconMapPin className="w-4 h-4" />
+                      <span>{place.location}</span>
+                    </div>
+                    <div className="border border-white/60 px-8 py-4 mb-5 backdrop-blur-sm bg-white/5">
+                      <h3 className="text-2xl md:text-3xl font-heading font-bold text-white tracking-widest uppercase leading-tight">
+                        {place.name}
+                      </h3>
+                    </div>
+                    <p className="text-white/90 text-base max-w-md mb-8 font-medium leading-relaxed">
+                      {place.desc}
+                    </p>
+                    <Link
+                      to={`/places/${place.slug || place.id}`}
+                      className="bg-white text-black px-8 py-3 rounded-full font-bold text-sm hover:bg-secondary hover:text-white transition-all uppercase tracking-wider shadow-lg transform hover:-translate-y-1"
+                    >
+                      Xem chi tiết
+                    </Link>
                   </div>
-                  <div className="border border-white/60 px-8 py-4 mb-5 backdrop-blur-sm bg-white/5">
-                    <h3 className="text-2xl md:text-3xl font-heading font-bold text-white tracking-widest uppercase leading-tight">
-                      {place.name}
-                    </h3>
+                  <div className="absolute bottom-8 left-8 z-10 transition-all duration-300 group-hover:opacity-0 group-hover:translate-y-4">
+                    <p className="text-white font-bold text-xl tracking-[0.2em] uppercase drop-shadow-lg border-l-4 border-secondary pl-4">
+                      {place.tag}
+                    </p>
                   </div>
-                  <p className="text-white/90 text-base max-w-md mb-8 font-medium leading-relaxed">
-                    {place.desc}
-                  </p>
-                  <Link
-                    to={`/places/${place.slug || place.id}`}
-                    className="bg-white text-black px-8 py-3 rounded-full font-bold text-sm hover:bg-secondary hover:text-white transition-all uppercase tracking-wider shadow-lg transform hover:-translate-y-1"
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-6">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="w-10 h-10 flex items-center justify-center rounded-full border border-border-light bg-white text-text-secondary hover:bg-primary/5 hover:text-primary hover:border-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <IconChevronLeft className="w-5 h-5" />
+                </button>
+
+                {paginationPages.map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-10 h-10 flex items-center justify-center rounded-full font-bold transition-all ${
+                      currentPage === pageNum
+                        ? "bg-primary text-white shadow-md shadow-primary/20 scale-105"
+                        : "text-text-secondary hover:bg-white hover:text-primary hover:shadow-sm"
+                    }`}
                   >
-                    Xem chi tiết
-                  </Link>
-                </div>
-                <div className="absolute bottom-8 left-8 z-10 transition-all duration-300 group-hover:opacity-0 group-hover:translate-y-4">
-                  <p className="text-white font-bold text-xl tracking-[0.2em] uppercase drop-shadow-lg border-l-4 border-secondary pl-4">
-                    {place.tag}
-                  </p>
-                </div>
+                    {pageNum}
+                  </button>
+                ))}
+
+                {totalPages > 5 && currentPage < totalPages - 2 && (
+                  <>
+                    <span className="w-10 h-10 flex items-center justify-center text-text-secondary/50">
+                      ...
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="w-10 h-10 flex items-center justify-center rounded-full text-text-secondary hover:bg-white hover:text-primary hover:shadow-sm transition-all"
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="w-10 h-10 flex items-center justify-center rounded-full border border-border-light bg-white text-text-secondary hover:bg-primary/5 hover:text-primary hover:border-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <IconChevronRight className="w-5 h-5" />
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
